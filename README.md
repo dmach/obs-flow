@@ -17,3 +17,5 @@
   - one decision in one file
   - create an AI skill to help with that?
   - rewrite tech-stack.md using this
+- explain how to read and write the specs
+- use identifiers in the specs that can be referenced in the tests and documentation
