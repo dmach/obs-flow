@@ -1,6 +1,7 @@
 # obs-flow
 - (OBS) Flow is workflow orchestration service for the Open Build Service.
-- It is currently in an early phase of gathering ideas, user stories and technical decisions.
+- It is currently in an **early phase of gathering ideas**, user stories and technical decisions.
+- There is no ongoing implementation (yet?).
 - The documents will change a lot in the next weeks, you may expect even some force-pushes.
 
 
