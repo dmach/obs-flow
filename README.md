@@ -1,5 +1,5 @@
 # obs-flow
-- (OBS) Flow is workflow orchestration service for the Open Build Service, aiming to simplify and replace parts of Git Workflow.
+- (OBS) Flow is workflow orchestration service for the Open Build Service, aiming to simplify and replace parts of Git Packaging Workflow.
 - It is currently in an **early phase of gathering ideas**, user stories and technical decisions.
 - There is no ongoing implementation (yet?).
 - The documents will change a lot in the next weeks, you may expect even some force-pushes.
@@ -12,6 +12,14 @@
 - [User Stories: Reviews](specs/user-stories-reviews.md)
 - [User Stories: Staging](specs/user-stories-staging.md)
 
+## Issues with Git Packaging Workflow
+- Gitea contains random git repos. After cloning one, it's not clear if it is a project, package or something else.
+- Multiple OBS projects or packages can use a single git owner/repo:branch; making changes in such branch has side-effects.
+- Project git contains metadata such as workflow.config and staging.config that contain references to OBS projects.
+  - TL;DR: 1:1 mapping between the project/package and underlying source as it was done in OBS is a good design choice.
+  - Circular reference (project points to git via scmurl, git points back via configs).
+  - Forking a project or making a snapshot or mirroring it doesn't make much sense, because we most likely want the workflow and staging config to be different.
+  - These configs are part of context of pull request reviews, because they refer to the target project. It that changes, we must redo the reviews.
 
 ## TODO
 - consider using Architecture Decision Records (ADRs) for design decisions
