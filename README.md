@@ -20,6 +20,7 @@
   - Circular reference (project points to git via scmurl, git points back via configs).
   - Forking a project or making a snapshot or mirroring it doesn't make much sense, because we most likely want the workflow and staging config to be different.
   - These configs are part of context of pull request reviews, because they refer to the target project. It that changes, we must redo the reviews.
+  - Also, the OBS prj/pac vs Gitea owner/repo:branch disconnect negatively impacts user experience.
 
 ## TODO
 - consider using Architecture Decision Records (ADRs) for design decisions
