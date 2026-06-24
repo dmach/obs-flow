@@ -31,6 +31,7 @@ This document presents a structured User Story Map for Pull Request Reviews.
 - [REVIEW-CONTEXT-12] The diff against the previous version of the repository (diff versus base).
 - [REVIEW-CONTEXT-13] The diff against the previously approved pull request revision by the same reviewer.
 - [REVIEW-CONTEXT-14] Build results (in many cases requires staging first)
+- [REVIEW-CONTEXT-14] The version of the source and the target package in OBS (if applicable).
 
 ---
 
