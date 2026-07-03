@@ -7,6 +7,7 @@
 
 ## Design Documents
 - [Requirements](specs/requirements.md)
+- [Requirements: Audit Trail](specs/requirements-audit-trail.md)
 - [Tech Stack](specs/tech-stack.md)
 - [User Stories: Pull Requests](specs/user-stories-pull-requests.md)
 - [User Stories: Reviews](specs/user-stories-reviews.md)
