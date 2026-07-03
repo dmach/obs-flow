@@ -35,4 +35,13 @@
 - ACLs based on Gitea perms
 - auth
   - do we need any special system accounts? (avoid collisions with the external source of usernames)
-
+- staging rule engine:
+  - add to an existing group if it's still collecting
+  - stay in the backlog
+  - create a new group (race conditions!) and become part of it
+  - based on package name (prefix?)
+  - based on devel project (list of projects? globs?)
+  - schedule staging batch creation?
+  - schedule staging batch branch state
+- how to report results from background jobs?
+  - closing/merging a pull request fails; if it runs in a background job, the result should be accessible via the PR page
