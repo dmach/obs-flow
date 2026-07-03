@@ -31,3 +31,8 @@
 - use identifiers in the specs that can be referenced in the tests and documentation
 - set branches to be automatically in sync with a given branch; that would require doing automatic fast-forwards and also protecting the branches from arbitrary pushes via git hooks (and ideally transactional changes across multiple branches)
 - branch life cycle - delete unneeded branches, preserve devel projects etc.
+- sync with Gitea (PR revisions)
+- ACLs based on Gitea perms
+- auth
+  - do we need any special system accounts? (avoid collisions with the external source of usernames)
+
