@@ -46,3 +46,4 @@
   - schedule staging batch branch state
 - how to report results from background jobs?
   - closing/merging a pull request fails; if it runs in a background job, the result should be accessible via the PR page
+- make repo read-only (lock)
