@@ -35,6 +35,7 @@
 - Every audited model **MUST** link to an `Event` (representing the "5Ws" of an action) via two fields:
   - `created_event`: When the record or state version came into existence.
   - `revoked_event`: When the record was superseded by an update or logically deleted. If this is `NULL`, the record is "active."
+- The `revoked_event` MUST be equal to or newer than `created_event`.
 
 
 ## The Challenge of Mutations and Foreign Keys
