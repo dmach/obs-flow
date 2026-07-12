@@ -23,6 +23,10 @@
 - It MUST work with the django-bolt API.
 
 
+## Out of scope
+- Thread-safety for model instances is not guaranteed because Django doesn't guarantee it as well.
+
+
 ## Concerns
 - Scaling.
 - Excessive data growth.
