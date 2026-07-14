@@ -50,3 +50,5 @@
 - make pull request read-only (when completed); avoid changing reviews etc.; not sure about adding more comments
 - list reviews with a note (+ with new updates since the note); (TODO: this refers to old SUSE way of doing group reviews, need to translate it to the new specs)
 - support Type=notify (or an alternative) in systemd service so it's clear when the service is completely initialized
+- include `idempotency_key` in requests
+- background jobs - should they use the original event in audit trail to connect with the original request?
