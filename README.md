@@ -48,3 +48,4 @@
   - closing/merging a pull request fails; if it runs in a background job, the result should be accessible via the PR page
 - make repo read-only (lock)
 - make pull request read-only (when completed); avoid changing reviews etc.; not sure about adding more comments
+- list reviews with a note (+ with new updates since the note); (TODO: this refers to old SUSE way of doing group reviews, need to translate it to the new specs)
