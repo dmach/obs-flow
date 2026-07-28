@@ -52,3 +52,4 @@
 - support Type=notify (or an alternative) in systemd service so it's clear when the service is completely initialized
 - include `idempotency_key` in requests
 - background jobs - should they use the original event in audit trail to connect with the original request?
+- ADR: changing IDs not supported (project name, package name, username, group name, ...) - they map to underlying structures on disk, we should make our lives easier to forbid the renames by design
