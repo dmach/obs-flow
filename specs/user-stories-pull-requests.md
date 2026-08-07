@@ -11,6 +11,7 @@ This document presents a structured User Story Map for Pull Requests.
 - [PULL-QUERY-4] Filter pull requests by the source owner, repository, and branch.
 - [PULL-QUERY-5] Filter pull requests by the draft status.
 - [PULL-QUERY-6] Filter pull requests by related bug references (including issues, CVEs, etc.). [RELENG]
+- [PULL-QUERY-7] Filter pull requests by their author and creation time (e.g. to double-check all pull requests the author created last week).
 
 ---
 
