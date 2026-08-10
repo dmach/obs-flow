@@ -37,6 +37,10 @@ Represents a human user, a bot, or an internal system account.
 - `is_active` (Boolean, default=True): Soft-disable for users who left.
 TODO: determine if usernames in OBS can change
 TODO: determine how OBS users map to oidc_sub
+TODO: lazy user sync from OBS? User.objects.get_or_create(username=...)
+TODO: how to sync users? what is_active means exactly?
+TODO: data we own vs cache; clearly mark entries that should be synced vs those we manage internally (service accounts); a flag? time of last sync?
+TODO: roles (maintainer, reader, bugowner, ...); git workflow has only maintainers; maybe explain why we don't need/want these any more
 
 ### Group
 Represents a team of users, mapped from OBS. Used for group-based reviews and ACLs (TODO: confirm).
@@ -57,12 +61,15 @@ Maps users to groups.
 ### Project
 Represents an OBS Project.
 - `name` (String, unique): The stable OBS project name (e.g., `SUSE:SLFO:1.0`).
+TODO: project inheritance is possible in OBS - possibly out of scope for git based workflow
+      check how it works for community projects, devel projects; we don't use this at all with pool/ and products/
 
 ### Package
 Represents an OBS Package within a Project.
 - `project` (FK to Project)
 - `name` (String): The OBS package name.
 - *Constraint:* `unique_together(project, name)`
+TODO: how to populate? A githook on every project git change?
 
 ### GitMapping
 Maps a specific Git branch to exactly one OBS entity.
@@ -112,6 +119,8 @@ Shared fields for all types of review configuration.
 - `depends_on` (FK to Self, null=True)
 - *Constraint:* Django CheckConstraint (XOR): Exactly one of `reviewer_user`, `reviewer_group`, or `dynamic_role` MUST be set.
 - *Constraint:* Application-level validation: `depends_on` MUST reference an entry within the same project and MUST NOT point to itself.
+TODO: depends_on is probably not sufficient, we may need M2M
+TODO: dynamic_role needs a design discussion
 
 ### ReviewConfiguration
 Defines review rules at the project level. Applies to the project, all packages or all stagings at the project level.
@@ -145,6 +154,7 @@ Shared fields for all types of reviews.
 - `state` (Enum: `waiting`, `pending`, `needinfo`, `accepted`, `rejected`, `overridden`)
     TODO: who can override a state? project maintainers? release managers? bot account owners?
     TODO: define `needinfo` behavior; expects action from PR or Staging author and clearing the flag to unblock the review.
+    TODO: review states (design discussion)
 - `justification` (Text, null): Mandatory for `needinfo`, `rejected` and `overridden`, resets on `state` change.
 - `external_review_url` (URL, null): URL of external review results, such as log or a page in a different service.
 - `locked_by` (FK to User, null=True): Temporary lock for group reviews.
@@ -152,6 +162,7 @@ Shared fields for all types of reviews.
 - *Constraint:* Django CheckConstraint: `actor` is NULL when `state` is 'waiting' or 'pending', and NOT NULL otherwise.
 - *Constraint:* Django CheckConstraint: `justification` is NOT NULL when `state` is 'needinfo', 'rejected', or 'overridden'.
 - *Constraint:* Django CheckConstraint: `locked_by` and `locked_until` MUST both be NULL or both be NOT NULL.
+TODO: external_review_url - clarify what it means; mainly pointer to a log of an automated check
 
 ### PullRequestReview
 Records a review decision made on a specific Pull Request Revision.
@@ -190,6 +201,11 @@ Maps Pull Requests to Staging Batches, allowing a Pull Request to belong to mult
 - `pull_request` (FK to PullRequest)
 - *Constraint:* `unique_together(staging_batch, pull_request)`
 
+TODO: categorizing PRs for staging (== working with staging backlog)
+- prevent touching a single PR in backlog multiple times
+- forwarded PRs are needed now
+- generate a git ref with project change for the package PR?
+
 
 ## Bugs & Issues
 
@@ -209,9 +225,10 @@ Represents a specific issue/bug/CVE tracked in an external system.
 - `name` (String): The identifier of the issue in the external tracker (e.g., `123456`, `CVE-2023-1234`).
 - *Constraint:* `unique_together(issue_tracker, name)`
 
-### PullRequestIssue (M2M)
+### PullRequestRevisionIssue (M2M)
 Maps Pull Requests to Issues they address or reference.
-- `pull_request` (FK to PullRequest)
+- `pull_request_revision` (FK to PullRequestRevision)
 - `issue` (FK to Issue)
 - *Constraint:* `unique_together(pull_request, issue)`
 TODO: Evaluate the need for reference counting. We may need that for producing issue diffs.
+TODO: the latest revision has the actual bug references for the pull request
