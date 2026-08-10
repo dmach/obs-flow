@@ -1,0 +1,40 @@
+name: Publish Blog
+
+on:
+  push:
+    branches:
+      - main
+      - code
+    paths:
+      - 'blog/**'
+      - 'mkdocs.yml'
+      - '.github/workflows/publish-blog.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          version: "latest"
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install MkDocs Material
+        run: uv tool install mkdocs --with mkdocs-material
+
+      - name: Deploy to GitHub Pages
+        run: uvx mkdocs gh-deploy --force

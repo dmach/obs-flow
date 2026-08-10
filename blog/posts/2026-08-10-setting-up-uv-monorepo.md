@@ -1,7 +1,8 @@
 ---
 title: "Setting up our Python monorepo with uv"
 date: 2026-08-10
-author: Daniel Mach <daniel.mach@suse.com>
+authors:
+  - dmach
 tags: [python, uv, monorepo, layout]
 ---
 
@@ -10,6 +11,8 @@ tags: [python, uv, monorepo, layout]
 Because `obs-flow` consists of multiple components that need to be updated and tested together, we decided to use a **monorepo** approach.
 We chose [uv](https://github.com/astral-sh/uv) by Astral for its native workspace support.
 We structured our project using a `packages/` directory for our components, utilizing the standard `src/` layout internally for each package to prevent accidental import shadowing.
+
+<!-- more -->
 
 * `common`: Shared utilities and domain models.
 * `client`: Python client library providing programmatic access to the API.

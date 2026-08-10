@@ -1,0 +1,9 @@
+authors:
+  dmach:
+    name: Daniel Mach
+    description: Creator & Lead Architect, strongly opinionated on system design and clean code.
+    avatar: https://github.com/danielmach.png
+    links:
+      - icon: fontawesome/brands/github
+        type: github
+        url: https://github.com/danielmach
