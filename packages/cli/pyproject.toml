@@ -1,0 +1,17 @@
+[project]
+name = "obs-flow-cli"
+version = "0.1.0"
+description = "Command-line interface for OBS Flow to manage packaging workflows, reviews and staging."
+readme = "README.md"
+authors = [
+    { name = "Daniel Mach", email = "daniel.mach@suse.com" }
+]
+requires-python = ">=3.12"
+dependencies = []
+
+[project.scripts]
+obs-flow-cli = "obs_flow_cli:main"
+
+[build-system]
+requires = ["uv_build>=0.12.1,<0.13.0"]
+build-backend = "uv_build"

@@ -1,0 +1,14 @@
+[project]
+name = "obs-flow-common"
+version = "0.1.0"
+description = "Shared utilities and domain models for OBS Flow components."
+readme = "README.md"
+authors = [
+    { name = "Daniel Mach", email = "daniel.mach@suse.com" }
+]
+requires-python = ">=3.12"
+dependencies = []
+
+[build-system]
+requires = ["uv_build>=0.12.1,<0.13.0"]
+build-backend = "uv_build"
