@@ -1,0 +1,120 @@
+{% extends "base.html" %}
+
+{% block title %}Staging Batch #{{ batch.id }} - OBS Flow{% endblock %}
+
+{% block content %}
+<nav aria-label="breadcrumb">
+    <ul>
+        <li><a href="{% url 'home' %}">Home</a></li>
+        <li><a href="{% url 'staging_list' %}">Staging Batches</a></li>
+        <li>Staging Batch #{{ batch.id }}</li>
+    </ul>
+</nav>
+
+<header style="margin-bottom: 1.5rem;">
+    <h2 class="mb-0">{{ batch.title|default:"Staging Batch" }} <span class="muted" style="font-weight: normal;">#{{ batch.id }}</span></h2>
+</header>
+
+<div class="layout-with-sidebar">
+    <!-- Left Column: Main Content -->
+    <div>
+        <section style="margin-bottom: 2rem;">
+            <h3>Included Pull Requests</h3>
+            {% if pull_requests_data %}
+                <table class="striped">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Title</th>
+                            <th>Reviews</th>
+                            <th>State</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in pull_requests_data %}
+                            <tr>
+                                <td><a href="{% url 'pr_detail' item.pr.id %}">{{ item.pr.target.owner }}/{{ item.pr.target.repo }}#{{ item.pr.number }}</a></td>
+                                <td>{{ item.pr.title }}</td>
+                                <td>{{ item.accepted_reviews }}/{{ item.total_reviews }}</td>
+                                <td><span class="badge badge-{{ item.pr.state }}">{{ item.pr.state }}</span></td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            {% else %}
+                <p class="muted">No pull requests included in this batch.</p>
+            {% endif %}
+        </section>
+
+        <section>
+            <h3>Staging Reviews</h3>
+            {% if reviews %}
+                <table class="striped">
+                    <thead>
+                        <tr>
+                            <th>Reviewer</th>
+                            <th>Actor</th>
+                            <th>State</th>
+                            <th>Date</th>
+                            <th>Justification</th>
+                            <th>URL</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for review in reviews %}
+                            <tr>
+                                <td>
+                                    {% if review.reviewer_user %}
+                                        {{ review.reviewer_user.username }}
+                                    {% elif review.reviewer_group %}
+                                        @{{ review.reviewer_group.name }}
+                                    {% else %}
+                                        role:{{ review.dynamic_role }}
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if review.actor %}
+                                        {% if review.reviewer_group or review.dynamic_role or review.reviewer_user != review.actor %}
+                                            {{ review.actor.username }}
+                                        {% endif %}
+                                    {% endif %}
+                                </td>
+                                <td><span class="badge badge-{{ review.state }}">{{ review.state }}</span></td>
+                                <td>{{ review.updated_at|date:"Y-m-d H:i" }}</td>
+                                <td>{{ review.justification|default:"" }}</td>
+                                <td>
+                                    {% if review.external_review_url %}
+                                        <a href="{{ review.external_review_url }}" target="_blank">link</a>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            {% else %}
+                <p class="muted">No reviews configured or pending.</p>
+            {% endif %}
+        </section>
+    </div>
+
+    <!-- Right Column: Sidebar Metadata -->
+    <aside>
+        <article class="p-1">
+            <div class="sidebar-section">
+                <h4>State</h4>
+                <p>{{ batch.state }}</p>
+            </div>
+            <div class="sidebar-section">
+                <h4>Target Project</h4>
+                <p>{{ batch.project.name }}</p>
+            </div>
+            <div class="sidebar-section">
+                <h4>Author</h4>
+                <p>{{ batch.author.username|default:"Automated" }}</p>
+            </div>
+            {% include "staging/partials/date_display.html" with date_type="embargo" %}
+            {% include "staging/partials/date_display.html" with date_type="release" %}
+        </article>
+    </aside>
+</div>
+{% endblock %}

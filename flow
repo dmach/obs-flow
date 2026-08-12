@@ -1,0 +1,6 @@
+#!/bin/bash
+# run 'flow' executable directly from the git checkout using 'uv'
+set -e
+TOPDIR=$(dirname $(readlink -f $0))
+export PYTHONPATH="${TOPDIR}/packages/common/src:${TOPDIR}/packages/client/src"
+exec uv --directory "${TOPDIR}/packages/cli" run flow "$@"

@@ -1,0 +1,26 @@
+[project]
+name = "obs-flow"
+version = "0.1.0"
+requires-python = ">=3.12"
+dependencies = []
+
+[tool.uv.workspace]
+members = [
+    "packages/common",
+    "packages/client",
+    "packages/cli",
+    "packages/server",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=9.0.0",
+]
+
+[tool.pytest.ini_options]
+pythonpath = [
+    "packages/cli/src",
+    "packages/client/src",
+    "packages/common/src",
+    "packages/server/src",
+]

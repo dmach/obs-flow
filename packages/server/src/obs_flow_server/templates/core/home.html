@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+
+{% block title %}Welcome - OBS Flow{% endblock %}
+
+{% block content %}
+<article class="p-1" style="text-align: center; margin-top: 2rem; padding: 3rem 2rem;">
+    <h1>Welcome to OBS Flow</h1>
+    <p class="muted" style="font-size: 1.1rem; max-width: 600px; margin: 0 auto 2rem auto;">
+        Workflow orchestration service for Open Build Service (OBS).<br />
+        Manage pull requests, staging batches, and their reviews with ease.
+    </p>
+    <div style="display: flex; justify-content: center; gap: 1rem;">
+        <a href="{% url 'pr_list' %}" class="button">View Pull Requests</a>
+        <a href="{% url 'staging_list' %}" class="button secondary">View Staging Batches</a>
+    </div>
+</article>
+{% endblock %}

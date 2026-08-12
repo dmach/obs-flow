@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+
+{% block title %}Pull Requests - OBS Flow{% endblock %}
+
+{% block content %}
+<h2>Pull Requests</h2>
+
+{% if pull_requests %}
+    <table class="striped">
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Title</th>
+                <th>Author</th>
+                <th>Target Branch</th>
+                <th>Mergeable</th>
+                <th>State</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for pr in pull_requests %}
+                <tr>
+                    <td><a href="{% url 'pr_detail' pr.id %}">{{ pr.target.owner }}/{{ pr.target.repo }}#{{ pr.number }}</a></td>
+                    <td>{{ pr.title }}</td>
+                    <td>{{ pr.author.username }}</td>
+                    <td><code>{{ pr.target.branch }}</code></td>
+                    <td>
+                        {% if pr.is_mergeable == True %}
+                            <span class="badge badge-accepted">yes</span>
+                        {% elif pr.is_mergeable == False %}
+                            <span class="badge badge-rejected">no</span>
+                        {% else %}
+                            <span class="badge badge-pending">unknown</span>
+                        {% endif %}
+                    </td>
+                    <td><span class="badge badge-{{ pr.state }}">{{ pr.state }}</span></td>
+                </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+{% else %}
+    <p class="muted">No pull requests found.</p>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,140 @@
+{% extends "base.html" %}
+
+{% block title %}{{ pr.target.owner }}/{{ pr.target.repo }}#{{ pr.number }} - OBS Flow{% endblock %}
+
+{% block content %}
+<nav aria-label="breadcrumb">
+    <ul>
+        <li><a href="{% url 'home' %}">Home</a></li>
+        <li><a href="{% url 'pr_list' %}">Pull Requests</a></li>
+        <li>{{ pr.target.owner }}/{{ pr.target.repo }}#{{ pr.number }}</li>
+    </ul>
+</nav>
+
+<header style="margin-bottom: 1.5rem;">
+    <h2 class="mb-0">{{ pr.title }} <span class="muted" style="font-weight: normal;">#{{ pr.number }}</span></h2>
+</header>
+
+<div class="layout-with-sidebar">
+    <!-- Left Column: Main Content -->
+    <div>
+        <section style="margin-bottom: 2rem;">
+            <h3>Reviews (Latest Revision)</h3>
+            {% if reviews %}
+                <table class="striped">
+                    <thead>
+                        <tr>
+                            <th>Reviewer</th>
+                            <th>Actor</th>
+                            <th>State</th>
+                            <th>Date</th>
+                            <th>Justification</th>
+                            <th>URL</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for review in reviews %}
+                            <tr>
+                                <td>
+                                    {% if review.reviewer_user %}
+                                        {{ review.reviewer_user.username }}
+                                    {% elif review.reviewer_group %}
+                                        @{{ review.reviewer_group.name }}
+                                    {% else %}
+                                        role:{{ review.dynamic_role }}
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if review.actor %}
+                                        {% if review.reviewer_group or review.dynamic_role or review.reviewer_user != review.actor %}
+                                            {{ review.actor.username }}
+                                        {% endif %}
+                                    {% endif %}
+                                </td>
+                                <td><span class="badge badge-{{ review.state }}">{{ review.state }}</span></td>
+                                <td>{{ review.updated_at|date:"Y-m-d H:i" }}</td>
+                                <td>{{ review.justification|default:"" }}</td>
+                                <td>
+                                    {% if review.external_review_url %}
+                                        <a href="{{ review.external_review_url }}" target="_blank">link</a>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            {% else %}
+                <p class="muted">No reviews configured or pending.</p>
+            {% endif %}
+        </section>
+
+        <section>
+            <h3>Revisions History</h3>
+            {% if revisions %}
+                <table class="striped">
+                    <thead>
+                        <tr>
+                            <th>Rev</th>
+                            <th>Head SHA</th>
+                            <th>Created At</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for rev in revisions %}
+                            <tr>
+                                <td><strong>#{{ rev.revision_number }}</strong></td>
+                                <td><code>{{ rev.head_sha|slice:":8" }}</code></td>
+                                <td>{{ rev.created_at|date:"Y-m-d H:i" }}</td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            {% else %}
+                <p class="muted">No revisions found.</p>
+            {% endif %}
+        </section>
+    </div>
+
+    <!-- Right Column: Sidebar Metadata -->
+    <aside>
+        <article class="p-1">
+            <div class="sidebar-section">
+                <h4>State</h4>
+                <p>{{ pr.state }}</p>
+            </div>
+            <div class="sidebar-section">
+                <h4>Draft</h4>
+                <p>{% if pr.is_draft %}yes{% else %}no{% endif %}</p>
+            </div>
+            <div class="sidebar-section">
+                <h4>Mergeable</h4>
+                <p>
+                    {% if pr.is_mergeable == True %}
+                        <span class="badge badge-accepted">yes</span>
+                    {% elif pr.is_mergeable == False %}
+                        <span class="badge badge-rejected">no</span>
+                    {% else %}
+                        <span class="badge badge-pending">unknown</span>
+                    {% endif %}
+                </p>
+            </div>
+            <div class="sidebar-section">
+                <h4>Target Project</h4>
+                <p>{{ pr.target.project.name|default:"(None)" }}</p>
+            </div>
+            <div class="sidebar-section">
+                <h4>Target Branch</h4>
+                <p>{{ pr.target.branch }}</p>
+            </div>
+            <div class="sidebar-section">
+                <h4>Source Branch</h4>
+                <p>{{ pr.source_owner }}/{{ pr.source_repo }}:{{ pr.source_branch }}</p>
+            </div>
+            <div class="sidebar-section">
+                <h4>Author</h4>
+                <p>{{ pr.author.username }}</p>
+            </div>
+        </article>
+    </aside>
+</div>
+{% endblock %}

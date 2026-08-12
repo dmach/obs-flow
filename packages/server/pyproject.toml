@@ -1,0 +1,27 @@
+[project]
+name = "obs-flow-server"
+version = "0.1.0"
+description = "Backend orchestration service for OBS Flow managing packaging workflow, reviews and staging."
+readme = "README.md"
+authors = [
+    { name = "Daniel Mach", email = "daniel.mach@suse.com" }
+]
+requires-python = ">=3.12"
+dependencies = [
+    "django>=5.2",
+    "django-bolt>=0.10.0",
+    "obs-flow-common",
+]
+
+[project.scripts]
+obs-flow-server = "obs_flow_server:main"
+
+[build-system]
+requires = ["hatchling>=1.27.0"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/obs_flow_server"]
+
+[tool.uv.sources]
+obs-flow-common = { workspace = true }

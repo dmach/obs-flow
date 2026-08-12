@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+
+{% block title %}Staging Batches - OBS Flow{% endblock %}
+
+{% block content %}
+<h2>Staging Batches</h2>
+
+{% if batches %}
+    <table class="striped">
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Title</th>
+                <th>Project</th>
+                <th>Author</th>
+                <th>State</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for batch in batches %}
+                <tr>
+                    <td><a href="{% url 'staging_detail' batch.id %}">#{{ batch.id }}</a></td>
+                    <td>{{ batch.title|default:"(No Title)" }}</td>
+                    <td>{{ batch.project.name }}</td>
+                    <td>{{ batch.author.username|default:"(Automated)" }}</td>
+                    <td><span class="badge badge-{{ batch.state }}">{{ batch.state }}</span></td>
+                </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+{% else %}
+    <p class="muted">No staging batches found.</p>
+{% endif %}
+{% endblock %}

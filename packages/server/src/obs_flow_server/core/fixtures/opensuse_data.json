@@ -1,0 +1,204 @@
+[
+  {
+    "model": "accounts.user",
+    "pk": 1,
+    "fields": {
+      "username": "darix",
+      "username_lower": "darix",
+      "account_type": "human",
+      "is_active": true,
+      "is_staff": true,
+      "is_superuser": true,
+      "date_joined": "2026-08-12T12:00:00Z"
+    }
+  },
+  {
+    "model": "accounts.user",
+    "pk": 2,
+    "fields": {
+      "username": "factory-auto",
+      "username_lower": "factory-auto",
+      "account_type": "bot",
+      "is_active": true,
+      "date_joined": "2026-08-12T12:00:00Z"
+    }
+  },
+  {
+    "model": "accounts.user",
+    "pk": 3,
+    "fields": {
+      "username": "dimstar",
+      "username_lower": "dimstar",
+      "account_type": "human",
+      "is_active": true,
+      "date_joined": "2026-08-12T12:00:00Z"
+    }
+  },
+  {
+    "model": "accounts.group",
+    "pk": 1,
+    "fields": {
+      "name": "opensuse-review-team",
+      "name_lower": "opensuse-review-team"
+    }
+  },
+  {
+    "model": "accounts.group",
+    "pk": 2,
+    "fields": {
+      "name": "factory-staging",
+      "name_lower": "factory-staging"
+    }
+  },
+  {
+    "model": "accounts.usergroup",
+    "pk": 1,
+    "fields": {
+      "user": 1,
+      "group": 1
+    }
+  },
+  {
+    "model": "accounts.usergroup",
+    "pk": 2,
+    "fields": {
+      "user": 3,
+      "group": 1
+    }
+  },
+  {
+    "model": "accounts.usergroup",
+    "pk": 3,
+    "fields": {
+      "user": 3,
+      "group": 2
+    }
+  },
+  {
+    "model": "core.project",
+    "pk": 1,
+    "fields": {
+      "name": "openSUSE:Factory"
+    }
+  },
+  {
+    "model": "core.gitmapping",
+    "pk": 1,
+    "fields": {
+      "owner": "openSUSE",
+      "repo": "osc",
+      "branch": "master",
+      "project": 1,
+      "package": null
+    }
+  },
+  {
+    "model": "pull_requests.pullrequest",
+    "pk": 1,
+    "fields": {
+      "target": 1,
+      "number": 1234,
+      "author": 2,
+      "title": "Pull Request #1234 for openSUSE/osc",
+      "source_owner": "openSUSE",
+      "source_repo": "osc",
+      "source_branch": "feature",
+      "state": "open"
+    }
+  },
+  {
+    "model": "pull_requests.pullrequestrevision",
+    "pk": 1,
+    "fields": {
+      "pull_request": 1,
+      "revision_number": 1,
+      "head_sha": "0123456789abcdef0123456789abcdef01234567",
+      "base_sha": "abcdef0123456789abcdef0123456789abcdef01",
+      "created_at": "2026-08-12T12:00:00Z"
+    }
+  },
+  {
+    "model": "pull_requests.pullrequestreview",
+    "pk": 1,
+    "fields": {
+      "revision": 1,
+      "reviewer_user": 2,
+      "reviewer_group": null,
+      "dynamic_role": null,
+      "depends_on": null,
+      "actor": null,
+      "state": "pending",
+      "justification": null,
+      "external_review_url": null,
+      "locked_by": null,
+      "locked_until": null,
+      "updated_at": "2026-08-12T12:00:00Z"
+    }
+  },
+  {
+    "model": "pull_requests.pullrequestreview",
+    "pk": 2,
+    "fields": {
+      "revision": 1,
+      "reviewer_user": null,
+      "reviewer_group": 1,
+      "dynamic_role": null,
+      "depends_on": null,
+      "actor": 1,
+      "state": "rejected",
+      "justification": "Missing changelog entry. Please update the .changes file.",
+      "external_review_url": "https://github.com/openSUSE/osc/pull/1234#pullrequestreview-123456",
+      "locked_by": null,
+      "locked_until": null,
+      "updated_at": "2026-08-12T12:00:00Z"
+    }
+  },
+  {
+    "model": "pull_requests.pullrequestreview",
+    "pk": 3,
+    "fields": {
+      "revision": 1,
+      "reviewer_user": null,
+      "reviewer_group": 2,
+      "dynamic_role": null,
+      "depends_on": null,
+      "actor": 3,
+      "state": "accepted",
+      "justification": "Looks good to me.",
+      "external_review_url": null,
+      "locked_by": null,
+      "locked_until": null,
+      "updated_at": "2026-08-12T12:00:00Z"
+    }
+  },
+  {
+    "model": "staging.stagingbatch",
+    "pk": 1,
+    "fields": {
+      "project": 1,
+      "title": "Staging Batch #1",
+      "author": 1,
+      "state": "collecting",
+      "created_at": "2026-08-12T12:00:00Z",
+      "updated_at": "2026-08-12T12:00:00Z"
+    }
+  },
+  {
+    "model": "staging.stagingreview",
+    "pk": 1,
+    "fields": {
+      "staging": 1,
+      "reviewer_user": 1,
+      "reviewer_group": null,
+      "dynamic_role": null,
+      "depends_on": null,
+      "actor": null,
+      "state": "pending",
+      "justification": null,
+      "external_review_url": null,
+      "locked_by": null,
+      "locked_until": null,
+      "updated_at": "2026-08-12T12:00:00Z"
+    }
+  }
+]
