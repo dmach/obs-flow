@@ -8,18 +8,25 @@ import click
 def cli(staging_id: int, message: str, override: bool) -> None:
     """Clear needinfo, actor is the staging author."""
 
+    import os
     from obs_flow_client import clear_needinfo_staging_review
     from obs_flow_common.messages import StagingReviewClearNeedInfoRequest
+    from ..helpers import get_connection
+    from ..output.review import ReviewRenderer
 
-    from obs_flow_cli.helpers import format_review, get_connection
+    if not message.strip():
+        raise click.BadParameter("Message cannot be empty.", param_hint="--message")
 
     req = StagingReviewClearNeedInfoRequest(
-        staging_id=staging_id, message=message, override=override
+        staging_id=staging_id,
+        message=message,
+        override=override,
     )
-
     with get_connection() as conn:
         res = clear_needinfo_staging_review(conn, req)
 
-    click.echo(f"Staging Batch ID: {click.style(str(res.staging_id), bold=True)}")
-    click.echo("=" * 40)
-    format_review(res.review)
+    verbose = os.getenv("OBS_FLOW_VERBOSE") == "1"
+    output = os.getenv("OBS_FLOW_OUTPUT")
+
+    renderer = ReviewRenderer(res.review)
+    renderer.render(fmt=output, verbose=verbose)

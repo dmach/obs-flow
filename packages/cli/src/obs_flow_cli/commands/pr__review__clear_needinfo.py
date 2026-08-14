@@ -5,15 +5,16 @@ from obs_flow_cli.types import PR_ID
 
 @click.command(name="clear-needinfo")
 @click.argument("pull_request_id", type=PR_ID)
-@click.option("-m", "--message", required=True, help="Mandatory clarification message")
+@click.option("-m", "--message", required=True, help="The explanation or answer to the requested info")
 @click.option("--override", is_flag=True, help="Override someone else's review")
 def cli(pull_request_id: str, message: str, override: bool) -> None:
     """Clear needinfo state on pull request reviews."""
 
+    import os
     from obs_flow_client import clear_needinfo_review
     from obs_flow_common.messages import PRReviewClearNeedInfoRequest
-
-    from obs_flow_cli.helpers import format_review, get_connection
+    from ..helpers import get_connection
+    from ..output.review import ReviewRenderer
 
     if not message.strip():
         raise click.BadParameter("Message cannot be empty.", param_hint="--message")
@@ -23,10 +24,11 @@ def cli(pull_request_id: str, message: str, override: bool) -> None:
         message=message,
         override=override,
     )
-
     with get_connection() as conn:
         res = clear_needinfo_review(conn, req)
 
-    click.echo(f"Pull Request: {click.style(res.pull_request_id, bold=True)}")
-    click.echo("=" * 40)
-    format_review(res.review)
+    verbose = os.getenv("OBS_FLOW_VERBOSE") == "1"
+    output = os.getenv("OBS_FLOW_OUTPUT")
+
+    renderer = ReviewRenderer(res.review)
+    renderer.render(fmt=output, verbose=verbose)

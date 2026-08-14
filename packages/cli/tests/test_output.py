@@ -1,0 +1,119 @@
+import json
+from datetime import datetime
+from unittest.mock import patch
+
+import click
+import msgspec
+import pytest
+
+from obs_flow_cli.output.common import Field, Renderer
+
+
+class DummyModel(msgspec.Struct):
+    id: int
+    name: str
+    tags: list[str]
+    created_at: str | None = None
+    is_active: bool | None = None
+    secret: str | None = None
+
+
+class DummyRenderer(Renderer):
+    id = Field(label="ID", style={"bold": True})
+    name = Field()  # Should default to "Name"
+    tags = Field(label="Tags", formatter=lambda v: ", ".join(v))
+    created_at = Field(label="Created", formatter=Field.format_datetime)
+    is_active = Field(label="Active", formatter=Field.format_yes_no, style=lambda v: "green" if v else "red")
+    secret = Field(label="Secret", verbose_only=True)
+
+
+def test_field_format_datetime():
+    assert Field.format_datetime(None) == ""
+    assert Field.format_datetime(datetime(2023, 1, 1, 12, 0, 0)) == "2023-01-01 12:00:00"
+    assert Field.format_datetime("2023-01-01T12:00:00") == "2023-01-01 12:00:00"
+
+
+def test_field_format_yes_no():
+    assert Field.format_yes_no(True) == "yes"
+    assert Field.format_yes_no(False) == "no"
+    assert Field.format_yes_no("1") == "yes"
+    assert Field.format_yes_no("yes") == "yes"
+    assert Field.format_yes_no("true") == "yes"
+    assert Field.format_yes_no("on") == "yes"
+    assert Field.format_yes_no("0") == "no"
+    assert Field.format_yes_no("no") == "no"
+    assert Field.format_yes_no("false") == "no"
+    assert Field.format_yes_no("off") == "no"
+    assert Field.format_yes_no("something else") == "yes"  # fallback to bool(value)
+
+
+def test_renderer_text():
+    data = DummyModel(id=42, name="test", tags=["a", "b"], created_at="2023-01-01T12:00:00", is_active=True)
+    renderer = DummyRenderer(data)
+
+    with patch("click.echo") as mock_echo:
+        renderer.render(fmt="text")
+
+        # Verify click.echo calls
+        mock_echo.assert_any_call("ID      : \x1b[1m42\x1b[0m")
+        mock_echo.assert_any_call("Name    : test")
+        mock_echo.assert_any_call("Tags    : a, b")
+        mock_echo.assert_any_call("Created : 2023-01-01 12:00:00")
+        mock_echo.assert_any_call("Active  : \x1b[32myes\x1b[0m")
+
+        # Secret should not be shown (verbose_only=True and verbose=False)
+        for call in mock_echo.call_args_list:
+            assert "Secret" not in call[0][0]
+
+
+def test_renderer_text_verbose():
+    data = DummyModel(id=42, name="test", tags=[], secret="hidden")
+    renderer = DummyRenderer(data)
+
+    with patch("click.echo") as mock_echo:
+        renderer.render(fmt="text", verbose=True)
+        mock_echo.assert_any_call("Secret  : hidden")
+
+
+def test_renderer_text_list():
+    data = [
+        DummyModel(id=1, name="test1", tags=[]),
+        DummyModel(id=2, name="test2", tags=[]),
+    ]
+    renderer = DummyRenderer(data)
+
+    with patch("click.echo") as mock_echo:
+        renderer.render(fmt="text")
+
+        mock_echo.assert_any_call("ID      : \x1b[1m1\x1b[0m")
+        mock_echo.assert_any_call("Name    : test1")
+        mock_echo.assert_any_call("---")
+        mock_echo.assert_any_call("ID      : \x1b[1m2\x1b[0m")
+        mock_echo.assert_any_call("Name    : test2")
+
+
+def test_renderer_json(capsys):
+    data = DummyModel(id=42, name="test", tags=["a", "b"])
+    renderer = DummyRenderer(data)
+    renderer.render(fmt="json")
+    captured = capsys.readouterr()
+
+    parsed = json.loads(captured.out)
+    assert parsed["id"] == 42
+    assert parsed["name"] == "test"
+    assert parsed["tags"] == ["a", "b"]
+
+
+def test_renderer_json_list(capsys):
+    data = [
+        DummyModel(id=1, name="test1", tags=[]),
+        DummyModel(id=2, name="test2", tags=[]),
+    ]
+    renderer = DummyRenderer(data)
+    renderer.render(fmt="json")
+    captured = capsys.readouterr()
+
+    parsed = json.loads(captured.out)
+    assert len(parsed) == 2
+    assert parsed[0]["id"] == 1
+    assert parsed[1]["id"] == 2

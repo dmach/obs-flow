@@ -8,16 +8,22 @@ import click
 def cli(staging_id: int, reviewer: str | None, override: bool) -> None:
     """Approve a staging batch review."""
 
+    import os
     from obs_flow_client import approve_staging_review
     from obs_flow_common.messages import StagingReviewApproveRequest
+    from ..helpers import get_connection
+    from ..output.review import ReviewRenderer
 
-    from obs_flow_cli.helpers import format_review, get_connection
-
-    req = StagingReviewApproveRequest(staging_id=staging_id, reviewer=reviewer, override=override)
-
+    req = StagingReviewApproveRequest(
+        staging_id=staging_id,
+        reviewer=reviewer,
+        override=override,
+    )
     with get_connection() as conn:
         res = approve_staging_review(conn, req)
 
-    click.echo(f"Staging Batch ID: {click.style(str(res.staging_id), bold=True)}")
-    click.echo("=" * 40)
-    format_review(res.review)
+    verbose = os.getenv("OBS_FLOW_VERBOSE") == "1"
+    output = os.getenv("OBS_FLOW_OUTPUT")
+
+    renderer = ReviewRenderer(res.review)
+    renderer.render(fmt=output, verbose=verbose)

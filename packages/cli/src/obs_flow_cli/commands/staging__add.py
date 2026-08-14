@@ -10,10 +10,11 @@ from obs_flow_cli.types import PR_ID
 def cli(staging_id: int, pull_request_ids: tuple[str, ...], allow_duplicates: bool) -> None:
     """Add pull requests to a staging batch."""
 
+    import os
     from obs_flow_client import add_to_staging
     from obs_flow_common.messages import StagingAddRequest
-
-    from obs_flow_cli.helpers import get_connection
+    from ..helpers import get_connection
+    from ..output.staging import StagingRenderer
 
     req = StagingAddRequest(
         id=staging_id,
@@ -24,7 +25,8 @@ def cli(staging_id: int, pull_request_ids: tuple[str, ...], allow_duplicates: bo
     with get_connection() as conn:
         res = add_to_staging(conn, req)
 
-    click.echo(f"Successfully added pull requests to staging batch {click.style(str(res.id), bold=True)}.")
-    click.echo("Current pull requests in batch:")
-    for pr in res.pull_requests:
-        click.echo(f"  - {pr}")
+    verbose = os.getenv("OBS_FLOW_VERBOSE") == "1"
+    output = os.getenv("OBS_FLOW_OUTPUT")
+
+    renderer = StagingRenderer(res)
+    renderer.render(fmt=output, verbose=verbose)
