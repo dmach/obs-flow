@@ -90,78 +90,78 @@ def get_review_for_request(revision: PullRequestRevision, reviewer_str: str | No
 
 @api.post("/api/v1/pr_review/show")
 @sync_to_async
-def show_review_endpoint(req: PRReviewShowRequest):
-    pr = get_pull_request(req.pull_request_id)
+def show_review_endpoint(payload: PRReviewShowRequest):
+    pr = get_pull_request(payload.pull_request_id)
     latest_revision = pr.revisions.order_by("-revision_number").first()
 
     reviews = latest_revision.reviews.all()
-    if req.reviewer:
-        user, group = parse_reviewer(req.reviewer)
+    if payload.reviewer:
+        user, group = parse_reviewer(payload.reviewer)
         if user:
             reviews = reviews.filter(reviewer_user=user)
         elif group:
             reviews = reviews.filter(reviewer_group=group)
 
     details = [review_to_detail(r) for r in reviews]
-    res = PRReviewShowResponse(pull_request_id=req.pull_request_id, reviews=details)
+    res = PRReviewShowResponse(pull_request_id=payload.pull_request_id, reviews=details)
     return msgspec.structs.asdict(res)
 
 
 @api.post("/api/v1/pr_review/approve")
 @sync_to_async
-def approve_review_endpoint(req: PRReviewApproveRequest):
-    pr = get_pull_request(req.pull_request_id)
+def approve_review_endpoint(payload: PRReviewApproveRequest):
+    pr = get_pull_request(payload.pull_request_id)
     latest_revision = pr.revisions.order_by("-revision_number").first()
 
-    review = get_review_for_request(latest_revision, req.reviewer)
+    review = get_review_for_request(latest_revision, payload.reviewer)
     review.state = PullRequestReview.State.ACCEPTED
     admin_user = User.objects.get(username="admin")
     review.actor = admin_user
     review.justification = None
     review.save()
 
-    res = PRReviewActionResponse(pull_request_id=req.pull_request_id, review=review_to_detail(review))
+    res = PRReviewActionResponse(pull_request_id=payload.pull_request_id, review=review_to_detail(review))
     return msgspec.structs.asdict(res)
 
 
 @api.post("/api/v1/pr_review/decline")
 @sync_to_async
-def decline_review_endpoint(req: PRReviewDeclineRequest):
-    pr = get_pull_request(req.pull_request_id)
+def decline_review_endpoint(payload: PRReviewDeclineRequest):
+    pr = get_pull_request(payload.pull_request_id)
     latest_revision = pr.revisions.order_by("-revision_number").first()
 
-    review = get_review_for_request(latest_revision, req.reviewer)
+    review = get_review_for_request(latest_revision, payload.reviewer)
     review.state = PullRequestReview.State.REJECTED
     admin_user = User.objects.get(username="admin")
     review.actor = admin_user
-    review.justification = req.message
+    review.justification = payload.message
     review.save()
 
-    res = PRReviewActionResponse(pull_request_id=req.pull_request_id, review=review_to_detail(review))
+    res = PRReviewActionResponse(pull_request_id=payload.pull_request_id, review=review_to_detail(review))
     return msgspec.structs.asdict(res)
 
 
 @api.post("/api/v1/pr_review/needinfo")
 @sync_to_async
-def needinfo_review_endpoint(req: PRReviewNeedInfoRequest):
-    pr = get_pull_request(req.pull_request_id)
+def needinfo_review_endpoint(payload: PRReviewNeedInfoRequest):
+    pr = get_pull_request(payload.pull_request_id)
     latest_revision = pr.revisions.order_by("-revision_number").first()
 
-    review = get_review_for_request(latest_revision, req.reviewer)
+    review = get_review_for_request(latest_revision, payload.reviewer)
     review.state = PullRequestReview.State.NEEDINFO
     admin_user = User.objects.get(username="admin")
     review.actor = admin_user
-    review.justification = req.message
+    review.justification = payload.message
     review.save()
 
-    res = PRReviewActionResponse(pull_request_id=req.pull_request_id, review=review_to_detail(review))
+    res = PRReviewActionResponse(pull_request_id=payload.pull_request_id, review=review_to_detail(review))
     return msgspec.structs.asdict(res)
 
 
 @api.post("/api/v1/pr_review/clear_needinfo")
 @sync_to_async
-def clear_needinfo_review_endpoint(req: PRReviewClearNeedInfoRequest):
-    pr = get_pull_request(req.pull_request_id)
+def clear_needinfo_review_endpoint(payload: PRReviewClearNeedInfoRequest):
+    pr = get_pull_request(payload.pull_request_id)
     latest_revision = pr.revisions.order_by("-revision_number").first()
 
     # Clear needinfo on all reviews for this revision that are in NEEDINFO state
@@ -172,7 +172,7 @@ def clear_needinfo_review_endpoint(req: PRReviewClearNeedInfoRequest):
     for review in reviews:
         review.state = PullRequestReview.State.PENDING
         review.actor = admin_user
-        review.justification = req.message
+        review.justification = payload.message
         review.save()
         last_review = review
 
@@ -180,24 +180,24 @@ def clear_needinfo_review_endpoint(req: PRReviewClearNeedInfoRequest):
         # If no reviews were in NEEDINFO, just get/create a default one to return
         last_review = get_review_for_request(latest_revision, None)
 
-    res = PRReviewActionResponse(pull_request_id=req.pull_request_id, review=review_to_detail(last_review))
+    res = PRReviewActionResponse(pull_request_id=payload.pull_request_id, review=review_to_detail(last_review))
     return msgspec.structs.asdict(res)
 
 
 @api.post("/api/v1/pr_review/reopen")
 @sync_to_async
-def reopen_review_endpoint(req: PRReviewReopenRequest):
-    pr = get_pull_request(req.pull_request_id)
+def reopen_review_endpoint(payload: PRReviewReopenRequest):
+    pr = get_pull_request(payload.pull_request_id)
     latest_revision = pr.revisions.order_by("-revision_number").first()
 
-    review = get_review_for_request(latest_revision, req.reviewer)
+    review = get_review_for_request(latest_revision, payload.reviewer)
     review.state = PullRequestReview.State.PENDING
     admin_user = User.objects.get(username="admin")
     review.actor = admin_user
-    review.justification = req.message
+    review.justification = payload.message
     review.save()
 
-    res = PRReviewActionResponse(pull_request_id=req.pull_request_id, review=review_to_detail(review))
+    res = PRReviewActionResponse(pull_request_id=payload.pull_request_id, review=review_to_detail(review))
     return msgspec.structs.asdict(res)
 
 

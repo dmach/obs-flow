@@ -91,16 +91,16 @@ def show_staging_endpoint(request, staging_id: int):
 
 @api.post("/api/v1/staging/create")
 @sync_to_async
-def create_staging_endpoint(req: StagingCreateRequest):
+def create_staging_endpoint(payload: StagingCreateRequest):
     project = Project.objects.get(name="suse:obs-flow")
     admin_user = User.objects.get(username="admin")
 
     batch = StagingBatch.objects.create(
         project=project,
-        title=req.title,
+        title=payload.title,
         author=admin_user,
-        embargo_date=timezone.datetime.fromisoformat(req.embargo_date) if req.embargo_date else None,
-        release_date=timezone.datetime.fromisoformat(req.release_date) if req.release_date else None,
+        embargo_date=timezone.datetime.fromisoformat(payload.embargo_date) if payload.embargo_date else None,
+        release_date=timezone.datetime.fromisoformat(payload.release_date) if payload.release_date else None,
     )
 
     # Create default reviews for the staging batch
@@ -125,12 +125,12 @@ def create_staging_endpoint(req: StagingCreateRequest):
 
 @api.post("/api/v1/staging/edit")
 @sync_to_async
-def edit_staging_endpoint(req: StagingEditRequest):
+def edit_staging_endpoint(payload: StagingEditRequest):
     batch = update_staging_batch(
-        batch_id=req.id,
-        title=req.title,
-        embargo_date=req.embargo_date,
-        release_date=req.release_date,
+        batch_id=payload.id,
+        title=payload.title,
+        embargo_date=payload.embargo_date,
+        release_date=payload.release_date,
     )
 
     res = StagingEditResponse(
@@ -148,10 +148,10 @@ def edit_staging_endpoint(req: StagingEditRequest):
 
 @api.post("/api/v1/staging/add")
 @sync_to_async
-def add_to_staging_endpoint(req: StagingAddRequest):
-    batch = StagingBatch.objects.get(id=req.id)
+def add_to_staging_endpoint(payload: StagingAddRequest):
+    batch = StagingBatch.objects.get(id=payload.id)
 
-    for pr_id in req.pull_request_ids:
+    for pr_id in payload.pull_request_ids:
         pr = get_pull_request(pr_id)
         StagingBatchPullRequest.objects.get_or_create(staging_batch=batch, pull_request=pr)
 
@@ -162,10 +162,10 @@ def add_to_staging_endpoint(req: StagingAddRequest):
 
 @api.post("/api/v1/staging/remove")
 @sync_to_async
-def remove_from_staging_endpoint(req: StagingRemoveRequest):
-    batch = StagingBatch.objects.get(id=req.id)
+def remove_from_staging_endpoint(payload: StagingRemoveRequest):
+    batch = StagingBatch.objects.get(id=payload.id)
 
-    for pr_id in req.pull_request_ids:
+    for pr_id in payload.pull_request_ids:
         try:
             pr = get_pull_request(pr_id)
             StagingBatchPullRequest.objects.filter(staging_batch=batch, pull_request=pr).delete()
@@ -184,75 +184,75 @@ def remove_from_staging_endpoint(req: StagingRemoveRequest):
 
 @api.post("/api/v1/staging_review/show")
 @sync_to_async
-def show_staging_review_endpoint(req: StagingReviewShowRequest):
-    batch = StagingBatch.objects.get(id=req.staging_id)
+def show_staging_review_endpoint(payload: StagingReviewShowRequest):
+    batch = StagingBatch.objects.get(id=payload.staging_id)
 
     reviews = batch.reviews.all()
 
-    if req.reviewer:
-        user, group = parse_reviewer(req.reviewer)
+    if payload.reviewer:
+        user, group = parse_reviewer(payload.reviewer)
         if user:
             reviews = reviews.filter(reviewer_user=user)
         elif group:
             reviews = reviews.filter(reviewer_group=group)
 
     details = [review_to_detail(r) for r in reviews]
-    res = StagingReviewShowResponse(staging_id=req.staging_id, reviews=details)
+    res = StagingReviewShowResponse(staging_id=payload.staging_id, reviews=details)
     return msgspec.structs.asdict(res)
 
 
 @api.post("/api/v1/staging_review/approve")
 @sync_to_async
-def approve_staging_review_endpoint(req: StagingReviewApproveRequest):
-    batch = StagingBatch.objects.get(id=req.staging_id)
+def approve_staging_review_endpoint(payload: StagingReviewApproveRequest):
+    batch = StagingBatch.objects.get(id=payload.staging_id)
 
-    review = get_review_for_request(batch, req.reviewer)
+    review = get_review_for_request(batch, payload.reviewer)
     review.state = StagingReview.State.ACCEPTED
     admin_user = User.objects.get(username="admin")
     review.actor = admin_user
     review.justification = None
     review.save()
 
-    res = StagingReviewActionResponse(staging_id=req.staging_id, review=review_to_detail(review))
+    res = StagingReviewActionResponse(staging_id=payload.staging_id, review=review_to_detail(review))
     return msgspec.structs.asdict(res)
 
 
 @api.post("/api/v1/staging_review/decline")
 @sync_to_async
-def decline_staging_review_endpoint(req: StagingReviewDeclineRequest):
-    batch = StagingBatch.objects.get(id=req.staging_id)
+def decline_staging_review_endpoint(payload: StagingReviewDeclineRequest):
+    batch = StagingBatch.objects.get(id=payload.staging_id)
 
-    review = get_review_for_request(batch, req.reviewer)
+    review = get_review_for_request(batch, payload.reviewer)
     review.state = StagingReview.State.REJECTED
     admin_user = User.objects.get(username="admin")
     review.actor = admin_user
-    review.justification = req.message
+    review.justification = payload.message
     review.save()
 
-    res = StagingReviewActionResponse(staging_id=req.staging_id, review=review_to_detail(review))
+    res = StagingReviewActionResponse(staging_id=payload.staging_id, review=review_to_detail(review))
     return msgspec.structs.asdict(res)
 
 
 @api.post("/api/v1/staging_review/needinfo")
 @sync_to_async
-def needinfo_staging_review_endpoint(req: StagingReviewNeedInfoRequest):
-    batch = StagingBatch.objects.get(id=req.staging_id)
+def needinfo_staging_review_endpoint(payload: StagingReviewNeedInfoRequest):
+    batch = StagingBatch.objects.get(id=payload.staging_id)
 
-    review = get_review_for_request(batch, req.reviewer)
+    review = get_review_for_request(batch, payload.reviewer)
     review.state = StagingReview.State.NEEDINFO
     admin_user = User.objects.get(username="admin")
     review.actor = admin_user
-    review.justification = req.message
+    review.justification = payload.message
     review.save()
 
-    res = StagingReviewActionResponse(staging_id=req.staging_id, review=review_to_detail(review))
+    res = StagingReviewActionResponse(staging_id=payload.staging_id, review=review_to_detail(review))
     return msgspec.structs.asdict(res)
 
 
 @api.post("/api/v1/staging_review/clear_needinfo")
 @sync_to_async
-def clear_needinfo_staging_review_endpoint(req: StagingReviewClearNeedInfoRequest):
-    batch = StagingBatch.objects.get(id=req.staging_id)
+def clear_needinfo_staging_review_endpoint(payload: StagingReviewClearNeedInfoRequest):
+    batch = StagingBatch.objects.get(id=payload.staging_id)
 
     # Clear needinfo on all reviews for this batch that are in NEEDINFO state
     reviews = batch.reviews.filter(state=StagingReview.State.NEEDINFO)
@@ -262,28 +262,28 @@ def clear_needinfo_staging_review_endpoint(req: StagingReviewClearNeedInfoReques
     for review in reviews:
         review.state = StagingReview.State.PENDING
         review.actor = admin_user
-        review.justification = req.message
+        review.justification = payload.message
         review.save()
         last_review = review
 
     if not last_review:
         last_review = get_review_for_request(batch, None)
 
-    res = StagingReviewActionResponse(staging_id=req.staging_id, review=review_to_detail(last_review))
+    res = StagingReviewActionResponse(staging_id=payload.staging_id, review=review_to_detail(last_review))
     return msgspec.structs.asdict(res)
 
 
 @api.post("/api/v1/staging_review/reopen")
 @sync_to_async
-def reopen_staging_review_endpoint(req: StagingReviewReopenRequest):
-    batch = StagingBatch.objects.get(id=req.staging_id)
+def reopen_staging_review_endpoint(payload: StagingReviewReopenRequest):
+    batch = StagingBatch.objects.get(id=payload.staging_id)
 
-    review = get_review_for_request(batch, req.reviewer)
+    review = get_review_for_request(batch, payload.reviewer)
     review.state = StagingReview.State.PENDING
     admin_user = User.objects.get(username="admin")
     review.actor = admin_user
-    review.justification = req.message
+    review.justification = payload.message
     review.save()
 
-    res = StagingReviewActionResponse(staging_id=req.staging_id, review=review_to_detail(review))
+    res = StagingReviewActionResponse(staging_id=payload.staging_id, review=review_to_detail(review))
     return msgspec.structs.asdict(res)
