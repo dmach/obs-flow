@@ -16,12 +16,14 @@ class ReviewRenderer(Renderer):
     )
     actor = Field(
         label="Actor",
+        skip=Field.skip_none,
     )
     when = Field(
         label="Date",
         formatter=Field.format_datetime,
+        skip=Field.skip_none,
     )
     why = Field(
         label="Reason",
-        include_none=False,
+        skip=Field.skip_none,
     )

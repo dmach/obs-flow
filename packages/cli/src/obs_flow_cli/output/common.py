@@ -20,7 +20,7 @@ class Field:
     label: str | None = None
     style: StyleType | None = None
     formatter: Callable[[Any], str] | None = None
-    include_none: bool = False  # show the field only if it contains None
+    skip: Callable[[Any], bool] | None = None
     verbose_only: bool = False  # show the field only in the verbose mode
 
     @staticmethod
@@ -42,6 +42,24 @@ class Field:
             if value.lower() in ["0", "no", "false", "off"]:
                 return "no"
         return "yes" if value else "no"
+
+    @staticmethod
+    def skip_none(value: Any) -> bool:
+        """
+        Helper function to skip rendering if the value is None.
+        """
+        return value is None
+
+    @staticmethod
+    def skip_empty(value: Any) -> bool:
+        """
+        Helper function to skip rendering if the value is empty (None, empty string, list, dict, or set).
+        """
+        if value is None:
+            return True
+        if isinstance(value, str | list | dict | set) and not value:
+            return True
+        return False
 
 
 class Renderer:
@@ -93,7 +111,7 @@ class Renderer:
         for field_name, field_cfg in self._fields.items():
             raw_value = getattr(item, field_name, None)
 
-            if raw_value is None and not field_cfg.include_none:
+            if field_cfg.skip and field_cfg.skip(raw_value):
                 continue
 
             if field_cfg.verbose_only and not verbose:
