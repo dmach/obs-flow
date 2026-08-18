@@ -5,7 +5,7 @@ from django.conf import settings
 from core.models import Project, Package
 
 
-class ReviewConfigurationBase(models.Model):
+class ReviewConfigBase(models.Model):
     class ConfigType(models.TextChoices):
         PROJECT = "project", "Project"
         PACKAGE = "package", "Package"
@@ -35,10 +35,9 @@ class ReviewConfigurationBase(models.Model):
         null=True,
         blank=True,
     )
-    depends_on = models.ForeignKey(
+    depends_on = models.ManyToManyField(
         "self",
-        on_delete=models.SET_NULL,
-        null=True,
+        symmetrical=False,
         blank=True,
         related_name="%(class)s_dependents",
     )
@@ -57,25 +56,25 @@ class ReviewConfigurationBase(models.Model):
         ]
 
 
-class ReviewConfiguration(ReviewConfigurationBase):
+class ReviewConfig(ReviewConfigBase):
     project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name="review_configurations")
 
-    class Meta(ReviewConfigurationBase.Meta):
-        constraints = ReviewConfigurationBase.Meta.constraints + [
+    class Meta(ReviewConfigBase.Meta):
+        constraints = ReviewConfigBase.Meta.constraints + [
             models.UniqueConstraint(
-                fields=["project", "reviewer_user"],
+                fields=["project", "type", "reviewer_user"],
                 condition=Q(reviewer_user__isnull=False),
-                name="unique_project_reviewer_user",
+                name="unique_project_type_reviewer_user",
             ),
             models.UniqueConstraint(
-                fields=["project", "reviewer_group"],
+                fields=["project", "type", "reviewer_group"],
                 condition=Q(reviewer_group__isnull=False),
-                name="unique_project_reviewer_group",
+                name="unique_project_type_reviewer_group",
             ),
             models.UniqueConstraint(
-                fields=["project", "dynamic_role"],
+                fields=["project", "type", "dynamic_role"],
                 condition=Q(dynamic_role__isnull=False),
-                name="unique_project_dynamic_role",
+                name="unique_project_type_dynamic_role",
             ),
         ]
 
@@ -84,7 +83,7 @@ class ReviewConfiguration(ReviewConfigurationBase):
         return f"Config for {self.project.name}: {reviewer} ({self.type})"
 
 
-class ReviewConfigurationOverride(ReviewConfigurationBase):
+class ReviewConfigOverride(ReviewConfigBase):
     class Mode(models.TextChoices):
         ADD = "add", "Add"
         REMOVE = "remove", "Remove"
@@ -92,12 +91,8 @@ class ReviewConfigurationOverride(ReviewConfigurationBase):
     package = models.ForeignKey(Package, on_delete=models.CASCADE, related_name="review_overrides")
     mode = models.CharField(max_length=10, choices=Mode.choices, default=Mode.ADD)
 
-    class Meta(ReviewConfigurationBase.Meta):
-        constraints = ReviewConfigurationBase.Meta.constraints + [
-            models.CheckConstraint(
-                condition=~Q(mode="remove", depends_on__isnull=False),
-                name="override_remove_no_depends_on",
-            ),
+    class Meta(ReviewConfigBase.Meta):
+        constraints = ReviewConfigBase.Meta.constraints + [
             models.UniqueConstraint(
                 fields=["package", "reviewer_user"],
                 condition=Q(reviewer_user__isnull=False),
@@ -152,10 +147,9 @@ class BaseReview(models.Model):
         null=True,
         blank=True,
     )
-    depends_on = models.ForeignKey(
+    depends_on = models.ManyToManyField(
         "self",
-        on_delete=models.SET_NULL,
-        null=True,
+        symmetrical=False,
         blank=True,
         related_name="%(class)s_dependents",
     )

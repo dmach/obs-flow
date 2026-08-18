@@ -1,6 +1,7 @@
 import msgspec
 from asgiref.sync import sync_to_async
 from django.utils import timezone
+from django.http import HttpResponseBadRequest
 from django_bolt import BoltAPI
 
 from obs_flow_common.messages import (
@@ -93,7 +94,15 @@ def show_staging_endpoint(request, staging_id: int):
 @sync_to_async
 def create_staging_endpoint(payload: StagingCreateRequest):
     project = Project.objects.get(name=payload.project)
-    admin_user = User.objects.get(username="admin")
+    try:
+        project = Project.objects.get(name=payload.project)
+    except Project.DoesNotExist:
+        return HttpResponseBadRequest(f"Project not found: {payload.project}")
+
+    try:
+        admin_user = User.objects.get(username="admin")
+    except User.DoesNotExist:
+        admin_user = User.objects.first()
 
     batch = StagingBatch.objects.create(
         project=project,
@@ -103,12 +112,33 @@ def create_staging_endpoint(payload: StagingCreateRequest):
         release_date=timezone.datetime.fromisoformat(payload.release_date) if payload.release_date else None,
     )
 
-    # Create default reviews for the staging batch
-    StagingReview.objects.create(
-        staging=batch,
-        reviewer_user=admin_user,
-        state=StagingReview.State.PENDING,
-    )
+    # Create reviews for the staging batch based on ReviewConfig
+    from reviews.models import ReviewConfig
+    configs = ReviewConfig.objects.filter(project=project, type="staging")
+    if configs.exists():
+        config_to_review = {}
+        for config in configs:
+            review = StagingReview.objects.create(
+                staging=batch,
+                reviewer_user=config.reviewer_user,
+                reviewer_group=config.reviewer_group,
+                dynamic_role=config.dynamic_role,
+                state=StagingReview.State.PENDING,
+            )
+            config_to_review[config] = review
+
+        # Set up dependencies between the created reviews
+        for config, review in config_to_review.items():
+            for dep_config in config.depends_on.all():
+                if dep_config in config_to_review:
+                    review.depends_on.add(config_to_review[dep_config])
+    else:
+        if admin_user:
+            StagingReview.objects.create(
+                staging=batch,
+                reviewer_user=admin_user,
+                state=StagingReview.State.PENDING,
+            )
 
     res = StagingCreateResponse(
         id=batch.id,

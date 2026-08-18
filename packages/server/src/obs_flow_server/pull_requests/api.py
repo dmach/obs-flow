@@ -292,6 +292,30 @@ def _do_sync_pull_request(req: PRSyncRequest) -> PRSyncResponse:
             base_sha=base_sha
         )
 
+        from reviews.models import ReviewConfig
+
+        git_mapping = pr.target
+        if git_mapping.project_id:
+            project = git_mapping.project
+            config_type = ReviewConfig.ConfigType.PROJECT
+        elif git_mapping.package_id:
+            project = git_mapping.package.project
+            config_type = ReviewConfig.ConfigType.PACKAGE
+        else:
+            project = None
+            config_type = None
+
+        if project and config_type:
+            configs = ReviewConfig.objects.filter(project=project, type=config_type)
+            for config in configs:
+                PullRequestReview.objects.create(
+                    revision=latest_revision,
+                    reviewer_user=config.reviewer_user,
+                    reviewer_group=config.reviewer_group,
+                    dynamic_role=config.dynamic_role,
+                    state=PullRequestReview.State.PENDING
+                )
+
     return PRSyncResponse(
         pull_request=PRDetail(
             id=f"{req.owner}/{req.repo}#{req.number}",

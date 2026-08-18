@@ -14,9 +14,37 @@ from obs_flow_common.messages import (
     PRReviewReopenRequest,
     PRReviewShowRequest,
     PRReviewShowResponse,
+    ReviewConfigDTO,
+    ReviewConfigAddRequest,
+    ReviewConfigRemoveRequest,
+    ReviewConfigListRequest,
+    ReviewConfigAddResponse,
+    ReviewConfigRemoveResponse,
+    ReviewConfigListResponse,
 )
 
 from obs_flow_client.connection import Connection
+
+
+def add_review_config(conn: Connection, req: ReviewConfigAddRequest) -> ReviewConfigAddResponse:
+    """Adds a review configuration for a project."""
+    serialized_data = msgspec.json.encode(req)
+    response_bytes = conn.post("/api/v1/review-config/add", data=serialized_data)
+    return msgspec.json.decode(response_bytes, type=ReviewConfigAddResponse)
+
+
+def remove_review_config(conn: Connection, req: ReviewConfigRemoveRequest) -> ReviewConfigRemoveResponse:
+    """Removes a review configuration for a project."""
+    serialized_data = msgspec.json.encode(req)
+    response_bytes = conn.post("/api/v1/review-config/remove", data=serialized_data)
+    return msgspec.json.decode(response_bytes, type=ReviewConfigRemoveResponse)
+
+
+def list_review_configs(conn: Connection, req: ReviewConfigListRequest) -> ReviewConfigListResponse:
+    """Lists review configurations for a project."""
+    serialized_data = msgspec.json.encode(req)
+    response_bytes = conn.post("/api/v1/review-config/list", data=serialized_data)
+    return msgspec.json.decode(response_bytes, type=ReviewConfigListResponse)
 
 
 def show_review(conn: Connection, req: PRReviewShowRequest) -> PRReviewShowResponse:

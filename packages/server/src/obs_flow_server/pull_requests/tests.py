@@ -10,6 +10,21 @@ from obs_flow_server.api import api
 
 
 class TestPRSyncEndpoint(TransactionTestCase):
+    fixtures = ["opensuse_data.json"]
+
+    def test_show_review_endpoint(self):
+        """Verify that show_review_endpoint works."""
+        payload = {
+            "pull_request_id": "openSUSE/osc#1234",
+            "reviewer": "darix"
+        }
+        with TestClient(api) as client:
+            response = client.post(
+                "/api/v1/pr_review/show",
+                content=json.dumps(payload),
+            )
+        self.assertEqual(response.status_code, 200)
+
     @override_settings(GITEA_URL=None, GITEA_TOKEN=None)
     def test_sync_fails_without_settings(self):
         """Verify that the endpoint fails if GITEA_URL or GITEA_TOKEN is not set."""
@@ -112,6 +127,14 @@ class TestPRSyncEndpoint(TransactionTestCase):
             base_sha="0000000000000000000000000000000000000000"
         )
 
+        from reviews.models import ReviewConfig
+        reviewer_user = User.objects.create(username="reviewer1", username_lower="reviewer1", account_type=User.AccountType.HUMAN)
+        ReviewConfig.objects.create(
+            project=project,
+            type=ReviewConfig.ConfigType.PROJECT,
+            reviewer_user=reviewer_user
+        )
+
         # Mock Gitea response with updated title, mergeable, and new head SHA
         mock_response = MagicMock()
         gitea_data = {
@@ -165,3 +188,98 @@ class TestPRSyncEndpoint(TransactionTestCase):
         
         # Verify both revisions exist
         self.assertEqual(pr.revisions.count(), 2)
+
+        # Verify review was created for the new revision
+        latest_revision = pr.revisions.get(revision_number=2)
+        self.assertEqual(latest_revision.reviews.count(), 1)
+        review = latest_revision.reviews.first()
+        self.assertEqual(review.reviewer_user, reviewer_user)
+        from pull_requests.models import PullRequestReview
+        self.assertEqual(review.state, PullRequestReview.State.PENDING)
+
+    @override_settings(GITEA_URL="https://gitea.example.com", GITEA_TOKEN="secret-token")
+    @patch("urllib.request.urlopen")
+    def test_sync_creates_revision_for_package_pr_and_creates_reviews(self, mock_urlopen):
+        """Verify that syncing a package PR creates reviews based on ReviewConfig for package type."""
+        from core.models import Package
+        project = Project.objects.create(name="suse:obs-flow")
+        package = Package.objects.create(project=project, name="my-package")
+        git_mapping = GitMapping.objects.create(owner="suse", repo="obs-flow", branch="main", package=package)
+        author = User.objects.create(username="john_doe", username_lower="john_doe", account_type=User.AccountType.HUMAN)
+        pr = PullRequest.objects.create(
+            target=git_mapping,
+            number=123,
+            author=author,
+            title="Old Title",
+            is_draft=True,
+            is_mergeable=False,
+            state=PullRequest.State.OPEN,
+            source_owner="john_doe",
+            source_repo="obs-flow",
+            source_branch="bugfix"
+        )
+        PullRequestRevision.objects.create(
+            pull_request=pr,
+            revision_number=1,
+            head_sha="1111111111111111111111111111111111111111",
+            base_sha="0000000000000000000000000000000000000000"
+        )
+
+        from reviews.models import ReviewConfig
+        reviewer_user = User.objects.create(username="reviewer1", username_lower="reviewer1", account_type=User.AccountType.HUMAN)
+        # Create a config for package type
+        ReviewConfig.objects.create(
+            project=project,
+            type=ReviewConfig.ConfigType.PACKAGE,
+            reviewer_user=reviewer_user
+        )
+        # Create a config for project type (should NOT be used)
+        reviewer_user_project = User.objects.create(username="reviewer_project", username_lower="reviewer_project", account_type=User.AccountType.HUMAN)
+        ReviewConfig.objects.create(
+            project=project,
+            type=ReviewConfig.ConfigType.PROJECT,
+            reviewer_user=reviewer_user_project
+        )
+
+        # Mock Gitea response with updated title, mergeable, and new head SHA
+        mock_response = MagicMock()
+        gitea_data = {
+            "title": "New Title",
+            "draft": False,
+            "mergeable": True,
+            "state": "open",
+            "user": {"login": "john_doe"},
+            "head": {
+                "sha": "2222222222222222222222222222222222222222",
+                "ref": "bugfix",
+                "repo": {
+                    "owner": {"login": "john_doe"},
+                    "name": "obs-flow"
+                }
+            },
+            "base": {
+                "sha": "0000000000000000000000000000000000000000"
+            }
+        }
+        mock_response.read.return_value = json.dumps(gitea_data).encode("utf-8")
+        mock_urlopen.return_value.__enter__.return_value = mock_response
+
+        payload = {
+            "owner": "suse",
+            "repo": "obs-flow",
+            "number": 123
+        }
+        with TestClient(api) as client:
+            response = client.post(
+                "/api/v1/pr/sync",
+                content=json.dumps(payload),
+            )
+        self.assertEqual(response.status_code, 200)
+
+        # Verify review was created for the new revision and it is the package config, not project config
+        latest_revision = pr.revisions.get(revision_number=2)
+        self.assertEqual(latest_revision.reviews.count(), 1)
+        review = latest_revision.reviews.first()
+        self.assertEqual(review.reviewer_user, reviewer_user)
+        from pull_requests.models import PullRequestReview
+        self.assertEqual(review.state, PullRequestReview.State.PENDING)

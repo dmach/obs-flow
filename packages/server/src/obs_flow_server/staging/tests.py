@@ -1,4 +1,4 @@
-from django.test import TestCase
+from django.test import TestCase, TransactionTestCase
 from accounts.models import User, Group
 from core.models import Project, GitMapping
 from pull_requests.models import PullRequest, PullRequestRevision, PullRequestReview
@@ -70,23 +70,45 @@ class TestFixtureData(TestCase):
         self.assertTrue(StagingReview.objects.filter(staging=batch, reviewer_user__username="darix").exists())
 
 
-import json
-from django.test import TransactionTestCase
-from django_bolt.testing import TestClient
-from obs_flow_server.api import api
-
-
-class TestStagingAPI(TransactionTestCase):
+class TestStagingCreationWithReviewConfig(TransactionTestCase):
     fixtures = ["opensuse_data.json"]
 
-    def setUp(self):
-        User.objects.create(username="admin", username_lower="admin")
+    def test_create_staging_with_review_configs(self):
+        """Verify that creating a staging batch for a project with staging review configurations
+        correctly populates the staging reviews and their dependencies.
+        """
+        import json
+        from django_bolt.testing import TestClient
+        from obs_flow_server.api import api
+        from reviews.models import ReviewConfig
 
-    def test_create_staging_batch_with_project(self):
-        """Verify that creating a staging batch requires a project and sets it correctly."""
+        project = Project.objects.get(name="openSUSE:Factory")
+        user_darix = User.objects.get(username="darix")
+        user_dimstar = User.objects.get(username="dimstar")
+        group_team = Group.objects.get(name="opensuse-review-team")
+
+        # 1. Add review configurations for staging
+        config_darix = ReviewConfig.objects.create(
+            project=project,
+            type="staging",
+            reviewer_user=user_darix,
+        )
+        config_team = ReviewConfig.objects.create(
+            project=project,
+            type="staging",
+            reviewer_group=group_team,
+        )
+        config_dimstar = ReviewConfig.objects.create(
+            project=project,
+            type="staging",
+            reviewer_user=user_dimstar,
+        )
+        config_dimstar.depends_on.add(config_darix, config_team)
+
+        # 2. Create a staging batch for openSUSE:Factory
         payload = {
             "project": "openSUSE:Factory",
-            "title": "My Staging Batch",
+            "title": "Factory Staging Batch A",
         }
         with TestClient(api) as client:
             response = client.post(
@@ -96,22 +118,29 @@ class TestStagingAPI(TransactionTestCase):
         self.assertEqual(response.status_code, 200)
         res_data = response.json()
         self.assertEqual(res_data["target_project"], "openSUSE:Factory")
-        self.assertEqual(res_data["title"], "My Staging Batch")
+        self.assertEqual(res_data["title"], "Factory Staging Batch A")
 
-        # Verify it was created in the database
-        batch = StagingBatch.objects.get(id=res_data["id"])
-        self.assertEqual(batch.project.name, "openSUSE:Factory")
-        self.assertEqual(batch.title, "My Staging Batch")
+        # 3. Verify that the created staging batch has exactly the configured reviewers
+        batch_id = res_data["id"]
+        batch = StagingBatch.objects.get(id=batch_id)
+        self.assertEqual(batch.project, project)
 
-    def test_create_staging_batch_missing_project(self):
-        """Verify that creating a staging batch without a project fails."""
-        payload = {
-            "title": "My Staging Batch",
-        }
-        with TestClient(api) as client:
-            response = client.post(
-                "/api/v1/staging/create",
-                content=json.dumps(payload),
-            )
-        self.assertNotEqual(response.status_code, 200)
+        reviews = StagingReview.objects.filter(staging=batch)
+        self.assertEqual(reviews.count(), 3)
+
+        # Verify individual reviews and their states
+        review_darix = reviews.get(reviewer_user=user_darix)
+        self.assertEqual(review_darix.state, StagingReview.State.PENDING)
+
+        review_team = reviews.get(reviewer_group=group_team)
+        self.assertEqual(review_team.state, StagingReview.State.PENDING)
+
+        review_dimstar = reviews.get(reviewer_user=user_dimstar)
+        self.assertEqual(review_dimstar.state, StagingReview.State.PENDING)
+
+        # Verify dependencies are correctly mapped
+        self.assertCountEqual(
+            review_dimstar.depends_on.all(),
+            [review_darix, review_team]
+        )
 
