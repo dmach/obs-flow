@@ -89,7 +89,12 @@ class TestPRSyncEndpoint(TransactionTestCase):
         self.assertEqual(pr_detail["state"], "open")
         self.assertEqual(pr_detail["is_draft"], False)
         self.assertEqual(pr_detail["is_mergeable"], True)
-        self.assertEqual(pr_detail["author"], "john_doe")
+        self.assertEqual(pr_detail["author"], {
+            "username": "john_doe",
+            "full_name": None,
+            "email": "",
+            "is_active": True,
+        })
         self.assertEqual(pr_detail["latest_revision"], 1)
         self.assertEqual(pr_detail["head_sha"], "1111111111111111111111111111111111111111")
 

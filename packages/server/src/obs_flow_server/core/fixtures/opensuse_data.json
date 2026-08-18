@@ -5,6 +5,8 @@
     "fields": {
       "username": "darix",
       "username_lower": "darix",
+      "full_name": "Marcus Rueckert",
+      "email": "mrueckert@suse.com",
       "account_type": "human",
       "is_active": true,
       "is_staff": true,
@@ -29,6 +31,8 @@
     "fields": {
       "username": "dimstar",
       "username_lower": "dimstar",
+      "full_name": "Dominique Leuenberger",
+      "email": "dimstar@opensuse.org",
       "account_type": "human",
       "is_active": true,
       "date_joined": "2026-08-12T12:00:00Z"

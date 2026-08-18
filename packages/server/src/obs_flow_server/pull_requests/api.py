@@ -21,9 +21,11 @@ from obs_flow_common.messages import (
 )
 from obs_flow_server.api import api
 
+from accounts.helpers import build_user_dto
 from accounts.models import User, Group
 from core.models import GitMapping, Project
 from pull_requests.models import PullRequest, PullRequestRevision, PullRequestReview
+from reviews.api import build_reviewer_dto_from_fields
 
 
 PR_ID_REGEX = re.compile(r"^([^/]+)/([^#]+)#(\d+)$")
@@ -59,17 +61,17 @@ def parse_reviewer(reviewer_str: str | None):
 
 
 def review_to_detail(review: PullRequestReview) -> ReviewDetail:
-    if review.reviewer_user:
-        reviewer = review.reviewer_user.username
-    elif review.reviewer_group:
-        reviewer = f"@{review.reviewer_group.name}"
-    else:
-        reviewer = f"role:{review.dynamic_role}"
+    reviewer_dto = build_reviewer_dto_from_fields(
+        review.reviewer_user,
+        review.reviewer_group,
+        review.dynamic_role,
+    )
+    actor_dto = build_user_dto(review.actor) if review.actor else None
 
     return ReviewDetail(
-        reviewer=reviewer,
+        reviewer=reviewer_dto,
         state=review.state,
-        actor=review.actor.username if review.actor else None,
+        actor=actor_dto,
         when=review.updated_at.isoformat(),
         why=review.justification,
     )
@@ -323,7 +325,7 @@ def _do_sync_pull_request(req: PRSyncRequest) -> PRSyncResponse:
             state=pr.state,
             is_draft=pr.is_draft,
             is_mergeable=pr.is_mergeable,
-            author=pr.author.username,
+            author=build_user_dto(pr.author),
             latest_revision=latest_revision.revision_number,
             head_sha=latest_revision.head_sha,
             base_sha=latest_revision.base_sha,

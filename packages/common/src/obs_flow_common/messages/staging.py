@@ -1,11 +1,12 @@
 import msgspec
-from obs_flow_common.messages.core import ReviewDetail
+from obs_flow_common.messages.core import UserDTO
+from obs_flow_common.messages.reviews import ReviewDetail
 
 class StagingResponse(msgspec.Struct):
     """Details of a staging batch, used for detail views and creation/edit responses."""
     id: int
     state: str
-    creator: str | None = None
+    creator: UserDTO | None = None
     title: str | None = None
     target_project: str | None = None
     pull_requests: list[str] = []

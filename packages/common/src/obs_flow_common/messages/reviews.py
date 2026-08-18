@@ -1,4 +1,35 @@
 import msgspec
+from obs_flow_common.messages.core import UserDTO
+
+
+class ReviewerDataBase(msgspec.Struct, tag=True):
+    """Base class for reviewer details."""
+    pass
+
+
+class PersonReviewerDTO(ReviewerDataBase, UserDTO, tag="person"):
+    pass
+
+
+class GroupReviewerDTO(ReviewerDataBase, tag="group"):
+    name: str
+    email: str | None
+
+
+class DynamicRoleReviewerDTO(ReviewerDataBase, tag="role"):
+    role: str
+
+
+ReviewerDTO = PersonReviewerDTO | GroupReviewerDTO | DynamicRoleReviewerDTO
+
+
+class ReviewDetail(msgspec.Struct):
+    """Details of an individual review."""
+    reviewer: ReviewerDTO
+    state: str
+    actor: UserDTO | None = None
+    when: str | None = None
+    why: str | None = None
 
 
 class ReviewConfigDTO(msgspec.Struct):
@@ -9,14 +40,14 @@ class ReviewConfigDTO(msgspec.Struct):
         id: The database ID of the configuration.
         project: The name of the project.
         type: The type of configuration (project, package, staging).
-        reviewer: The reviewer identifier (e.g., username, @group, role:role_name).
-        depends_on: List of reviewer identifiers this configuration depends on.
+        reviewer: The reviewer details.
+        depends_on: List of reviewer details this configuration depends on.
     """
     id: int
     project: str
     type: str
-    reviewer: str
-    depends_on: list[str]
+    reviewer: ReviewerDTO
+    depends_on: list[ReviewerDTO]
 
 
 class ReviewConfigAddRequest(msgspec.Struct):

@@ -26,10 +26,12 @@ from obs_flow_common.messages import (
 )
 from obs_flow_server.api import api
 
+from accounts.helpers import build_user_dto
 from accounts.models import User, Group
 from core.models import Project
 from pull_requests.models import PullRequest
 from pull_requests.api import get_pull_request, parse_reviewer
+from reviews.api import build_reviewer_dto_from_fields
 from staging.models import StagingBatch, StagingBatchPullRequest, StagingReview
 from staging.views import update_staging_batch
 
@@ -40,10 +42,11 @@ def pr_to_id(pr: PullRequest) -> str:
 
 def batch_to_detail(batch: StagingBatch) -> StagingDetail:
     prs = [pr_to_id(bpr.pull_request) for bpr in batch.batch_pull_requests.all()]
+    creator_dto = build_user_dto(batch.author) if batch.author else None
     return StagingDetail(
         id=batch.id,
         state=batch.state,
-        creator=batch.author.username if batch.author else None,
+        creator=creator_dto,
         title=batch.title,
         target_project=batch.project.name,
         pull_requests=prs,
@@ -53,17 +56,17 @@ def batch_to_detail(batch: StagingBatch) -> StagingDetail:
 
 
 def review_to_detail(review: StagingReview) -> ReviewDetail:
-    if review.reviewer_user:
-        reviewer = review.reviewer_user.username
-    elif review.reviewer_group:
-        reviewer = f"@{review.reviewer_group.name}"
-    else:
-        reviewer = f"role:{review.dynamic_role}"
+    reviewer_dto = build_reviewer_dto_from_fields(
+        review.reviewer_user,
+        review.reviewer_group,
+        review.dynamic_role,
+    )
+    actor_dto = build_user_dto(review.actor) if review.actor else None
 
     return ReviewDetail(
-        reviewer=reviewer,
+        reviewer=reviewer_dto,
         state=review.state,
-        actor=review.actor.username if review.actor else None,
+        actor=actor_dto,
         when=review.updated_at.isoformat(),
         why=review.justification,
     )

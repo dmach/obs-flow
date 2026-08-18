@@ -1,4 +1,5 @@
 from .common import Field, Renderer
+from .formatters import format_user_dto
 
 
 class StagingRenderer(Renderer):
@@ -15,12 +16,13 @@ class StagingRenderer(Renderer):
     )
     creator = Field(
         label="Creator",
+        formatter=format_user_dto,
     )
     title = Field(
         label="Title",
         skip=Field.skip_none,
     )
-    project = Field(
+    target_project = Field(
         label="Project",
     )
     release_date = Field(

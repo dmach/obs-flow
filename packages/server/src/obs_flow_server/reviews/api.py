@@ -9,6 +9,10 @@ from obs_flow_common.messages.reviews import (
     ReviewConfigAddResponse,
     ReviewConfigRemoveResponse,
     ReviewConfigListResponse,
+    ReviewerDTO,
+    PersonReviewerDTO,
+    GroupReviewerDTO,
+    DynamicRoleReviewerDTO,
 )
 from obs_flow_server.api import api
 
@@ -64,16 +68,47 @@ def get_review_config(project: Project, config_type: str, reviewer_str: str) -> 
     )
 
 
+def build_reviewer_dto_from_fields(user: User | None, group: Group | None, dynamic_role: str | None) -> ReviewerDTO:
+    """
+    Converts reviewer fields into a ReviewerDTO message struct.
+    """
+    if user:
+        return PersonReviewerDTO(
+            username=user.username,
+            full_name=user.full_name,
+            email=user.email,
+            is_active=user.is_active,
+        )
+    elif group:
+        return GroupReviewerDTO(
+            name=group.name,
+            email=group.email,
+        )
+    elif dynamic_role:
+        return DynamicRoleReviewerDTO(
+            role=dynamic_role,
+        )
+    else:
+        raise ValueError("Invalid reviewer: no user, group, or dynamic role set")
+
+
+def build_reviewer_dto(config: ReviewConfig) -> ReviewerDTO:
+    """
+    Converts a ReviewConfig's reviewer into a ReviewerDTO message struct.
+    """
+    return build_reviewer_dto_from_fields(config.reviewer_user, config.reviewer_group, config.dynamic_role)
+
+
 def build_review_config_dto(config: ReviewConfig) -> ReviewConfigDTO:
     """
     Converts a ReviewConfig instance to a ReviewConfigDTO message struct.
     """
-    depends_on_list = [format_reviewer(dep) for dep in config.depends_on.all()]
+    depends_on_list = [build_reviewer_dto(dep) for dep in config.depends_on.all()]
     return ReviewConfigDTO(
         id=config.id,
         project=config.project.name,
         type=config.type,
-        reviewer=format_reviewer(config),
+        reviewer=build_reviewer_dto(config),
         depends_on=depends_on_list,
     )
 

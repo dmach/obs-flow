@@ -1,10 +1,12 @@
 from .common import Field, Renderer
+from .formatters import format_reviewer_dto, format_user_dto
 
 
 class ReviewRenderer(Renderer):
     reviewer = Field(
         label="Reviewer",
         style={"bold": True},
+        formatter=format_reviewer_dto,
     )
     state = Field(
         label="State",
@@ -16,6 +18,7 @@ class ReviewRenderer(Renderer):
     )
     actor = Field(
         label="Actor",
+        formatter=format_user_dto,
         skip=Field.skip_none,
     )
     when = Field(

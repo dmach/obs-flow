@@ -121,15 +121,18 @@ def test_renderer_json_list(capsys):
 
 def test_review_config_renderer():
     from obs_flow_cli.output.review_config import ReviewConfigRenderer
-    from obs_flow_common.messages import ReviewConfigDTO
+    from obs_flow_common.messages import ReviewConfigDTO, PersonReviewerDTO, GroupReviewerDTO
 
     # with depends_on
     config1 = ReviewConfigDTO(
         id=1,
         project="openSUSE:Factory",
         type="project",
-        reviewer="darix",
-        depends_on=["reviewer1", "reviewer2"]
+        reviewer=PersonReviewerDTO(username="darix", full_name=None, email=None, is_active=True),
+        depends_on=[
+            PersonReviewerDTO(username="reviewer1", full_name=None, email=None, is_active=True),
+            PersonReviewerDTO(username="reviewer2", full_name=None, email=None, is_active=True),
+        ]
     )
     renderer = ReviewConfigRenderer(config1)
     with patch("click.echo") as mock_echo:
@@ -145,7 +148,7 @@ def test_review_config_renderer():
         id=2,
         project="openSUSE:Factory",
         type="project",
-        reviewer="darix",
+        reviewer=PersonReviewerDTO(username="darix", full_name=None, email=None, is_active=True),
         depends_on=[]
     )
     renderer = ReviewConfigRenderer(config2)
@@ -158,4 +161,77 @@ def test_review_config_renderer():
         # ensure "Depends on" is NOT in any of the calls
         for call in mock_echo.call_args_list:
             assert "Depends on" not in call[0][0]
+
+    # detailed person reviewer
+    config3 = ReviewConfigDTO(
+        id=3,
+        project="openSUSE:Factory",
+        type="project",
+        reviewer=PersonReviewerDTO(username="darix", full_name="Marcus Rueckert", email="mrueckert@suse.com", is_active=True),
+        depends_on=[]
+    )
+    renderer = ReviewConfigRenderer(config3)
+    with patch("click.echo") as mock_echo:
+        renderer.render(fmt="text")
+        mock_echo.assert_any_call("Reviewer   : \x1b[1mdarix (Marcus Rueckert <mrueckert@suse.com>)\x1b[0m")
+
+    # detailed group reviewer
+    config4 = ReviewConfigDTO(
+        id=4,
+        project="openSUSE:Factory",
+        type="project",
+        reviewer=GroupReviewerDTO(name="opensuse-review-team", email="review-team@opensuse.org"),
+        depends_on=[]
+    )
+    renderer = ReviewConfigRenderer(config4)
+    with patch("click.echo") as mock_echo:
+        renderer.render(fmt="text")
+        mock_echo.assert_any_call("Reviewer   : \x1b[1m@opensuse-review-team (<review-team@opensuse.org>)\x1b[0m")
+
+
+def test_review_renderer():
+    from obs_flow_cli.output.review import ReviewRenderer
+    from obs_flow_common.messages import ReviewDetail, PersonReviewerDTO, UserDTO
+
+    detail = ReviewDetail(
+        reviewer=PersonReviewerDTO(username="darix", full_name="Marcus Rueckert", email="mrueckert@suse.com", is_active=True),
+        state="accepted",
+        actor=UserDTO(username="dimstar", full_name="Dominique Leuenberger", email="dimstar@opensuse.org", is_active=True),
+        when="2023-01-01T12:00:00",
+        why="Looks good",
+    )
+    renderer = ReviewRenderer(detail)
+    with patch("click.echo") as mock_echo:
+        renderer.render(fmt="text")
+        mock_echo.assert_any_call("Reviewer : \x1b[1mdarix (Marcus Rueckert <mrueckert@suse.com>)\x1b[0m")
+        mock_echo.assert_any_call("State    : \x1b[32mACCEPTED\x1b[0m")
+        mock_echo.assert_any_call("Actor    : dimstar (Dominique Leuenberger <dimstar@opensuse.org>)")
+        mock_echo.assert_any_call("Date     : 2023-01-01 12:00:00")
+        mock_echo.assert_any_call("Reason   : Looks good")
+
+
+def test_staging_renderer():
+    from obs_flow_cli.output.staging import StagingRenderer
+    from obs_flow_common.messages import StagingResponse, UserDTO
+
+    response = StagingResponse(
+        id=1,
+        state="failed",
+        creator=UserDTO(username="darix", full_name="Marcus Rueckert", email="mrueckert@suse.com", is_active=True),
+        title="Staging batch 1",
+        target_project="openSUSE:Factory",
+        pull_requests=["suse/obs-flow#123"],
+        embargo_date="2023-01-01T12:00:00",
+        release_date="2023-01-02T12:00:00",
+    )
+    renderer = StagingRenderer(response)
+    with patch("click.echo") as mock_echo:
+        renderer.render(fmt="text")
+        mock_echo.assert_any_call("ID           : \x1b[1m1\x1b[0m")
+        mock_echo.assert_any_call("State        : \x1b[31mFAILED\x1b[0m")
+        mock_echo.assert_any_call("Creator      : darix (Marcus Rueckert <mrueckert@suse.com>)")
+        mock_echo.assert_any_call("Title        : Staging batch 1")
+        mock_echo.assert_any_call("Project      : openSUSE:Factory")
+        mock_echo.assert_any_call("Release Date : 2023-01-02 12:00:00")
+        mock_echo.assert_any_call("Embargo Date : 2023-01-01 12:00:00")
 

@@ -24,6 +24,7 @@ from obs_flow_common.messages import (
     ReviewConfigAddResponse,
     ReviewConfigRemoveResponse,
     ReviewConfigListResponse,
+    PersonReviewerDTO,
 )
 from click.testing import CliRunner
 from obs_flow_cli.commands.review_config import cli as review_config_cli
@@ -50,7 +51,13 @@ class TestReviewConfigEndpoints(TransactionTestCase):
         config_detail = res_data["data"]
         self.assertEqual(config_detail["project"], "openSUSE:Factory")
         self.assertEqual(config_detail["type"], "project")
-        self.assertEqual(config_detail["reviewer"], "darix")
+        self.assertEqual(config_detail["reviewer"], {
+            "type": "person",
+            "username": "darix",
+            "full_name": "Marcus Rueckert",
+            "email": "mrueckert@suse.com",
+            "is_active": True,
+        })
         self.assertEqual(config_detail["depends_on"], [])
 
         # Verify database state
@@ -76,7 +83,11 @@ class TestReviewConfigEndpoints(TransactionTestCase):
         self.assertEqual(response.status_code, 200)
         res_data = response.json()
         config_detail = res_data["data"]
-        self.assertEqual(config_detail["reviewer"], "@opensuse-review-team")
+        self.assertEqual(config_detail["reviewer"], {
+            "type": "group",
+            "name": "opensuse-review-team",
+            "email": None,
+        })
         self.assertEqual(config_detail["type"], "staging")
 
     def test_add_review_config_dynamic_role(self):
@@ -95,7 +106,10 @@ class TestReviewConfigEndpoints(TransactionTestCase):
         self.assertEqual(response.status_code, 200)
         res_data = response.json()
         config_detail = res_data["data"]
-        self.assertEqual(config_detail["reviewer"], "role:maintainer")
+        self.assertEqual(config_detail["reviewer"], {
+            "type": "role",
+            "role": "maintainer",
+        })
         self.assertEqual(config_detail["type"], "package")
 
     def test_add_review_config_same_reviewer_different_type(self):
@@ -185,8 +199,27 @@ class TestReviewConfigEndpoints(TransactionTestCase):
         self.assertEqual(response.status_code, 200)
         res_data = response.json()
         config_detail = res_data["data"]
-        self.assertEqual(config_detail["reviewer"], "dimstar")
-        self.assertCountEqual(config_detail["depends_on"], ["darix", "@opensuse-review-team"])
+        self.assertEqual(config_detail["reviewer"], {
+            "type": "person",
+            "username": "dimstar",
+            "full_name": "Dominique Leuenberger",
+            "email": "dimstar@opensuse.org",
+            "is_active": True,
+        })
+        self.assertCountEqual(config_detail["depends_on"], [
+            {
+                "type": "person",
+                "username": "darix",
+                "full_name": "Marcus Rueckert",
+                "email": "mrueckert@suse.com",
+                "is_active": True,
+            },
+            {
+                "type": "group",
+                "name": "opensuse-review-team",
+                "email": None,
+            }
+        ])
 
         # Verify database relations
         config = ReviewConfig.objects.get(reviewer_user__username="dimstar")
@@ -250,7 +283,11 @@ class TestReviewConfigEndpoints(TransactionTestCase):
         res_data = response.json()
         configs = res_data["data"]
         self.assertEqual(len(configs), 1)
-        self.assertEqual(configs[0]["reviewer"], "@opensuse-review-team")
+        self.assertEqual(configs[0]["reviewer"], {
+            "type": "group",
+            "name": "opensuse-review-team",
+            "email": None,
+        })
 
     def test_remove_review_config_by_reviewer(self):
         """Verify removing a review configuration by reviewer string."""
@@ -275,7 +312,13 @@ class TestReviewConfigEndpoints(TransactionTestCase):
         res_data = response.json()
         config_detail = res_data["data"]
         self.assertEqual(config_detail["id"], config.id)
-        self.assertEqual(config_detail["reviewer"], "darix")
+        self.assertEqual(config_detail["reviewer"], {
+            "type": "person",
+            "username": "darix",
+            "full_name": "Marcus Rueckert",
+            "email": "mrueckert@suse.com",
+            "is_active": True,
+        })
         self.assertFalse(ReviewConfig.objects.filter(
             project=project,
             type="project",
@@ -291,7 +334,7 @@ class TestClientLibrary(TransactionTestCase):
             id=1,
             project="openSUSE:Factory",
             type="project",
-            reviewer="darix",
+            reviewer=PersonReviewerDTO(username="darix", full_name="Marcus Rueckert", email="mrueckert@suse.com", is_active=True),
             depends_on=[]
         )
         response_payload = ReviewConfigAddResponse(data=dto)
@@ -306,7 +349,7 @@ class TestClientLibrary(TransactionTestCase):
         )
         res = add_review_config(conn, req)
         self.assertEqual(res.data.id, 1)
-        self.assertEqual(res.data.reviewer, "darix")
+        self.assertEqual(res.data.reviewer, PersonReviewerDTO(username="darix", full_name="Marcus Rueckert", email="mrueckert@suse.com", is_active=True))
         mock_post.assert_called_once_with("/api/v1/review-config/add", data=msgspec.json.encode(req))
 
     @patch.object(Connection, "post")
@@ -316,7 +359,7 @@ class TestClientLibrary(TransactionTestCase):
             id=1,
             project="openSUSE:Factory",
             type="project",
-            reviewer="darix",
+            reviewer=PersonReviewerDTO(username="darix", full_name="Marcus Rueckert", email="mrueckert@suse.com", is_active=True),
             depends_on=[]
         )
         response_payload = ReviewConfigRemoveResponse(data=dto)
@@ -330,7 +373,7 @@ class TestClientLibrary(TransactionTestCase):
         )
         res = remove_review_config(conn, req)
         self.assertEqual(res.data.id, 1)
-        self.assertEqual(res.data.reviewer, "darix")
+        self.assertEqual(res.data.reviewer, PersonReviewerDTO(username="darix", full_name="Marcus Rueckert", email="mrueckert@suse.com", is_active=True))
         mock_post.assert_called_once_with("/api/v1/review-config/remove", data=msgspec.json.encode(req))
 
     @patch.object(Connection, "post")
@@ -340,7 +383,7 @@ class TestClientLibrary(TransactionTestCase):
             id=1,
             project="openSUSE:Factory",
             type="project",
-            reviewer="darix",
+            reviewer=PersonReviewerDTO(username="darix", full_name="Marcus Rueckert", email="mrueckert@suse.com", is_active=True),
             depends_on=[]
         )
         response_payload = ReviewConfigListResponse(data=[dto])
@@ -353,7 +396,7 @@ class TestClientLibrary(TransactionTestCase):
         )
         res = list_review_configs(conn, req)
         self.assertEqual(len(res.data), 1)
-        self.assertEqual(res.data[0].reviewer, "darix")
+        self.assertEqual(res.data[0].reviewer, PersonReviewerDTO(username="darix", full_name="Marcus Rueckert", email="mrueckert@suse.com", is_active=True))
         mock_post.assert_called_once_with("/api/v1/review-config/list", data=msgspec.json.encode(req))
 
 
@@ -365,7 +408,7 @@ class TestCLIManagement(TransactionTestCase):
             id=1,
             project="openSUSE:Factory",
             type="project",
-            reviewer="darix",
+            reviewer=PersonReviewerDTO(username="darix", full_name="Marcus Rueckert", email="mrueckert@suse.com", is_active=True),
             depends_on=[]
         )
         mock_add.return_value = ReviewConfigAddResponse(data=dto)
@@ -388,7 +431,7 @@ class TestCLIManagement(TransactionTestCase):
             id=1,
             project="openSUSE:Factory",
             type="project",
-            reviewer="darix",
+            reviewer=PersonReviewerDTO(username="darix", full_name="Marcus Rueckert", email="mrueckert@suse.com", is_active=True),
             depends_on=[]
         )
         mock_remove.return_value = ReviewConfigRemoveResponse(data=dto)
@@ -411,7 +454,7 @@ class TestCLIManagement(TransactionTestCase):
             id=1,
             project="openSUSE:Factory",
             type="project",
-            reviewer="darix",
+            reviewer=PersonReviewerDTO(username="darix", full_name="Marcus Rueckert", email="mrueckert@suse.com", is_active=True),
             depends_on=[]
         )
         mock_list.return_value = ReviewConfigListResponse(data=[dto])

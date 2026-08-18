@@ -1,5 +1,6 @@
 import msgspec
-from obs_flow_common.messages.core import ReviewDetail
+from obs_flow_common.messages.core import UserDTO
+from obs_flow_common.messages.reviews import ReviewDetail
 
 
 class PRDetail(msgspec.Struct):
@@ -9,7 +10,7 @@ class PRDetail(msgspec.Struct):
     state: str
     is_draft: bool
     is_mergeable: bool | None
-    author: str
+    author: UserDTO
     latest_revision: int
     head_sha: str
     base_sha: str

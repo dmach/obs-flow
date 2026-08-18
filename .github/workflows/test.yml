@@ -1,0 +1,43 @@
+name: Test
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.12", "3.13", "3.14", "3.15"]
+        django-version: ["5.2", "6.0", "6.1"]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Set up Python ${{ matrix.python-version }}
+        run: uv python install ${{ matrix.python-version }}
+
+      - name: Install dependencies
+        run: uv sync --all-packages
+
+      - name: Install Django ${{ matrix.django-version }}
+        run: uv pip install "django~=${{ matrix.django-version }}"
+
+      - name: Generate migrations
+        env:
+          UV_NO_SYNC: "1"
+        run: uv run --package obs-flow-server python packages/server/src/obs_flow_server/manage.py makemigrations
+
+      - name: Run tests
+        env:
+          UV_NO_SYNC: "1"
+        run: make test
