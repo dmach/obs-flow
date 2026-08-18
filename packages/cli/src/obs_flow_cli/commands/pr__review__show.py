@@ -9,22 +9,25 @@ from obs_flow_cli.types import PR_ID
 def cli(pull_request_id: str, reviewer: str | None) -> None:
     """Show pull request review details."""
 
+    import os
     from obs_flow_client import show_review
     from obs_flow_common.messages import PRReviewShowRequest
+    from ..helpers import get_connection
+    from ..output.review import ReviewRenderer
 
-    from obs_flow_cli.helpers import format_review, get_connection
-
-    req = PRReviewShowRequest(pull_request_id=pull_request_id, reviewer=reviewer)
-
+    req = PRReviewShowRequest(
+        pull_request_id=pull_request_id,
+        reviewer=reviewer,
+    )
     with get_connection() as conn:
         res = show_review(conn, req)
 
-    click.echo(f"Pull Request: {click.style(res.pull_request_id, bold=True)}")
-    click.echo("=" * 40)
-
     if not res.reviews:
-        click.echo("No reviews found.")
+        click.echo("No reviews found.", err=True)
         return
 
-    for review in res.reviews:
-        format_review(review)
+    verbose = os.getenv("OBS_FLOW_VERBOSE") == "1"
+    output = os.getenv("OBS_FLOW_OUTPUT")
+
+    renderer = ReviewRenderer(res.reviews)
+    renderer.render(fmt=output, verbose=verbose)

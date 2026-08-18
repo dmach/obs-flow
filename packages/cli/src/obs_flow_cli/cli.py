@@ -8,15 +8,19 @@ from .lazy_group import LazyGroup
 
 @click.group(cls=LazyGroup, context_settings={"help_option_names": ["-h", "--help"]})
 @click.option("-v", "--verbose", is_flag=True, help="Enable verbose output")
+@click.option("--output", type=click.Choice(["text", "json"], case_sensitive=False), help="Output format.")
 @click.option("--traceback", is_flag=True, help="Show full traceback on error")
 @click.pass_context
-def main(ctx: click.Context, verbose: bool, traceback: bool) -> None:
+def main(ctx: click.Context, verbose: bool, output: str, traceback: bool) -> None:
     """
     flow: OBS Flow command-line interface
     """
     ctx.ensure_object(dict)
+    ctx.obj["output"] = output
     ctx.obj["verbose"] = verbose
     ctx.obj["traceback"] = traceback
+    if output:
+        os.environ["OBS_FLOW_OUTPUT"] = output
     if verbose:
         os.environ["OBS_FLOW_VERBOSE"] = "1"
     if traceback:

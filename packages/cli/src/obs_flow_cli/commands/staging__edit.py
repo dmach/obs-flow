@@ -9,20 +9,23 @@ import click
 def cli(staging_id: int, title: str | None, embargo_date: str | None, release_date: str | None) -> None:
     """Edit an existing staging batch."""
 
+    import os
     from obs_flow_client import edit_staging
     from obs_flow_common.messages import StagingEditRequest
+    from ..helpers import get_connection
+    from ..output.staging import StagingRenderer
 
-    from obs_flow_cli.helpers import get_connection
-
-    req = StagingEditRequest(id=staging_id, title=title, embargo_date=embargo_date, release_date=release_date)
-
+    req = StagingEditRequest(
+        id=staging_id,
+        title=title,
+        embargo_date=embargo_date,
+        release_date=release_date,
+    )
     with get_connection() as conn:
         res = edit_staging(conn, req)
 
-    click.echo(f"Staging batch {click.style(str(res.id), bold=True)} updated successfully.")
-    if res.title:
-        click.echo(f"Title: {res.title}")
-    if res.embargo_date:
-        click.echo(f"Embargo Date: {res.embargo_date}")
-    if res.release_date:
-        click.echo(f"Release Date: {res.release_date}")
+    verbose = os.getenv("OBS_FLOW_VERBOSE") == "1"
+    output = os.getenv("OBS_FLOW_OUTPUT")
+
+    renderer = StagingRenderer(res)
+    renderer.render(fmt=output, verbose=verbose)
