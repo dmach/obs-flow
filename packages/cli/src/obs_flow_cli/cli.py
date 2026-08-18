@@ -39,4 +39,6 @@ def run() -> None:
         if "--traceback" in sys.argv or os.environ.get("OBS_FLOW_TRACEBACK") == "1":
             raise
         print(str(e), file=sys.stderr)
+        if e.response is not None:
+            print(str(e.response.text), file=sys.stderr)
         sys.exit(1)

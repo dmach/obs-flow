@@ -18,6 +18,7 @@ class StagingRenderer(Renderer):
     )
     title = Field(
         label="Title",
+        skip=Field.skip_none,
     )
     project = Field(
         label="Project",
@@ -25,8 +26,10 @@ class StagingRenderer(Renderer):
     release_date = Field(
         label="Release Date",
         formatter=Field.format_datetime,
+        skip=Field.skip_none,
     )
     embargo_date = Field(
         label="Embargo Date",
         formatter=Field.format_datetime,
+        skip=Field.skip_none,
     )

@@ -117,3 +117,45 @@ def test_renderer_json_list(capsys):
     assert len(parsed) == 2
     assert parsed[0]["id"] == 1
     assert parsed[1]["id"] == 2
+
+
+def test_review_config_renderer():
+    from obs_flow_cli.output.review_config import ReviewConfigRenderer
+    from obs_flow_common.messages import ReviewConfigDTO
+
+    # with depends_on
+    config1 = ReviewConfigDTO(
+        id=1,
+        project="openSUSE:Factory",
+        type="project",
+        reviewer="darix",
+        depends_on=["reviewer1", "reviewer2"]
+    )
+    renderer = ReviewConfigRenderer(config1)
+    with patch("click.echo") as mock_echo:
+        renderer.render(fmt="text")
+        mock_echo.assert_any_call("ID         : \x1b[1m1\x1b[0m")
+        mock_echo.assert_any_call("Project    : openSUSE:Factory")
+        mock_echo.assert_any_call("Type       : project")
+        mock_echo.assert_any_call("Reviewer   : \x1b[1mdarix\x1b[0m")
+        mock_echo.assert_any_call("Depends on : reviewer1, reviewer2")
+
+    # without depends_on (empty list)
+    config2 = ReviewConfigDTO(
+        id=2,
+        project="openSUSE:Factory",
+        type="project",
+        reviewer="darix",
+        depends_on=[]
+    )
+    renderer = ReviewConfigRenderer(config2)
+    with patch("click.echo") as mock_echo:
+        renderer.render(fmt="text")
+        mock_echo.assert_any_call("ID         : \x1b[1m2\x1b[0m")
+        mock_echo.assert_any_call("Project    : openSUSE:Factory")
+        mock_echo.assert_any_call("Type       : project")
+        mock_echo.assert_any_call("Reviewer   : \x1b[1mdarix\x1b[0m")
+        # ensure "Depends on" is NOT in any of the calls
+        for call in mock_echo.call_args_list:
+            assert "Depends on" not in call[0][0]
+

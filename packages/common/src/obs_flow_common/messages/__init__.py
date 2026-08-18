@@ -1,6 +1,15 @@
 from obs_flow_common.messages.core import (
     ReviewDetail,
 )
+from obs_flow_common.messages.reviews import (
+    ReviewConfigDTO,
+    ReviewConfigAddRequest,
+    ReviewConfigRemoveRequest,
+    ReviewConfigListRequest,
+    ReviewConfigAddResponse,
+    ReviewConfigRemoveResponse,
+    ReviewConfigListResponse,
+)
 from obs_flow_common.messages.pull_requests import (
     PRDetail,
     PRSyncRequest,
@@ -38,6 +47,13 @@ from obs_flow_common.messages.staging import (
 
 __all__ = [
     "ReviewDetail",
+    "ReviewConfigDTO",
+    "ReviewConfigAddRequest",
+    "ReviewConfigRemoveRequest",
+    "ReviewConfigListRequest",
+    "ReviewConfigAddResponse",
+    "ReviewConfigRemoveResponse",
+    "ReviewConfigListResponse",
     "PRDetail",
     "PRSyncRequest",
     "PRSyncResponse",
