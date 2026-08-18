@@ -21,6 +21,7 @@ StagingEditResponse = StagingResponse
 
 class StagingCreateRequest(msgspec.Struct):
     """Request to create a new staging batch."""
+    project: str
     title: str | None = None
     embargo_date: str | None = None
     release_date: str | None = None

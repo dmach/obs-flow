@@ -92,7 +92,7 @@ def show_staging_endpoint(request, staging_id: int):
 @api.post("/api/v1/staging/create")
 @sync_to_async
 def create_staging_endpoint(payload: StagingCreateRequest):
-    project = Project.objects.get(name="suse:obs-flow")
+    project = Project.objects.get(name=payload.project)
     admin_user = User.objects.get(username="admin")
 
     batch = StagingBatch.objects.create(

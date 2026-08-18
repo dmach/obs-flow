@@ -68,3 +68,50 @@ class TestFixtureData(TestCase):
         # Verify StagingReview
         batch = StagingBatch.objects.get(id=1)
         self.assertTrue(StagingReview.objects.filter(staging=batch, reviewer_user__username="darix").exists())
+
+
+import json
+from django.test import TransactionTestCase
+from django_bolt.testing import TestClient
+from obs_flow_server.api import api
+
+
+class TestStagingAPI(TransactionTestCase):
+    fixtures = ["opensuse_data.json"]
+
+    def setUp(self):
+        User.objects.create(username="admin", username_lower="admin")
+
+    def test_create_staging_batch_with_project(self):
+        """Verify that creating a staging batch requires a project and sets it correctly."""
+        payload = {
+            "project": "openSUSE:Factory",
+            "title": "My Staging Batch",
+        }
+        with TestClient(api) as client:
+            response = client.post(
+                "/api/v1/staging/create",
+                content=json.dumps(payload),
+            )
+        self.assertEqual(response.status_code, 200)
+        res_data = response.json()
+        self.assertEqual(res_data["target_project"], "openSUSE:Factory")
+        self.assertEqual(res_data["title"], "My Staging Batch")
+
+        # Verify it was created in the database
+        batch = StagingBatch.objects.get(id=res_data["id"])
+        self.assertEqual(batch.project.name, "openSUSE:Factory")
+        self.assertEqual(batch.title, "My Staging Batch")
+
+    def test_create_staging_batch_missing_project(self):
+        """Verify that creating a staging batch without a project fails."""
+        payload = {
+            "title": "My Staging Batch",
+        }
+        with TestClient(api) as client:
+            response = client.post(
+                "/api/v1/staging/create",
+                content=json.dumps(payload),
+            )
+        self.assertNotEqual(response.status_code, 200)
+

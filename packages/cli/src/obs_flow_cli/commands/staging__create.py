@@ -1,14 +1,12 @@
 import click
 
 
-# TODO: require --project
-
-
 @click.command(name="create")
+@click.option("--project", required=True, help="The target project for the staging batch")
 @click.option("--title", help="A descriptive title for the staging batch")
 @click.option("--embargo-date", help="Planned embargo date (ISO-8601 format)")
 @click.option("--release-date", help="Planned release date (ISO-8601 format)")
-def cli(title: str | None, embargo_date: str | None, release_date: str | None) -> None:
+def cli(project: str, title: str | None, embargo_date: str | None, release_date: str | None) -> None:
     """Create a new staging batch."""
 
     import os
@@ -18,6 +16,7 @@ def cli(title: str | None, embargo_date: str | None, release_date: str | None) -
     from ..output.staging import StagingRenderer
 
     req = StagingCreateRequest(
+        project=project,
         title=title,
         embargo_date=embargo_date,
         release_date=release_date,
