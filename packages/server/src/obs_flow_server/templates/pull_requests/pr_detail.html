@@ -108,20 +108,26 @@
             </div>
             <div class="sidebar-section">
                 <h4>Mergeable</h4>
-                <p>
-                    {% if pr.is_mergeable == True %}
-                        <span class="badge badge-accepted">yes</span>
-                    {% elif pr.is_mergeable == False %}
-                        <span class="badge badge-rejected">no</span>
-                    {% else %}
-                        <span class="badge badge-pending">unknown</span>
-                    {% endif %}
-                </p>
+                <p>{% if pr.is_mergeable %}yes{% else %}no{% endif %}</p>
             </div>
             <div class="sidebar-section">
                 <h4>Target Project</h4>
-                <p>{{ pr.target.project.name|default:"(None)" }}</p>
+                <p>
+                    {% if pr.target.project %}
+                        {{ pr.target.project.name }}
+                    {% elif pr.target.package %}
+                        {{ pr.target.package.project.name }}
+                    {% else %}
+                        (None)
+                    {% endif %}
+                </p>
             </div>
+            {% if pr.target.package %}
+            <div class="sidebar-section">
+                <h4>Target Package</h4>
+                <p>{{ pr.target.package.name }}</p>
+            </div>
+            {% endif %}
             <div class="sidebar-section">
                 <h4>Target Branch</h4>
                 <p>{{ pr.target.branch }}</p>
