@@ -235,3 +235,48 @@ def test_staging_renderer():
         mock_echo.assert_any_call("Release Date : 2023-01-02 12:00:00")
         mock_echo.assert_any_call("Embargo Date : 2023-01-01 12:00:00")
 
+
+def test_git_mapping_renderer():
+    from obs_flow_cli.output.git_mapping import GitMappingRenderer
+    from obs_flow_common.messages import GitMappingDetail
+
+    # Project-only mapping
+    detail = GitMappingDetail(
+        id=1,
+        owner="openSUSE",
+        repo="osc",
+        branch="master",
+        project="openSUSE:Factory",
+        package=None,
+    )
+    renderer = GitMappingRenderer(detail)
+    with patch("click.echo") as mock_echo:
+        renderer.render(fmt="text")
+        mock_echo.assert_any_call("ID         : \x1b[1m1\x1b[0m")
+        mock_echo.assert_any_call("Owner      : openSUSE")
+        mock_echo.assert_any_call("Repository : osc")
+        mock_echo.assert_any_call("Branch     : \x1b[32mmaster\x1b[0m")
+        mock_echo.assert_any_call("Project    : openSUSE:Factory")
+        # package is None and has skip=Field.skip_none, so it shouldn't be in the output
+        for call in mock_echo.call_args_list:
+            assert "Package" not in call[0][0]
+
+    # Package-based mapping (should render both project and package)
+    detail_pkg = GitMappingDetail(
+        id=2,
+        owner="openSUSE",
+        repo="osc",
+        branch="master",
+        project="openSUSE:Factory",
+        package="osc",
+    )
+    renderer_pkg = GitMappingRenderer(detail_pkg)
+    with patch("click.echo") as mock_echo:
+        renderer_pkg.render(fmt="text")
+        mock_echo.assert_any_call("ID         : \x1b[1m2\x1b[0m")
+        mock_echo.assert_any_call("Owner      : openSUSE")
+        mock_echo.assert_any_call("Repository : osc")
+        mock_echo.assert_any_call("Branch     : \x1b[32mmaster\x1b[0m")
+        mock_echo.assert_any_call("Project    : openSUSE:Factory")
+        mock_echo.assert_any_call("Package    : osc")
+

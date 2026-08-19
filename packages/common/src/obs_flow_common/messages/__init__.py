@@ -1,5 +1,14 @@
 from obs_flow_common.messages.core import (
     UserDTO,
+    GitMappingDetail,
+    GitMappingListRequest,
+    GitMappingListResponse,
+    GitMappingAddRequest,
+    GitMappingAddResponse,
+    GitMappingRemoveRequest,
+    GitMappingRemoveResponse,
+    GitMappingEditRequest,
+    GitMappingEditResponse,
 )
 from obs_flow_common.messages.reviews import (
     ReviewConfigDTO,
@@ -52,6 +61,15 @@ from obs_flow_common.messages.staging import (
 
 __all__ = [
     "UserDTO",
+    "GitMappingDetail",
+    "GitMappingListRequest",
+    "GitMappingListResponse",
+    "GitMappingAddRequest",
+    "GitMappingAddResponse",
+    "GitMappingRemoveRequest",
+    "GitMappingRemoveResponse",
+    "GitMappingEditRequest",
+    "GitMappingEditResponse",
     "ReviewDetail",
     "ReviewConfigDTO",
     "ReviewConfigAddRequest",
