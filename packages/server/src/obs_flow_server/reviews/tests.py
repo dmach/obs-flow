@@ -27,7 +27,7 @@ from obs_flow_common.messages import (
     PersonReviewerDTO,
 )
 from click.testing import CliRunner
-from obs_flow_cli.commands.review_config import cli as review_config_cli
+from obs_flow_cli.commands.config__review import cli as review_config_cli
 
 
 class TestReviewConfigEndpoints(TransactionTestCase):
@@ -403,7 +403,7 @@ class TestClientLibrary(TransactionTestCase):
 class TestCLIManagement(TransactionTestCase):
     @patch("obs_flow_client.add_review_config")
     def test_cli_add_review_config(self, mock_add):
-        """Verify CLI review-config add command."""
+        """Verify CLI config review add command."""
         dto = ReviewConfigDTO(
             id=1,
             project="openSUSE:Factory",
@@ -426,7 +426,7 @@ class TestCLIManagement(TransactionTestCase):
 
     @patch("obs_flow_client.remove_review_config")
     def test_cli_remove_review_config(self, mock_remove):
-        """Verify CLI review-config remove command."""
+        """Verify CLI config review remove command."""
         dto = ReviewConfigDTO(
             id=1,
             project="openSUSE:Factory",
@@ -449,7 +449,7 @@ class TestCLIManagement(TransactionTestCase):
 
     @patch("obs_flow_client.list_review_configs")
     def test_cli_list_review_configs(self, mock_list):
-        """Verify CLI review-config list command."""
+        """Verify CLI config review list command."""
         dto = ReviewConfigDTO(
             id=1,
             project="openSUSE:Factory",
