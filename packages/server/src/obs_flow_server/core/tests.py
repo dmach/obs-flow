@@ -138,3 +138,93 @@ class TestGitMappingAPI(TransactionTestCase):
         self.assertEqual(mapping.branch, "develop")
         self.assertIsNone(mapping.project)
         self.assertEqual(mapping.package, self.package)
+
+
+class TestSyncGiteaCommand(TransactionTestCase):
+    def test_save_to_db_preserves_pull_requests(self):
+        from accounts.models import User
+        from pull_requests.models import PullRequest
+        from core.management.commands.sync_gitea import Command
+
+        user = User.objects.create(username="testuser", username_lower="testuser")
+        project1 = Project.objects.create(name="proj1")
+        project2 = Project.objects.create(name="proj2")
+
+        # Create a GitMapping for proj1
+        mapping = GitMapping.objects.create(
+            owner="org", repo="repo", branch="main", project=project1
+        )
+
+        # Create a PR for this mapping
+        pr = PullRequest.objects.create(
+            target=mapping,
+            number=1,
+            author=user,
+            source_owner="org",
+            source_repo="repo",
+            source_branch="feat",
+        )
+
+        self.assertEqual(PullRequest.objects.count(), 1)
+
+        # Run save_to_db to move the mapping to proj2
+        cmd = Command()
+        cmd.save_to_db(
+            obs_project="proj2",
+            org="org",
+            repo="repo",
+            branch="main",
+            package_sha={},
+            submodule_branches={},
+        )
+
+        # Verify that the PR is preserved and the mapping is now associated with proj2
+        self.assertEqual(PullRequest.objects.count(), 1)
+        mapping.refresh_from_db()
+        self.assertEqual(mapping.project, project2)
+        self.assertIsNone(mapping.package)
+
+    def test_save_to_db_preserves_pull_requests_package(self):
+        from accounts.models import User
+        from pull_requests.models import PullRequest
+        from core.management.commands.sync_gitea import Command
+
+        user = User.objects.create(username="testuser", username_lower="testuser")
+        project = Project.objects.create(name="proj1")
+        package1 = Package.objects.create(project=project, name="pkg1")
+        package2 = Package.objects.create(project=project, name="pkg2")
+
+        # Create a GitMapping for pkg1
+        mapping = GitMapping.objects.create(
+            owner="org", repo="repo", branch="main", package=package1
+        )
+
+        # Create a PR for this mapping
+        pr = PullRequest.objects.create(
+            target=mapping,
+            number=1,
+            author=user,
+            source_owner="org",
+            source_repo="repo",
+            source_branch="feat",
+        )
+
+        self.assertEqual(PullRequest.objects.count(), 1)
+
+        # Run save_to_db to move the mapping to pkg2
+        cmd = Command()
+        cmd.save_to_db(
+            obs_project="proj1",
+            org="org_proj",
+            repo="repo_proj",
+            branch="main",
+            package_sha={"pkg2": "some-sha"},
+            submodule_branches={"pkg2": ("host", "org", "repo", "main")},
+        )
+
+        # Verify that the PR is preserved and the mapping is now associated with pkg2
+        self.assertEqual(PullRequest.objects.count(), 1)
+        mapping.refresh_from_db()
+        self.assertEqual(mapping.package, package2)
+        self.assertIsNone(mapping.project)
+
