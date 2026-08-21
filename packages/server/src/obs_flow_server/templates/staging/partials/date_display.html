@@ -8,6 +8,6 @@
                 {{ batch.release_date|date:"Y-m-d H:i"|default:"None" }}
             {% endif %}
         </span>
-        <button hx-get="{% url 'staging_edit_date_form' batch.id date_type %}" hx-target="#{{ date_type }}-date-container" hx-swap="outerHTML" class="outline secondary" style="padding: 0.1rem 0.3rem; border: none; font-size: 0.8rem; cursor: pointer; margin: 0;">✏️</button>
+        <button hx-get="{% url 'staging_edit_date_form' batch.id date_type %}" hx-target="#{{ date_type }}-date-container" hx-swap="outerHTML" class="outline secondary btn-icon">✏️</button>
     </p>
 </div>

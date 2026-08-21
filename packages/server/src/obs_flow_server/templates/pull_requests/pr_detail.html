@@ -11,14 +11,14 @@
     </ul>
 </nav>
 
-<header style="margin-bottom: 1.5rem;">
-    <h2 class="mb-0">{{ pr.title }} <span class="muted" style="font-weight: normal;">#{{ pr.number }}</span></h2>
+<header class="detail-header">
+    <h2 class="mb-0">{{ pr.title }} <span class="muted detail-id">#{{ pr.number }}</span></h2>
 </header>
 
 <div class="layout-with-sidebar">
     <!-- Left Column: Main Content -->
     <div>
-        <section style="margin-bottom: 2rem;">
+        <section class="detail-section">
             <h3>Reviews (Latest Revision)</h3>
             {% if reviews %}
                 <table class="striped">

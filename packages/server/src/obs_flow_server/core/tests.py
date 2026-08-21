@@ -228,3 +228,72 @@ class TestSyncGiteaCommand(TransactionTestCase):
         self.assertEqual(mapping.package, package2)
         self.assertIsNone(mapping.project)
 
+
+class TestGitMappingViews(TransactionTestCase):
+    def test_git_mapping_list_filtering_and_pagination(self):
+        """Verify that the git mapping list page correctly filters and paginates git mappings."""
+        from django.test import Client
+
+        # Create 205 git mappings to test pagination (page size is 200)
+        for i in range(1, 206):
+            GitMapping.objects.create(
+                owner="suse" if i % 2 == 0 else "openSUSE",
+                repo=f"repo-{i}",
+                branch=f"branch-{i}",
+                project=Project.objects.create(name=f"proj-{i}")
+            )
+
+        client = Client()
+
+        # 1. Test pagination (page 1 should have 200 items, page 2 should have 5 items)
+        response = client.get("/git-mappings/")
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Page 1 of 2")
+        self.assertContains(response, "repo-205")
+
+        response = client.get("/git-mappings/?page=2")
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Page 2 of 2")
+        self.assertContains(response, "repo-1")
+
+        # 2. Test filtering by owner
+        response = client.get("/git-mappings/?owner=suse&owner_exact=on")
+        self.assertEqual(response.status_code, 200)
+        # 102 mappings should fit on 1 page
+        self.assertNotContains(response, "Page 1 of 2")
+
+    def test_git_mapping_list_filtering_by_project_or_package_project(self):
+        """Verify that filtering by project name correctly matches both direct projects and projects linked via a package."""
+        from django.test import Client
+
+        # Mapping 1: Direct project
+        proj1 = Project.objects.create(name="suse:direct")
+        GitMapping.objects.create(owner="org", repo="repo1", branch="main", project=proj1)
+
+        # Mapping 2: Via package
+        proj2 = Project.objects.create(name="suse:indirect")
+        pkg2 = Package.objects.create(project=proj2, name="mypkg")
+        GitMapping.objects.create(owner="org", repo="repo2", branch="main", package=pkg2)
+
+        client = Client()
+
+        # Filter by direct project
+        response = client.get("/git-mappings/?project=suse:direct")
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "repo1")
+        self.assertNotContains(response, "repo2")
+
+        # Filter by indirect project
+        response = client.get("/git-mappings/?project=suse:indirect")
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "repo2")
+        self.assertNotContains(response, "repo1")
+
+        # Filter by common substring
+        response = client.get("/git-mappings/?project=suse:")
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "repo1")
+        self.assertContains(response, "repo2")
+
+
+
