@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+
+{% block title %}Git Mappings - OBS Flow{% endblock %}
+
+{% block content %}
+<section>
+    <h2>Git Mappings</h2>
+    <p class="muted">Mappings between git branches and projects/packages.</p>
+
+    <table class="striped">
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Owner</th>
+                <th>Repository</th>
+                <th>Branch</th>
+                <th>Target Project</th>
+                <th>Target Package</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for mapping in mappings %}{% spaceless %}
+            <tr>
+                <td>{{ mapping.id }}</td>
+                <td>{{ mapping.owner }}</td>
+                <td>{{ mapping.repo }}</td>
+                <td><code>{{ mapping.branch }}</code></td>
+                <td>{% if mapping.project %}{{ mapping.project.name }}{% elif mapping.package %}{{ mapping.package.project.name }}{% else %}<span class="muted">-</span>{% endif %}</td>
+                <td>{% if mapping.package %}{{ mapping.package.name }}{% else %}<span class="muted">-</span>{% endif %}</td>
+            </tr>{% endspaceless %}
+            {% empty %}
+            <tr>
+                <td colspan="6" style="text-align: center;" class="muted">No git mappings defined.</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</section>
+{% endblock %}

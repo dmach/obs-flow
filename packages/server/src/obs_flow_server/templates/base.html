@@ -7,7 +7,7 @@
     <title>{% block title %}OBS Flow{% endblock %}</title>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css">
     <link rel="stylesheet" href="{% static 'css/custom.css' %}">
-    <script src="https://unpkg.com/htmx.org@2.0.1"></script>
+    <script src="https://unpkg.com/htmx.org@2.0.1/dist/htmx.min.js"></script>
 </head>
 <body>
     <header class="container">
@@ -17,6 +17,7 @@
                     <li><strong><a href="{% url 'home' %}">OBS Flow</a></strong></li>
                 </ul>
                 <ul>
+                    <li><a href="{% url 'git_mapping_list' %}">Git Mappings</a></li>
                     <li><a href="{% url 'pr_list' %}">Pull Requests</a></li>
                     <li><a href="{% url 'staging_list' %}">Staging Batches</a></li>
                 </ul>

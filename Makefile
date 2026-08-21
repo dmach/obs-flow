@@ -11,6 +11,14 @@ reset-db: ## Reset the database and recreate migrations
 	find packages/server/src/obs_flow_server/*/migrations -type f -name "*.py" ! -name "__init__.py" -delete
 	uv run --package obs-flow-server python packages/server/src/obs_flow_server/manage.py makemigrations
 	uv run --package obs-flow-server python packages/server/src/obs_flow_server/manage.py migrate
+	uv run --package obs-flow-server python packages/server/src/obs_flow_server/manage.py loaddata packages/server/src/obs_flow_server/core/fixtures/opensuse_data.json
+	./flow config git-mapping add --project=openSUSE:Leap:16.1 --owner=openSUSE --repo=Leap --branch=leap-16.1
+	./flow config git-mapping add --project=openSUSE:Leap:16.1 --package=osc --owner=pool --repo=osc --branch=leap-16.1
+	./flow config review add --project=openSUSE:Leap:16.1 --type=package --user=factory-auto
+	./flow config review add --project=openSUSE:Leap:16.1 --type=package --group=opensuse-review-team
+	./flow config review add --project=openSUSE:Leap:16.1 --type=package --user=darix
+	./flow config review add --project=openSUSE:Leap:16.1 --type=package --role=maintainer
+	curl -X POST http://localhost:8000/api/v1/pr/sync -d '{"owner": "pool", "repo": "osc", "number": 4}'
 
 .PHONY: run
 run: ## Run the django-bolt server in development mode

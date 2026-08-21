@@ -252,12 +252,16 @@ def _do_sync_pull_request(req: PRSyncRequest) -> PRSyncResponse:
         }
     )
 
-    # Get or create Project and GitMapping
-    project_name = f"{req.owner}:{req.repo}"
-    project, _ = Project.objects.get_or_create(name=project_name)
-    git_mapping, _ = GitMapping.objects.get_or_create(
-        owner=req.owner, repo=req.repo, branch="main", defaults={"project": project}
-    )
+    # Find GitMapping
+    base_branch = data.get("base", {}).get("ref", "main")
+    try:
+        git_mapping = GitMapping.objects.get(
+            owner__iexact=req.owner,
+            repo__iexact=req.repo,
+            branch=base_branch
+        )
+    except GitMapping.DoesNotExist:
+        raise Exception(f"No GitMapping found for {req.owner}/{req.repo}:{base_branch}")
 
     # Get or create PR
     pr, created = PullRequest.objects.get_or_create(

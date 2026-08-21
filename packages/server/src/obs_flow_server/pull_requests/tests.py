@@ -44,7 +44,11 @@ class TestPRSyncEndpoint(TransactionTestCase):
     @override_settings(GITEA_URL="https://gitea.example.com", GITEA_TOKEN="secret-token")
     @patch("urllib.request.urlopen")
     def test_sync_creates_new_pr(self, mock_urlopen):
-        """Verify that syncing a non-existent PR creates it and its author/project/revision."""
+        """Verify that syncing a non-existent PR creates it and its author/revision."""
+        # Create Project and GitMapping first
+        project = Project.objects.create(name="suse:obs-flow")
+        GitMapping.objects.create(owner="suse", repo="obs-flow", branch="main", project=project)
+
         # Mock Gitea response
         mock_response = MagicMock()
         gitea_data = {
@@ -62,7 +66,8 @@ class TestPRSyncEndpoint(TransactionTestCase):
                 }
             },
             "base": {
-                "sha": "0000000000000000000000000000000000000000"
+                "sha": "0000000000000000000000000000000000000000",
+                "ref": "main"
             }
         }
         mock_response.read.return_value = json.dumps(gitea_data).encode("utf-8")
@@ -157,7 +162,8 @@ class TestPRSyncEndpoint(TransactionTestCase):
                 }
             },
             "base": {
-                "sha": "0000000000000000000000000000000000000000"
+                "sha": "0000000000000000000000000000000000000000",
+                "ref": "main"
             }
         }
         mock_response.read.return_value = json.dumps(gitea_data).encode("utf-8")
@@ -263,7 +269,8 @@ class TestPRSyncEndpoint(TransactionTestCase):
                 }
             },
             "base": {
-                "sha": "0000000000000000000000000000000000000000"
+                "sha": "0000000000000000000000000000000000000000",
+                "ref": "main"
             }
         }
         mock_response.read.return_value = json.dumps(gitea_data).encode("utf-8")
@@ -288,3 +295,34 @@ class TestPRSyncEndpoint(TransactionTestCase):
         self.assertEqual(review.reviewer_user, reviewer_user)
         from pull_requests.models import PullRequestReview
         self.assertEqual(review.state, PullRequestReview.State.PENDING)
+
+
+class TestPRViews(TransactionTestCase):
+    def test_pr_detail_view_with_package(self):
+        """Verify that the PR detail page correctly renders the project name and package name when the target is a package."""
+        from django.test import Client
+        from core.models import Package
+
+        project = Project.objects.create(name="suse:obs-flow")
+        package = Package.objects.create(project=project, name="my-package")
+        git_mapping = GitMapping.objects.create(owner="suse", repo="obs-flow", branch="main", package=package)
+        author = User.objects.create(username="john_doe", username_lower="john_doe", account_type=User.AccountType.HUMAN)
+        pr = PullRequest.objects.create(
+            target=git_mapping,
+            number=123,
+            author=author,
+            title="My PR",
+            is_draft=False,
+            is_mergeable=True,
+            state=PullRequest.State.OPEN,
+            source_owner="john_doe",
+            source_repo="obs-flow",
+            source_branch="bugfix"
+        )
+
+        client = Client()
+        response = client.get(f"/pull_requests/{pr.id}/")
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "suse:obs-flow")
+        self.assertContains(response, "my-package")
+

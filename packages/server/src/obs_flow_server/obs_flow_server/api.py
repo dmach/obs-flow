@@ -28,6 +28,7 @@ api = BoltAPI(middleware=[ExceptionHandlerMiddleware])
 import pull_requests.api
 import staging.api
 import reviews.api
+import core.api
 
 # Mount Django ASGI app at the root path to serve standard Django views
 api.mount_django("/", clear_root_path=True)
