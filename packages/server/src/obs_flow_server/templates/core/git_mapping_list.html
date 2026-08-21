@@ -41,12 +41,42 @@
         <table class="striped">
             <thead>
                 <tr>
-                    <th>ID</th>
-                    <th>Owner</th>
-                    <th>Repository</th>
-                    <th>Branch</th>
-                    <th>Target Project</th>
-                    <th>Target Package</th>
+                    <th>
+                        <a href="?sort={% if current_sort == 'id' %}-id{% else %}id{% endif %}{{ base_query }}" class="sort-link">
+                            ID
+                            {% if current_sort == 'id' %}▲{% elif current_sort == '-id' %}▼{% endif %}
+                        </a>
+                    </th>
+                    <th>
+                        <a href="?sort={% if current_sort == 'owner' %}-owner{% else %}owner{% endif %}{{ base_query }}" class="sort-link">
+                            Owner
+                            {% if current_sort == 'owner' %}▲{% elif current_sort == '-owner' %}▼{% endif %}
+                        </a>
+                    </th>
+                    <th>
+                        <a href="?sort={% if current_sort == 'repo' %}-repo{% else %}repo{% endif %}{{ base_query }}" class="sort-link">
+                            Repository
+                            {% if current_sort == 'repo' %}▲{% elif current_sort == '-repo' %}▼{% endif %}
+                        </a>
+                    </th>
+                    <th>
+                        <a href="?sort={% if current_sort == 'branch' %}-branch{% else %}branch{% endif %}{{ base_query }}" class="sort-link">
+                            Branch
+                            {% if current_sort == 'branch' %}▲{% elif current_sort == '-branch' %}▼{% endif %}
+                        </a>
+                    </th>
+                    <th>
+                        <a href="?sort={% if current_sort == 'project__name' %}-project__name{% else %}project__name{% endif %}{{ base_query }}" class="sort-link">
+                            Target Project
+                            {% if current_sort == 'project__name' %}▲{% elif current_sort == '-project__name' %}▼{% endif %}
+                        </a>
+                    </th>
+                    <th>
+                        <a href="?sort={% if current_sort == 'package__name' %}-package__name{% else %}package__name{% endif %}{{ base_query }}" class="sort-link">
+                            Target Package
+                            {% if current_sort == 'package__name' %}▲{% elif current_sort == '-package__name' %}▼{% endif %}
+                        </a>
+                    </th>
                 </tr>
             </thead>
             <tbody>

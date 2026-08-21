@@ -18,7 +18,7 @@ def home(request):
 
 def git_mapping_list(request):
     form = GitMappingFilterForm(request.GET)
-    qs = GitMapping.objects.select_related("project", "package", "package__project").all().order_by("-id")
+    qs = GitMapping.objects.select_related("project", "package", "package__project").all()
 
     if form.is_valid():
         owner = form.cleaned_data.get("owner")
@@ -64,12 +64,22 @@ def git_mapping_list(request):
             else:
                 qs = qs.filter(package__name__icontains=package)
 
+    allowed_sorts = ['id', 'owner', 'repo', 'branch', 'project__name', 'package__name']
+    sort_param = request.GET.get('sort', '-id')
+    if sort_param.lstrip('-') not in allowed_sorts:
+        sort_param = '-id'
+
+    qs = qs.order_by(sort_param)
+
     paginator = Paginator(qs, 200)
     page_number = request.GET.get("page")
     page_obj = paginator.get_page(page_number)
 
-    filter_params = {k: v for k, v in request.GET.items() if k != 'page' and v}
-    filter_query = "&" + urllib.parse.urlencode(filter_params) if filter_params else ""
+    base_params = {k: v for k, v in request.GET.items() if k not in ['page', 'sort'] and v}
+    base_query = "&" + urllib.parse.urlencode(base_params) if base_params else ""
+
+    page_params = {k: v for k, v in request.GET.items() if k != 'page' and v}
+    filter_query = "&" + urllib.parse.urlencode(page_params) if page_params else ""
 
     return render(
         request,
@@ -78,6 +88,8 @@ def git_mapping_list(request):
             "form": form,
             "page_obj": page_obj,
             "filter_query": filter_query,
+            "base_query": base_query,
+            "current_sort": sort_param,
             "total_count": paginator.count,
         },
     )

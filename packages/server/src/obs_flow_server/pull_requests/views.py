@@ -91,12 +91,22 @@ def pr_list(request):
         if reviewer_group:
             qs = qs.filter(revisions__reviews__reviewer_group__name__iexact=reviewer_group).distinct()
 
+    allowed_sorts = ['id', 'title', 'author__username', 'target__branch', 'is_mergeable', 'state']
+    sort_param = request.GET.get('sort', '-id')
+    if sort_param.lstrip('-') not in allowed_sorts:
+        sort_param = '-id'
+
+    qs = qs.order_by(sort_param)
+
     paginator = Paginator(qs, 200)
     page_number = request.GET.get("page")
     page_obj = paginator.get_page(page_number)
 
-    filter_params = {k: v for k, v in request.GET.items() if k != 'page' and v}
-    filter_query = "&" + urllib.parse.urlencode(filter_params) if filter_params else ""
+    base_params = {k: v for k, v in request.GET.items() if k not in ['page', 'sort'] and v}
+    base_query = "&" + urllib.parse.urlencode(base_params) if base_params else ""
+
+    page_params = {k: v for k, v in request.GET.items() if k != 'page' and v}
+    filter_query = "&" + urllib.parse.urlencode(page_params) if page_params else ""
 
     return render(
         request,
@@ -105,6 +115,8 @@ def pr_list(request):
             "form": form,
             "page_obj": page_obj,
             "filter_query": filter_query,
+            "base_query": base_query,
+            "current_sort": sort_param,
             "total_count": paginator.count,
         }
     )
