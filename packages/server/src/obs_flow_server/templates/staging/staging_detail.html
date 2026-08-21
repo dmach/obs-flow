@@ -11,14 +11,14 @@
     </ul>
 </nav>
 
-<header style="margin-bottom: 1.5rem;">
-    <h2 class="mb-0">{{ batch.title|default:"Staging Batch" }} <span class="muted" style="font-weight: normal;">#{{ batch.id }}</span></h2>
+<header class="detail-header">
+    <h2 class="mb-0">{{ batch.title|default:"Staging Batch" }} <span class="muted detail-id">#{{ batch.id }}</span></h2>
 </header>
 
 <div class="layout-with-sidebar">
     <!-- Left Column: Main Content -->
     <div>
-        <section style="margin-bottom: 2rem;">
+        <section class="detail-section">
             <h3>Included Pull Requests</h3>
             {% if pull_requests_data %}
                 <table class="striped">

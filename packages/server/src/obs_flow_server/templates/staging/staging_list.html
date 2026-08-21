@@ -3,9 +3,99 @@
 {% block title %}Staging Batches - OBS Flow{% endblock %}
 
 {% block content %}
-<h2>Staging Batches</h2>
+<div class="page-header">
+    <h2>Staging Batches <span class="badge">{{ total_count }}</span></h2>
+</div>
 
-{% if batches %}
+<details class="filter-panel" {% if request.GET %}open{% endif %}>
+    <summary>Toggle Search & Filters</summary>
+    <div class="filter-panel-body">
+        <form method="GET" action="">
+            <fieldset>
+                <legend>Target Filter</legend>
+                <div class="grid">
+                    {% for field, exact_field in form.target_fields %}
+                    <div>
+                        <div class="filter-field-header">
+                            <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+                            {% if exact_field %}
+                            <label class="filter-exact-label">
+                                {{ exact_field }} Exact
+                            </label>
+                            {% endif %}
+                        </div>
+                        {{ field }}
+                    </div>
+                    {% endfor %}
+                </div>
+            </fieldset>
+
+            <fieldset>
+                <legend>PR Filter</legend>
+                <div class="grid">
+                    {% for field, exact_field in form.pr_fields %}
+                    <div>
+                        <div class="filter-field-header">
+                            <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+                            {% if exact_field %}
+                            <label class="filter-exact-label">
+                                {{ exact_field }} Exact
+                            </label>
+                            {% endif %}
+                        </div>
+                        {{ field }}
+                    </div>
+                    {% endfor %}
+                </div>
+            </fieldset>
+
+            <fieldset>
+                <legend>PR Source Filter</legend>
+                <div class="grid">
+                    {% for field, exact_field in form.pr_source_fields %}
+                    <div>
+                        <div class="filter-field-header">
+                            <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+                            {% if exact_field %}
+                            <label class="filter-exact-label">
+                                {{ exact_field }} Exact
+                            </label>
+                            {% endif %}
+                        </div>
+                        {{ field }}
+                    </div>
+                    {% endfor %}
+                </div>
+            </fieldset>
+
+            <fieldset>
+                <legend>PR Target Filter</legend>
+                <div class="grid">
+                    {% for field, exact_field in form.pr_target_fields %}
+                    <div>
+                        <div class="filter-field-header">
+                            <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+                            {% if exact_field %}
+                            <label class="filter-exact-label">
+                                {{ exact_field }} Exact
+                            </label>
+                            {% endif %}
+                        </div>
+                        {{ field }}
+                    </div>
+                    {% endfor %}
+                </div>
+            </fieldset>
+
+            <div class="filter-actions">
+                <button type="button" class="secondary outline" onclick="window.location.href='?'">Reset</button>
+                <button type="submit">Apply Filter</button>
+            </div>
+        </form>
+    </div>
+</details>
+
+{% if page_obj %}
     <table class="striped">
         <thead>
             <tr>
@@ -17,7 +107,7 @@
             </tr>
         </thead>
         <tbody>
-            {% for batch in batches %}
+            {% for batch in page_obj %}
                 <tr>
                     <td><a href="{% url 'staging_detail' batch.id %}">#{{ batch.id }}</a></td>
                     <td>{{ batch.title|default:"(No Title)" }}</td>
@@ -28,6 +118,30 @@
             {% endfor %}
         </tbody>
     </table>
+
+    {% if page_obj.has_other_pages %}
+    <nav aria-label="pagination" class="pagination-nav">
+      <ul class="pagination-list">
+        {% if page_obj.has_previous %}
+          <li><a href="?page=1{{ filter_query }}" role="button" class="outline secondary">&laquo;&laquo; First</a></li>
+          <li><a href="?page={{ page_obj.previous_page_number }}{{ filter_query }}" role="button" class="outline secondary">&laquo; Previous</a></li>
+        {% else %}
+          <li><a href="#" aria-disabled="true" role="button" class="outline secondary disabled">&laquo;&laquo; First</a></li>
+          <li><a href="#" aria-disabled="true" role="button" class="outline secondary disabled">&laquo; Previous</a></li>
+        {% endif %}
+
+        <li class="pagination-info">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</li>
+
+        {% if page_obj.has_next %}
+          <li><a href="?page={{ page_obj.next_page_number }}{{ filter_query }}" role="button" class="outline secondary">Next &raquo;</a></li>
+          <li><a href="?page={{ page_obj.paginator.num_pages }}{{ filter_query }}" role="button" class="outline secondary">Last &raquo;&raquo;</a></li>
+        {% else %}
+          <li><a href="#" aria-disabled="true" role="button" class="outline secondary disabled">Next &raquo;</a></li>
+          <li><a href="#" aria-disabled="true" role="button" class="outline secondary disabled">Last &raquo;&raquo;</a></li>
+        {% endif %}
+      </ul>
+    </nav>
+    {% endif %}
 {% else %}
     <p class="muted">No staging batches found.</p>
 {% endif %}

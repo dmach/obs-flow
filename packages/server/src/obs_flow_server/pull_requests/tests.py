@@ -326,3 +326,53 @@ class TestPRViews(TransactionTestCase):
         self.assertContains(response, "suse:obs-flow")
         self.assertContains(response, "my-package")
 
+    def test_pr_list_filtering_and_pagination(self):
+        """Verify that the PR list page correctly filters and paginates pull requests."""
+        from django.test import Client
+
+        project = Project.objects.create(name="suse:obs-flow")
+        git_mapping = GitMapping.objects.create(owner="suse", repo="obs-flow", branch="main", project=project)
+        author1 = User.objects.create(username="john_doe", username_lower="john_doe", account_type=User.AccountType.HUMAN)
+        author2 = User.objects.create(username="jane_doe", username_lower="jane_doe", account_type=User.AccountType.HUMAN)
+
+        # Create 205 PRs to test pagination (page size is 200)
+        for i in range(1, 206):
+            PullRequest.objects.create(
+                target=git_mapping,
+                number=i,
+                author=author1 if i % 2 == 0 else author2,
+                title=f"PR {i}",
+                is_draft=False,
+                is_mergeable=True,
+                state=PullRequest.State.OPEN,
+                source_owner="john_doe" if i % 2 == 0 else "jane_doe",
+                source_repo="obs-flow",
+                source_branch=f"bugfix-{i}"
+            )
+
+        client = Client()
+
+        # 1. Test pagination (page 1 should have 200 items, page 2 should have 5 items)
+        response = client.get("/pull_requests/")
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Page 1 of 2")
+        self.assertContains(response, "PR 205") # Ordered by -id, so PR 205 is on page 1
+
+        response = client.get("/pull_requests/?page=2")
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Page 2 of 2")
+        self.assertContains(response, "PR 1")
+
+        # 2. Test filtering by author (john_doe has 102 PRs, jane_doe has 103 PRs)
+        response = client.get("/pull_requests/?author=john_doe")
+        self.assertEqual(response.status_code, 200)
+        # 102 PRs should fit on 1 page (no pagination links needed or page 1 of 1)
+        self.assertNotContains(response, "Page 1 of 2")
+
+        # 3. Test exact filtering by title
+        response = client.get("/pull_requests/?title=PR 10&title_exact=on")
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "PR 10")
+        self.assertNotContains(response, "PR 11")
+
+

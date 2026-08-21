@@ -10,32 +10,29 @@
     <script src="https://unpkg.com/htmx.org@2.0.1/dist/htmx.min.js"></script>
 </head>
 <body>
-    <header class="container">
-        <div class="navbar-container">
-            <nav>
-                <ul>
-                    <li><strong><a href="{% url 'home' %}">OBS Flow</a></strong></li>
-                </ul>
-                <ul>
-                    <li><a href="{% url 'git_mapping_list' %}">Git Mappings</a></li>
-                    <li><a href="{% url 'pr_list' %}">Pull Requests</a></li>
-                    <li><a href="{% url 'staging_list' %}">Staging Batches</a></li>
-                </ul>
-            </nav>
-        </div>
+    <header class="navbar-container">
+        <nav class="container">
+            <ul>
+                <li><strong><a href="{% url 'home' %}">OBS Flow</a></strong></li>
+            </ul>
+            <ul>
+                <li><a href="{% url 'git_mapping_list' %}">Git Mappings</a></li>
+                <li><a href="{% url 'pr_list' %}">Pull Requests</a></li>
+                <li><a href="{% url 'staging_list' %}">Staging Batches</a></li>
+            </ul>
+        </nav>
     </header>
 
     <main class="container">
         {% block content %}{% endblock %}
     </main>
 
-    <footer class="container">
+    <footer class="container page-footer">
         <small>
-            OBS workflow orchestration service &bull;
-            <a href="#">Documentation</a> &bull;
-            <a href="#">File a bug</a> &bull;
-            <a href="#">Support</a> &bull;
-            <a href="#">Source Code</a>
+            <a href="#" class="secondary">Documentation</a> &bull;
+            <a href="#" class="secondary">File a bug</a> &bull;
+            <a href="#" class="secondary">Support</a> &bull;
+            <a href="#" class="secondary">Source Code</a>
         </small>
     </footer>
 </body>

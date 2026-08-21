@@ -144,3 +144,41 @@ class TestStagingCreationWithReviewConfig(TransactionTestCase):
             [review_darix, review_team]
         )
 
+
+class TestStagingViews(TransactionTestCase):
+    def test_staging_list_filtering_and_pagination(self):
+        """Verify that the staging list page correctly filters and paginates staging batches."""
+        from django.test import Client
+
+        project1 = Project.objects.create(name="suse:obs-flow")
+        project2 = Project.objects.create(name="openSUSE:Factory")
+        author = User.objects.create(username="john_doe", username_lower="john_doe", account_type=User.AccountType.HUMAN)
+
+        # Create 205 staging batches to test pagination (page size is 200)
+        for i in range(1, 206):
+            StagingBatch.objects.create(
+                project=project1 if i % 2 == 0 else project2,
+                title=f"Batch {i}",
+                author=author,
+                state=StagingBatch.State.COLLECTING
+            )
+
+        client = Client()
+
+        # 1. Test pagination (page 1 should have 200 items, page 2 should have 5 items)
+        response = client.get("/staging/")
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Page 1 of 2")
+        self.assertContains(response, "Batch 205")
+
+        response = client.get("/staging/?page=2")
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Page 2 of 2")
+        self.assertContains(response, "Batch 1")
+
+        # 2. Test filtering by target_owner (project name)
+        response = client.get("/staging/?target_owner=suse:obs-flow")
+        self.assertEqual(response.status_code, 200)
+        # 102 batches should fit on 1 page
+        self.assertNotContains(response, "Page 1 of 2")
+
