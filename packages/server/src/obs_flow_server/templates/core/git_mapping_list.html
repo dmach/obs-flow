@@ -82,12 +82,12 @@
             <tbody>
                 {% for mapping in page_obj %}{% spaceless %}
                 <tr>
-                    <td>{{ mapping.id }}</td>
-                    <td>{{ mapping.owner }}</td>
-                    <td>{{ mapping.repo }}</td>
-                    <td><code>{{ mapping.branch }}</code></td>
-                    <td>{% if mapping.project %}{{ mapping.project.name }}{% elif mapping.package %}{{ mapping.package.project.name }}{% else %}<span class="muted">-</span>{% endif %}</td>
-                    <td>{% if mapping.package %}{{ mapping.package.name }}{% else %}<span class="muted">-</span>{% endif %}</td>
+                    <td data-label="ID">{{ mapping.id }}</td>
+                    <td data-label="Owner">{{ mapping.owner }}</td>
+                    <td data-label="Repository">{{ mapping.repo }}</td>
+                    <td data-label="Branch"><code>{{ mapping.branch }}</code></td>
+                    <td data-label="Target Project">{% if mapping.project %}{{ mapping.project.name }}{% elif mapping.package %}{{ mapping.package.project.name }}{% else %}<span class="muted">-</span>{% endif %}</td>
+                    <td data-label="Target Package">{% if mapping.package %}{{ mapping.package.name }}{% else %}<span class="muted">-</span>{% endif %}</td>
                 </tr>{% endspaceless %}
                 {% endfor %}
             </tbody>

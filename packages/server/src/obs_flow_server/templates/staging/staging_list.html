@@ -134,11 +134,11 @@
         <tbody>
             {% for batch in page_obj %}
                 <tr>
-                    <td><a href="{% url 'staging_detail' batch.id %}">#{{ batch.id }}</a></td>
-                    <td>{{ batch.title|default:"(No Title)" }}</td>
-                    <td>{{ batch.project.name }}</td>
-                    <td>{{ batch.author.username|default:"(Automated)" }}</td>
-                    <td><span class="badge badge-{{ batch.state }}">{{ batch.state }}</span></td>
+                    <td data-label="ID"><a href="{% url 'staging_detail' batch.id %}">#{{ batch.id }}</a></td>
+                    <td data-label="Title">{{ batch.title|default:"(No Title)" }}</td>
+                    <td data-label="Project">{{ batch.project.name }}</td>
+                    <td data-label="Author">{{ batch.author.username|default:"(Automated)" }}</td>
+                    <td data-label="State"><span class="badge badge-{{ batch.state }}">{{ batch.state }}</span></td>
                 </tr>
             {% endfor %}
         </tbody>

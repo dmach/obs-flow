@@ -137,11 +137,11 @@
         <tbody>
             {% for pr in page_obj %}
                 <tr>
-                    <td><a href="{% url 'pr_detail' pr.id %}">{{ pr.target.owner }}/{{ pr.target.repo }}#{{ pr.number }}</a></td>
-                    <td>{{ pr.title }}</td>
-                    <td>{{ pr.author.username }}</td>
-                    <td><code>{{ pr.target.branch }}</code></td>
-                    <td>
+                    <td data-label="ID"><a href="{% url 'pr_detail' pr.id %}">{{ pr.target.owner }}/{{ pr.target.repo }}#{{ pr.number }}</a></td>
+                    <td data-label="Title">{{ pr.title }}</td>
+                    <td data-label="Author">{{ pr.author.username }}</td>
+                    <td data-label="Target Branch"><code>{{ pr.target.branch }}</code></td>
+                    <td data-label="Mergeable">
                         {% if pr.is_mergeable == True %}
                             <span class="badge badge-accepted">yes</span>
                         {% elif pr.is_mergeable == False %}
@@ -150,7 +150,7 @@
                             <span class="badge badge-pending">unknown</span>
                         {% endif %}
                     </td>
-                    <td><span class="badge badge-{{ pr.state }}">{{ pr.state }}</span></td>
+                    <td data-label="State"><span class="badge badge-{{ pr.state }}">{{ pr.state }}</span></td>
                 </tr>
             {% endfor %}
         </tbody>

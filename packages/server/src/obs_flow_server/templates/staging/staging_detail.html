@@ -33,10 +33,10 @@
                     <tbody>
                         {% for item in pull_requests_data %}
                             <tr>
-                                <td><a href="{% url 'pr_detail' item.pr.id %}">{{ item.pr.target.owner }}/{{ item.pr.target.repo }}#{{ item.pr.number }}</a></td>
-                                <td>{{ item.pr.title }}</td>
-                                <td>{{ item.accepted_reviews }}/{{ item.total_reviews }}</td>
-                                <td><span class="badge badge-{{ item.pr.state }}">{{ item.pr.state }}</span></td>
+                                <td data-label="ID"><a href="{% url 'pr_detail' item.pr.id %}">{{ item.pr.target.owner }}/{{ item.pr.target.repo }}#{{ item.pr.number }}</a></td>
+                                <td data-label="Title">{{ item.pr.title }}</td>
+                                <td data-label="Reviews">{{ item.accepted_reviews }}/{{ item.total_reviews }}</td>
+                                <td data-label="State"><span class="badge badge-{{ item.pr.state }}">{{ item.pr.state }}</span></td>
                             </tr>
                         {% endfor %}
                     </tbody>
@@ -63,7 +63,7 @@
                     <tbody>
                         {% for review in reviews %}
                             <tr>
-                                <td>
+                                <td data-label="Reviewer">
                                     {% if review.reviewer_user %}
                                         {{ review.reviewer_user.username }}
                                     {% elif review.reviewer_group %}
@@ -72,19 +72,23 @@
                                         role:{{ review.dynamic_role }}
                                     {% endif %}
                                 </td>
-                                <td>
+                                <td data-label="Actor">
                                     {% if review.actor %}
                                         {% if review.reviewer_group or review.dynamic_role or review.reviewer_user != review.actor %}
                                             {{ review.actor.username }}
                                         {% endif %}
+                                    {% else %}
+                                        -
                                     {% endif %}
                                 </td>
-                                <td><span class="badge badge-{{ review.state }}">{{ review.state }}</span></td>
-                                <td>{{ review.updated_at|date:"Y-m-d H:i" }}</td>
-                                <td>{{ review.justification|default:"" }}</td>
-                                <td>
+                                <td data-label="State"><span class="badge badge-{{ review.state }}">{{ review.state }}</span></td>
+                                <td data-label="Date">{{ review.updated_at|date:"Y-m-d H:i" }}</td>
+                                <td data-label="Justification">{{ review.justification|default:"-" }}</td>
+                                <td data-label="URL">
                                     {% if review.external_review_url %}
                                         <a href="{{ review.external_review_url }}" target="_blank">link</a>
+                                    {% else %}
+                                        -
                                     {% endif %}
                                 </td>
                             </tr>
