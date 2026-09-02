@@ -1,12 +1,14 @@
 {% load static %}
-<!style>
+<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="color-scheme" content="light dark">
     <title>{% block title %}OBS Flow{% endblock %}</title>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css">
-    <link rel="stylesheet" href="{% static 'css/custom.css' %}">
+    <link rel="stylesheet" href="{% static 'css/flow.css' %}">
+    <script src="{% static 'js/flow.js' %}"></script>
     <script src="https://unpkg.com/htmx.org@2.0.1/dist/htmx.min.js"></script>
 </head>
 <body>
@@ -15,11 +17,19 @@
             <ul>
                 <li><strong><a href="{% url 'home' %}">OBS Flow</a></strong></li>
             </ul>
-            <ul>
+            <ul class="desktop-menu">
                 <li><a href="{% url 'git_mapping_list' %}">Git Mappings</a></li>
                 <li><a href="{% url 'pr_list' %}">Pull Requests</a></li>
                 <li><a href="{% url 'staging_list' %}">Staging Batches</a></li>
             </ul>
+            <details class="mobile-menu dropdown">
+                <summary role="button" class="secondary outline">Menu</summary>
+                <ul dir="rtl">
+                    <li><a href="{% url 'git_mapping_list' %}">Git Mappings</a></li>
+                    <li><a href="{% url 'pr_list' %}">Pull Requests</a></li>
+                    <li><a href="{% url 'staging_list' %}">Staging Batches</a></li>
+                </ul>
+            </details>
         </nav>
     </header>
 
@@ -29,10 +39,20 @@
 
     <footer class="container page-footer">
         <small>
-            <a href="#" class="secondary">Documentation</a> &bull;
-            <a href="#" class="secondary">File a bug</a> &bull;
-            <a href="#" class="secondary">Support</a> &bull;
-            <a href="#" class="secondary">Source Code</a>
+            <div>
+                <a href="#" class="secondary">Documentation</a> &bull;
+                <a href="#" class="secondary">File a bug</a> &bull;
+                <a href="#" class="secondary">Support</a> &bull;
+                <a href="#" class="secondary">Source Code</a>
+            </div>
+            <div style="margin-top: 0.75rem;">
+                <a href="#" id="theme-toggle" class="secondary">Toggle Theme</a> &bull;
+                <span class="font-size-switcher">
+                    <a href="#" data-size="small" class="font-size-btn" aria-label="Small font" title="Small font"></a>
+                    <a href="#" data-size="medium" class="font-size-btn" aria-label="Medium font" title="Medium font"></a>
+                    <a href="#" data-size="large" class="font-size-btn" aria-label="Large font" title="Large font"></a>
+                </span>
+            </div>
         </small>
     </footer>
 </body>
