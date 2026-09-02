@@ -47,7 +47,7 @@
         </section>
 
         <section>
-            <h3>Staging Reviews</h3>
+            <h3>Staging Reviews (Latest Revision)</h3>
             {% if reviews %}
                 <table class="striped">
                     <thead>
@@ -99,6 +99,32 @@
                 <p class="muted">No reviews configured or pending.</p>
             {% endif %}
         </section>
+
+        <section>
+            <h3>Revisions History</h3>
+            {% if revisions %}
+                <table class="striped">
+                    <thead>
+                        <tr>
+                            <th>Rev</th>
+                            <th>Fingerprint</th>
+                            <th>Created At</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for rev in revisions %}
+                            <tr>
+                                <td data-label="Rev"><strong>#{{ rev.revision_number }}</strong></td>
+                                <td data-label="Fingerprint"><code>{{ rev.fingerprint|slice:":12" }}</code></td>
+                                <td data-label="Created At">{{ rev.created_at|date:"Y-m-d H:i" }}</td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            {% else %}
+                <p class="muted">No revisions found.</p>
+            {% endif %}
+        </section>
     </div>
 
     <!-- Right Column: Sidebar Metadata -->
@@ -108,6 +134,16 @@
                 <h4>State</h4>
                 <p>{{ batch.state }}</p>
             </div>
+            {% if latest_revision %}
+            <div class="sidebar-section">
+                <h4>Latest Revision</h4>
+                <p>#{{ latest_revision.revision_number }}</p>
+            </div>
+            <div class="sidebar-section">
+                <h4>Fingerprint</h4>
+                <p><code>{{ latest_revision.fingerprint|slice:":12" }}</code></p>
+            </div>
+            {% endif %}
             <div class="sidebar-section">
                 <h4>Target Project</h4>
                 <p>{{ batch.project.name }}</p>

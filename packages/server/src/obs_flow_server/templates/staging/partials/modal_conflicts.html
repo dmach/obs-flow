@@ -1,0 +1,45 @@
+<dialog open id="staging-modal">
+    <form id="staging-modal-close" method="dialog"></form>
+    <article class="modal-wide modal-type-warning">
+        <header>
+            <h3 style="margin-bottom: 0;">Conflict Warning</h3>
+        </header>
+        <form id="staging-conflict-form" hx-post="{% url 'staging_ui_modal_confirm_add' %}" hx-target="#modal-container">
+            {% csrf_token %}
+            {% for pr_id in selected_prs %}
+                <input type="hidden" name="selected_prs" value="{{ pr_id }}">
+            {% endfor %}
+            <input type="hidden" name="batch_id" value="{{ batch_id }}">
+
+            <p>Some of the selected pull requests are already included in other open staging batches:</p>
+
+            <ul>
+                {% for conflict in conflicts %}
+                    <li>
+                        <strong>{{ conflict.pr.target.owner }}/{{ conflict.pr.target.repo }}#{{ conflict.pr.number }}</strong>
+                        is in:
+                        {% for b in conflict.other_batches %}
+                            <code>#{{ b.id }}{% if b.title %} ({{ b.title }}){% endif %}</code>{% if not forloop.last %}, {% endif %}
+                        {% endfor %}
+                    </li>
+                {% endfor %}
+            </ul>
+
+            <p>How would you like to proceed?</p>
+
+            <div class="modal-actions-stacked">
+                <button type="submit" name="resolution" value="safe" class="secondary">
+                    Exclude conflicting and add only safe PRs
+                </button>
+                <button type="submit" name="resolution" value="all" class="primary">
+                    Add all anyway (PRs will be in multiple batches)
+                </button>
+            </div>
+        </form>
+        <footer>
+            <button class="secondary outline modal-cancel-full" form="staging-modal-close">
+                Cancel Action
+            </button>
+        </footer>
+    </article>
+</dialog>

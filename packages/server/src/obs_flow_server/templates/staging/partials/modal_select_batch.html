@@ -1,0 +1,36 @@
+<dialog open id="staging-modal">
+    <form id="staging-modal-close" method="dialog"></form>
+    <article class="modal-type-info">
+        <header>
+            <h3 style="margin-bottom: 0;">Stage Selected Pull Requests</h3>
+        </header>
+        <form id="staging-action-form" hx-post="{% url 'staging_ui_modal_confirm_add' %}" hx-target="#modal-container">
+            {% csrf_token %}
+            {% for pr_id in selected_prs %}
+                <input type="hidden" name="selected_prs" value="{{ pr_id }}">
+            {% endfor %}
+
+            <p>You have selected <strong>{{ selected_prs|length }}</strong> pull request(s) targeting project <strong>{{ project.name }}</strong>.</p>
+
+            {% if batches %}
+                <label for="batch-select">Select Target Staging Batch:</label>
+                <select id="batch-select" name="batch_id" required>
+                    <option value="" disabled selected>-- Choose an open staging batch --</option>
+                    {% for batch in batches %}
+                        <option value="{{ batch.id }}">
+                            #{{ batch.id }} - {{ batch.project.name }} by {{ batch.author.username|default:"Automated" }}{% if batch.title %} - {{ batch.title }}{% endif %}
+                        </option>
+                    {% endfor %}
+                </select>
+            {% else %}
+                <p class="muted">No open staging batches found for project {{ project.name }}. Please create one first.</p>
+            {% endif %}
+        </form>
+        <footer>
+            <button class="secondary outline" form="staging-modal-close">Cancel</button>
+            {% if batches %}
+                <button type="submit" class="primary" form="staging-action-form">Next</button>
+            {% endif %}
+        </footer>
+    </article>
+</dialog>

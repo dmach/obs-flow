@@ -188,10 +188,20 @@
     }
   },
   {
+    "model": "staging.stagingbatchrevision",
+    "pk": 1,
+    "fields": {
+      "staging_batch": 1,
+      "revision_number": 1,
+      "fingerprint": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "created_at": "2026-08-12T12:00:00Z"
+    }
+  },
+  {
     "model": "staging.stagingreview",
     "pk": 1,
     "fields": {
-      "staging": 1,
+      "revision": 1,
       "reviewer_user": 1,
       "reviewer_group": null,
       "dynamic_role": null,

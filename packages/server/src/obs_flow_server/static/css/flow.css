@@ -63,15 +63,13 @@ table th, table td {
 }
 
 /* Compact articles (cards) */
-article {
-    margin-bottom: 1rem;
-    padding: 1rem;
+body article {
+    --pico-block-spacing-vertical: 1rem;
+    --pico-block-spacing-horizontal: 1rem;
 }
 
-article > header, article > footer {
-    margin-top: -1rem;
-    margin-bottom: 1rem;
-    padding: 0.5rem 1rem;
+body article > header, body article > footer {
+    padding: 0.5rem var(--pico-block-spacing-horizontal);
 }
 
 /* Compact headings */
@@ -523,4 +521,179 @@ details.filter-panel[open] summary {
 
 .font-size-btn.active {
     background-color: var(--pico-primary) !important;
+}
+
+/* Selection Mode Styles */
+.checkbox-cell {
+    width: 40px;
+    text-align: center;
+}
+
+.table-actions {
+    margin-bottom: 1rem;
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+}
+
+.table-actions button {
+    margin-bottom: 0;
+}
+
+/* CSS-only "select mode" toggle: the checkbox itself is never visible and is
+   never submitted (it has no name attribute), it only drives sibling styles. */
+.select-mode-toggle {
+    display: none !important;
+}
+
+.select-mode-label {
+    width: auto;
+    margin-bottom: 0;
+}
+
+.select-mode-label .select-mode-off {
+    display: none;
+}
+
+.select-mode-toggle:checked ~ form .select-mode-label .select-mode-on {
+    display: none;
+}
+
+.select-mode-toggle:checked ~ form .select-mode-label .select-mode-off {
+    display: inline;
+}
+
+@media (max-width: 768px) {
+    /* On mobile, hide checkboxes by default */
+    .checkbox-cell {
+        display: none !important;
+    }
+    /* When selection mode is active, show them */
+    .select-mode-toggle:checked ~ form .checkbox-cell {
+        display: flex !important;
+        width: auto;
+    }
+    .mobile-only {
+        display: inline-block !important;
+    }
+}
+
+@media (min-width: 769px) {
+    .mobile-only {
+        display: none !important;
+    }
+}
+
+/* Toast Notification Styles */
+#toast-container {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    z-index: 1000;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+/* Fade in, stay for 4s, fade out - entirely in CSS, no JavaScript timers. */
+.toast {
+    background-color: #2e3440;
+    color: #eceff4;
+    padding: 12px 24px;
+    border-radius: 4px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.15);
+    font-size: 0.9rem;
+    opacity: 0;
+    transform: translateY(20px);
+    animation: toast-in 0.3s ease forwards, toast-out 0.3s ease 4s forwards;
+}
+
+@keyframes toast-in {
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@keyframes toast-out {
+    from {
+        opacity: 1;
+        transform: translateY(0);
+    }
+    to {
+        opacity: 0;
+        transform: translateY(20px);
+        visibility: hidden;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .toast {
+        animation: none;
+        opacity: 1;
+        transform: none;
+    }
+}
+
+.toast-success {
+    border-left: 4px solid #a3be8c;
+}
+
+.toast-error {
+    border-left: 4px solid #bf616a;
+}
+
+/* Staging Modal Styles */
+dialog > article {
+    border: 1px solid var(--pico-border-color);
+    border-radius: var(--pico-border-radius);
+    box-shadow: 0 10px 40px -10px rgba(0, 0, 0, 0.3);
+}
+
+.modal-wide {
+    max-width: 800px;
+}
+
+.modal-warning {
+    color: var(--pico-red-color);
+}
+
+.modal-type-error > header {
+    background-color: rgba(191, 97, 106, 0.15);
+    border-bottom: 3px solid var(--pico-red-color);
+}
+.modal-type-error > header h3 {
+    color: var(--pico-red-color);
+}
+
+.modal-type-warning > header {
+    background-color: rgba(224, 175, 61, 0.15);
+    border-bottom: 3px solid var(--pico-amber-color);
+}
+.modal-type-warning > header h3 {
+    color: var(--pico-amber-color);
+}
+
+.modal-type-info > header {
+    background-color: rgba(135, 182, 238, 0.15);
+    border-bottom: 3px solid var(--pico-blue-color);
+}
+.modal-type-info > header h3 {
+    color: var(--pico-blue-color);
+}
+
+.modal-actions-stacked {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    margin-bottom: 1.5rem;
+}
+
+.modal-cancel-full {
+    width: 100%;
+}
+
+/* Override Pico CSS default 100% width for submit buttons */
+button[type="submit"] {
+    width: auto;
 }

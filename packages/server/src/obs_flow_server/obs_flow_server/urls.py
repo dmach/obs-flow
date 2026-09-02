@@ -43,4 +43,14 @@ urlpatterns = [
         staging_views.staging_date_display,
         name="staging_date_display",
     ),
+    path(
+        "staging/ui/modal/select-batch/",
+        staging_views.staging_ui_modal_select_batch,
+        name="staging_ui_modal_select_batch",
+    ),
+    path(
+        "staging/ui/modal/confirm-add/",
+        staging_views.staging_ui_modal_confirm_add,
+        name="staging_ui_modal_confirm_add",
+    ),
 ]

@@ -85,7 +85,7 @@
             </fieldset>
 
             <div class="filter-actions">
-                <button type="button" class="secondary outline" onclick="window.location.href='?'">Reset</button>
+                <a href="?" role="button" class="secondary outline">Reset</a>
                 <button type="submit">Apply Filter</button>
             </div>
         </form>
@@ -93,68 +93,88 @@
 </details>
 
 {% if page_obj %}
-    <table class="striped">
-        <thead>
-            <tr>
-                <th>
-                    <a href="?sort={% if current_sort == 'id' %}-id{% else %}id{% endif %}{{ base_query }}" class="sort-link">
-                        ID
-                        {% if current_sort == 'id' %}▲{% elif current_sort == '-id' %}▼{% endif %}
-                    </a>
-                </th>
-                <th>
-                    <a href="?sort={% if current_sort == 'title' %}-title{% else %}title{% endif %}{{ base_query }}" class="sort-link">
-                        Title
-                        {% if current_sort == 'title' %}▲{% elif current_sort == '-title' %}▼{% endif %}
-                    </a>
-                </th>
-                <th>
-                    <a href="?sort={% if current_sort == 'author__username' %}-author__username{% else %}author__username{% endif %}{{ base_query }}" class="sort-link">
-                        Author
-                        {% if current_sort == 'author__username' %}▲{% elif current_sort == '-author__username' %}▼{% endif %}
-                    </a>
-                </th>
-                <th>
-                    <a href="?sort={% if current_sort == 'target__branch' %}-target__branch{% else %}target__branch{% endif %}{{ base_query }}" class="sort-link">
-                        Target Branch
-                        {% if current_sort == 'target__branch' %}▲{% elif current_sort == '-target__branch' %}▼{% endif %}
-                    </a>
-                </th>
-                <th>
-                    <a href="?sort={% if current_sort == 'is_mergeable' %}-is_mergeable{% else %}is_mergeable{% endif %}{{ base_query }}" class="sort-link">
-                        Mergeable
-                        {% if current_sort == 'is_mergeable' %}▲{% elif current_sort == '-is_mergeable' %}▼{% endif %}
-                    </a>
-                </th>
-                <th>
-                    <a href="?sort={% if current_sort == 'state' %}-state{% else %}state{% endif %}{{ base_query }}" class="sort-link">
-                        State
-                        {% if current_sort == 'state' %}▲{% elif current_sort == '-state' %}▼{% endif %}
-                    </a>
-                </th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for pr in page_obj %}
-                <tr>
-                    <td data-label="ID"><a href="{% url 'pr_detail' pr.id %}">{{ pr.target.owner }}/{{ pr.target.repo }}#{{ pr.number }}</a></td>
-                    <td data-label="Title">{{ pr.title }}</td>
-                    <td data-label="Author">{{ pr.author.username }}</td>
-                    <td data-label="Target Branch"><code>{{ pr.target.branch }}</code></td>
-                    <td data-label="Mergeable">
-                        {% if pr.is_mergeable == True %}
-                            <span class="badge badge-accepted">yes</span>
-                        {% elif pr.is_mergeable == False %}
-                            <span class="badge badge-rejected">no</span>
-                        {% else %}
-                            <span class="badge badge-pending">unknown</span>
-                        {% endif %}
-                    </td>
-                    <td data-label="State"><span class="badge badge-{{ pr.state }}">{{ pr.state }}</span></td>
-                </tr>
-            {% endfor %}
-        </tbody>
-    </table>
+    {# Unnamed checkbox: drives the mobile "select mode" via CSS only and is never submitted. #}
+    <input type="checkbox" id="select-mode" class="select-mode-toggle">
+
+    <form hx-post="{% url 'staging_ui_modal_select_batch' %}" hx-target="#modal-container">
+        {% csrf_token %}
+        <div class="table-actions">
+            <button type="submit" class="primary">Stage Selected</button>
+            <label for="select-mode" role="button" class="secondary outline mobile-only select-mode-label">
+                <span class="select-mode-on">Select Mode</span>
+                <span class="select-mode-off">Exit Select Mode</span>
+            </label>
+        </div>
+
+        <div id="pr-table-container">
+            <table class="striped">
+                <thead>
+                    <tr>
+                        <th class="checkbox-cell">Select</th>
+                        <th>
+                            <a href="?sort={% if current_sort == 'id' %}-id{% else %}id{% endif %}{{ base_query }}" class="sort-link">
+                                ID
+                                {% if current_sort == 'id' %}▲{% elif current_sort == '-id' %}▼{% endif %}
+                            </a>
+                        </th>
+                        <th>
+                            <a href="?sort={% if current_sort == 'title' %}-title{% else %}title{% endif %}{{ base_query }}" class="sort-link">
+                                Title
+                                {% if current_sort == 'title' %}▲{% elif current_sort == '-title' %}▼{% endif %}
+                            </a>
+                        </th>
+                        <th>
+                            <a href="?sort={% if current_sort == 'author__username' %}-author__username{% else %}author__username{% endif %}{{ base_query }}" class="sort-link">
+                                Author
+                                {% if current_sort == 'author__username' %}▲{% elif current_sort == '-author__username' %}▼{% endif %}
+                            </a>
+                        </th>
+                        <th>
+                            <a href="?sort={% if current_sort == 'target__branch' %}-target__branch{% else %}target__branch{% endif %}{{ base_query }}" class="sort-link">
+                                Target Branch
+                                {% if current_sort == 'target__branch' %}▲{% elif current_sort == '-target__branch' %}▼{% endif %}
+                            </a>
+                        </th>
+                        <th>
+                            <a href="?sort={% if current_sort == 'is_mergeable' %}-is_mergeable{% else %}is_mergeable{% endif %}{{ base_query }}" class="sort-link">
+                                Mergeable
+                                {% if current_sort == 'is_mergeable' %}▲{% elif current_sort == '-is_mergeable' %}▼{% endif %}
+                            </a>
+                        </th>
+                        <th>
+                            <a href="?sort={% if current_sort == 'state' %}-state{% else %}state{% endif %}{{ base_query }}" class="sort-link">
+                                State
+                                {% if current_sort == 'state' %}▲{% elif current_sort == '-state' %}▼{% endif %}
+                            </a>
+                        </th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for pr in page_obj %}
+                        <tr>
+                            <td class="checkbox-cell" data-label="Select">
+                                <input type="checkbox" name="selected_prs" value="{{ pr.id }}" class="pr-checkbox">
+                            </td>
+                            <td data-label="ID"><a href="{% url 'pr_detail' pr.id %}">{{ pr.target.owner }}/{{ pr.target.repo }}#{{ pr.number }}</a></td>
+                            <td data-label="Title">{{ pr.title }}</td>
+                            <td data-label="Author">{{ pr.author.username }}</td>
+                            <td data-label="Target Branch"><code>{{ pr.target.branch }}</code></td>
+                            <td data-label="Mergeable">
+                                {% if pr.is_mergeable == True %}
+                                    <span class="badge badge-accepted">yes</span>
+                                {% elif pr.is_mergeable == False %}
+                                    <span class="badge badge-rejected">no</span>
+                                {% else %}
+                                    <span class="badge badge-pending">unknown</span>
+                                {% endif %}
+                            </td>
+                            <td data-label="State"><span class="badge badge-{{ pr.state }}">{{ pr.state }}</span></td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </form>
 
     {% if page_obj.has_other_pages %}
     <nav aria-label="pagination" class="pagination-nav">

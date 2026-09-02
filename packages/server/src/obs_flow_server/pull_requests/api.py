@@ -322,6 +322,31 @@ def _do_sync_pull_request(req: PRSyncRequest) -> PRSyncResponse:
                     state=PullRequestReview.State.PENDING
                 )
 
+        # Update any StagingBatches containing this PR to use the new PullRequestRevision
+        from staging.models import StagingBatch
+        from staging.api import create_staging_revision
+
+        affected_batches = StagingBatch.objects.filter(
+            revisions__revision_pull_requests__pull_request_revision__pull_request=pr
+        ).distinct()
+
+        for batch in affected_batches:
+            latest_rev = batch.revisions.order_by("-revision_number").first()
+            if latest_rev:
+                latest_pr_revs = [
+                    bpr.pull_request_revision
+                    for bpr in latest_rev.revision_pull_requests.all()
+                ]
+                latest_prs = [r.pull_request for r in latest_pr_revs]
+                if pr in latest_prs:
+                    updated_pr_revs = []
+                    for r in latest_pr_revs:
+                        if r.pull_request == pr:
+                            updated_pr_revs.append(latest_revision)
+                        else:
+                            updated_pr_revs.append(r)
+                    create_staging_revision(batch, updated_pr_revs)
+
     return PRSyncResponse(
         pull_request=PRDetail(
             id=f"{req.owner}/{req.repo}#{req.number}",
