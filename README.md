@@ -54,3 +54,4 @@
 - background jobs - should they use the original event in audit trail to connect with the original request?
 - ADR: changing IDs not supported (project name, package name, username, group name, ...) - they map to underlying structures on disk, we should make our lives easier to forbid the renames by design
 - limited read-only access (exclude expensive actions like huge diffs) - AI crawlers can easily overload the service otherwise
+- pull request dependencies (we have these partially implemented via staging; not sure if individual pr deps are actually needed; verify with stakeholders)
