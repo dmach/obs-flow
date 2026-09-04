@@ -11,7 +11,10 @@
     <script src="{% static 'js/flow.js' %}"></script>
     <script src="https://unpkg.com/htmx.org@2.0.1/dist/htmx.min.js"></script>
 </head>
-<body>
+{# hx-headers is inherited by every htmx request on the page, so all non-GET #}
+{# requests carry the CSRF token without any JavaScript. Rendering the token #}
+{# here also makes Django set the csrftoken cookie on every page. #}
+<body hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'>
     <header class="navbar-container">
         <nav class="container">
             <ul>
@@ -36,6 +39,9 @@
     <main class="container">
         {% block content %}{% endblock %}
     </main>
+
+    <div id="modal-container"></div>
+    {% include "partials/toasts.html" %}
 
     <footer class="container page-footer">
         <small>

@@ -4,11 +4,13 @@ from django.core.paginator import Paginator
 from django.db.models import Q
 from django.shortcuts import render, get_object_or_404
 from django.utils import timezone
+from django.views.decorators.csrf import ensure_csrf_cookie
 
 from pull_requests.models import PullRequest
 from pull_requests.forms import PullRequestFilterForm
 
 
+@ensure_csrf_cookie
 def pr_list(request):
     form = PullRequestFilterForm(request.GET)
     qs = PullRequest.objects.select_related("target", "author").all().order_by("-id")

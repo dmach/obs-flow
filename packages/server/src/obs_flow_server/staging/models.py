@@ -3,7 +3,7 @@ from django.db.models import Q
 from django.conf import settings
 
 from core.models import Project
-from pull_requests.models import PullRequest
+from pull_requests.models import PullRequest, PullRequestRevision
 from reviews.models import BaseReview
 
 
@@ -48,34 +48,51 @@ class StagingBatch(models.Model):
         return f"Staging Batch #{self.id} ({self.state}) for {self.project.name}"
 
 
-class StagingBatchPullRequest(models.Model):
-    staging_batch = models.ForeignKey(StagingBatch, on_delete=models.CASCADE, related_name="batch_pull_requests")
-    pull_request = models.ForeignKey(PullRequest, on_delete=models.CASCADE, related_name="pr_staging_batches")
+class StagingBatchRevision(models.Model):
+    staging_batch = models.ForeignKey(StagingBatch, on_delete=models.CASCADE, related_name="revisions")
+    revision_number = models.IntegerField()
+    fingerprint = models.CharField(max_length=64)  # Designed for SHA-256
+    created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        unique_together = ("staging_batch", "pull_request")
+        unique_together = ("staging_batch", "revision_number")
 
     def __str__(self):
-        return f"{self.staging_batch} -> {self.pull_request}"
+        return f"{self.staging_batch} - Rev {self.revision_number} ({self.fingerprint[:8]})"
+
+
+class StagingBatchRevisionPullRequest(models.Model):
+    staging_batch_revision = models.ForeignKey(
+        StagingBatchRevision, on_delete=models.CASCADE, related_name="revision_pull_requests"
+    )
+    pull_request_revision = models.ForeignKey(
+        PullRequestRevision, on_delete=models.CASCADE, related_name="staging_batch_revisions"
+    )
+
+    class Meta:
+        unique_together = ("staging_batch_revision", "pull_request_revision")
+
+    def __str__(self):
+        return f"{self.staging_batch_revision} -> {self.pull_request_revision}"
 
 
 class StagingReview(BaseReview):
-    staging = models.ForeignKey(StagingBatch, on_delete=models.CASCADE, related_name="reviews")
+    revision = models.ForeignKey(StagingBatchRevision, on_delete=models.CASCADE, related_name="reviews")
 
     class Meta(BaseReview.Meta):
         constraints = BaseReview.Meta.constraints + [
             models.UniqueConstraint(
-                fields=["staging", "reviewer_user"],
+                fields=["revision", "reviewer_user"],
                 condition=Q(reviewer_user__isnull=False),
                 name="unique_staging_review_user",
             ),
             models.UniqueConstraint(
-                fields=["staging", "reviewer_group"],
+                fields=["revision", "reviewer_group"],
                 condition=Q(reviewer_group__isnull=False),
                 name="unique_staging_review_group",
             ),
             models.UniqueConstraint(
-                fields=["staging", "dynamic_role"],
+                fields=["revision", "dynamic_role"],
                 condition=Q(dynamic_role__isnull=False),
                 name="unique_staging_review_dynamic_role",
             ),
@@ -83,4 +100,4 @@ class StagingReview(BaseReview):
 
     def __str__(self):
         reviewer = self.reviewer_user or self.reviewer_group or self.dynamic_role
-        return f"Review for {self.staging}: {reviewer} ({self.state})"
+        return f"Review for {self.revision}: {reviewer} ({self.state})"

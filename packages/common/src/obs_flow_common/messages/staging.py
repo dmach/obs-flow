@@ -12,6 +12,8 @@ class StagingResponse(msgspec.Struct):
     pull_requests: list[str] = []
     embargo_date: str | None = None
     release_date: str | None = None
+    latest_revision: int | None = None
+    fingerprint: str | None = None
 
 
 # Aliases for backward compatibility
