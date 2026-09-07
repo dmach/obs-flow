@@ -56,3 +56,4 @@
 - limited read-only access (exclude expensive actions like huge diffs) - AI crawlers can easily overload the service otherwise
 - pull request dependencies (we have these partially implemented via staging; not sure if individual pr deps are actually needed; verify with stakeholders)
 - would it be possible to create a feature to remember any current URL within the service as a shortcut? that might solve quick links to anywhere (e.g. list of PRs + filter)
+- search similar pull requests (e.g. there's a typo in a PR and others suffer from the same issue too -> review and decline them at once)
