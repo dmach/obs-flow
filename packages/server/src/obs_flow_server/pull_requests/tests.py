@@ -321,7 +321,7 @@ class TestPRViews(TransactionTestCase):
         )
 
         client = Client()
-        response = client.get(f"/pull_requests/{pr.id}/")
+        response = client.get(f"/pull-requests/{pr.id}/")
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "suse:obs-flow")
         self.assertContains(response, "my-package")
@@ -353,24 +353,24 @@ class TestPRViews(TransactionTestCase):
         client = Client()
 
         # 1. Test pagination (page 1 should have 200 items, page 2 should have 5 items)
-        response = client.get("/pull_requests/")
+        response = client.get("/pull-requests/")
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Page 1 of 2")
         self.assertContains(response, "PR 205") # Ordered by -id, so PR 205 is on page 1
 
-        response = client.get("/pull_requests/?page=2")
+        response = client.get("/pull-requests/?page=2")
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Page 2 of 2")
         self.assertContains(response, "PR 1")
 
         # 2. Test filtering by author (john_doe has 102 PRs, jane_doe has 103 PRs)
-        response = client.get("/pull_requests/?author=john_doe")
+        response = client.get("/pull-requests/?author=john_doe")
         self.assertEqual(response.status_code, 200)
         # 102 PRs should fit on 1 page (no pagination links needed or page 1 of 1)
         self.assertNotContains(response, "Page 1 of 2")
 
         # 3. Test exact filtering by title
-        response = client.get("/pull_requests/?title=PR 10&title_exact=on")
+        response = client.get("/pull-requests/?title=PR 10&title_exact=on")
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "PR 10")
         self.assertNotContains(response, "PR 11")
