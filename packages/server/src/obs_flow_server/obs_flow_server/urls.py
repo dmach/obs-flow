@@ -26,8 +26,8 @@ urlpatterns = [
     path("admin/", admin.site.urls),
     path("", core_views.home, name="home"),
     path("git-mappings/", core_views.git_mapping_list, name="git_mapping_list"),
-    path("pull_requests/", pr_views.pr_list, name="pr_list"),
-    path("pull_requests/<int:pr_id>/", pr_views.pr_detail, name="pr_detail"),
+    path("pull-requests/", pr_views.pr_list, name="pr_list"),
+    path("pull-requests/<int:pr_id>/", pr_views.pr_detail, name="pr_detail"),
     path("staging/", staging_views.staging_list, name="staging_list"),
     path("staging/<int:batch_id>/", staging_views.staging_detail, name="staging_detail"),
     path(
