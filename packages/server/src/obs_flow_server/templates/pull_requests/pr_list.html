@@ -10,7 +10,7 @@
 <details class="filter-panel" {% if request.GET %}open{% endif %}>
     <summary>Toggle Search & Filters</summary>
     <div class="filter-panel-body">
-        <form method="GET" action="">
+        <form method="GET" action="" data-clean-url="true">
             <div class="grid">
                 {% for field, exact_field in form.primary_fields %}
                 <div>
