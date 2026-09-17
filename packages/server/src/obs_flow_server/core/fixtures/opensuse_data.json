@@ -8,10 +8,7 @@
       "full_name": "Marcus Rueckert",
       "email": "mrueckert@suse.com",
       "account_type": "human",
-      "is_active": true,
-      "is_staff": true,
-      "is_superuser": true,
-      "date_joined": "2026-08-12T12:00:00Z"
+      "is_active": true
     }
   },
   {
@@ -21,8 +18,7 @@
       "username": "factory-auto",
       "username_lower": "factory-auto",
       "account_type": "bot",
-      "is_active": true,
-      "date_joined": "2026-08-12T12:00:00Z"
+      "is_active": true
     }
   },
   {
@@ -34,8 +30,7 @@
       "full_name": "Dominique Leuenberger",
       "email": "dimstar@opensuse.org",
       "account_type": "human",
-      "is_active": true,
-      "date_joined": "2026-08-12T12:00:00Z"
+      "is_active": true
     }
   },
   {

@@ -97,7 +97,7 @@ class TestPRSyncEndpoint(TransactionTestCase):
         self.assertEqual(pr_detail["author"], {
             "username": "john_doe",
             "full_name": None,
-            "email": "",
+            "email": None,
             "is_active": True,
         })
         self.assertEqual(pr_detail["latest_revision"], 1)
