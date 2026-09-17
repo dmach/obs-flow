@@ -22,8 +22,9 @@ import pull_requests.views as pr_views
 import staging.views as staging_views
 
 urlpatterns = [
-    path("accounts/", include("accounts.urls")),
     path("", core_views.home, name="home"),
+    path("accounts/", include("accounts.urls")),
+    path("bookmarks/", include("bookmarks.urls")),
     path("git-mappings/", core_views.git_mapping_list, name="git_mapping_list"),
     path("pull-requests/", pr_views.pr_list, name="pr_list"),
     path("pull-requests/<int:pr_id>/", pr_views.pr_detail, name="pr_detail"),

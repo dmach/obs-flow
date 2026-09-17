@@ -1,0 +1,26 @@
+<dialog open id="bookmark-modal">
+    <form id="bookmark-modal-close" method="dialog"></form>
+    <article class="modal-type-info">
+        <header>
+            <h3>Save Bookmark</h3>
+        </header>
+        <form id="bookmark-create-form" hx-post="{% url 'bookmark_create' %}" hx-target="#modal-container">
+            {% csrf_token %}
+            <label for="bookmark-name">Name:</label>
+            <input type="text" id="bookmark-name" name="name" value="{{ name }}" placeholder="e.g., My PR Filter" aria-invalid="{% if errors.name %}true{% endif %}" required>
+            {% if errors.name %}
+                <small>{{ errors.name }}</small>
+            {% endif %}
+
+            <label for="bookmark-url">URL:</label>
+            <input type="text" id="bookmark-url" name="url" value="{{ url }}" placeholder="e.g., /pull-requests/?author=darix" aria-invalid="{% if errors.url %}true{% endif %}" required>
+            {% if errors.url %}
+                <small>{{ errors.url }}</small>
+            {% endif %}
+        </form>
+        <footer>
+            <button class="secondary outline" form="bookmark-modal-close">Cancel</button>
+            <button type="submit" class="primary" form="bookmark-create-form">Save</button>
+        </footer>
+    </article>
+</dialog>

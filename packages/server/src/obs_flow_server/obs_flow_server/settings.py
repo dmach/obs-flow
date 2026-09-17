@@ -42,6 +42,7 @@ INSTALLED_APPS = [
     "reviews",
     "pull_requests",
     "staging",
+    "bookmarks",
 ]
 
 AUTH_USER_MODEL = "accounts.User"
@@ -68,6 +69,7 @@ TEMPLATES = [
                 "django.template.context_processors.request",
                 "django.contrib.auth.context_processors.auth",
                 "django.contrib.messages.context_processors.messages",
+                "bookmarks.context_processors.bookmarks",
             ],
         },
     },

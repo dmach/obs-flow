@@ -69,6 +69,16 @@
 
     <footer class="container">
         <small>
+            {% if request.user.is_authenticated %}
+            <strong>Bookmarks:</strong>
+            {% for bookmark in bookmarks %}
+                <a href="{{ bookmark.url }}" class="secondary">{{ bookmark.name }}</a> &bull;
+            {% endfor %}
+            <a href="#" hx-get="{% url 'bookmark_create' %}?url={{ request.get_full_path|urlencode }}" hx-target="#modal-container" class="secondary"><em>Save this page</em></a> &bull;
+            <a href="{% url 'bookmark_list' %}" class="secondary"><em>Manage Bookmarks</em></a>
+            </div>
+            <br>
+            {% endif %}
             <a href="#" class="secondary">Documentation</a> &bull;
             <a href="#" class="secondary">File a bug</a> &bull;
             <a href="#" class="secondary">Support</a> &bull;

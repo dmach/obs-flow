@@ -3,4 +3,4 @@
 set -e
 TOPDIR=$(dirname $(readlink -f $0))
 export PYTHONPATH="${TOPDIR}/packages/common/src:${TOPDIR}/packages/client/src"
-exec uv --directory "${TOPDIR}/packages/cli" run flow "$@"
+exec uv run --package obs-flow-cli flow "$@"
