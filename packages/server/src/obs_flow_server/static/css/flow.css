@@ -139,7 +139,7 @@ blockquote {
     padding-bottom: 0.5rem;
 }
 
-.navbar-container ul {
+.navbar-container nav > ul {
     display: flex;
     list-style: none;
     margin: 0;
@@ -148,19 +148,43 @@ blockquote {
     align-items: center;
 }
 
-.navbar-container a {
+.navbar-container nav > ul > li > a {
     color: #ffffff !important;
     text-decoration: none;
     font-weight: 500;
 }
 
-.navbar-container a:hover {
+.navbar-container nav > ul > li > a:hover {
     color: #e0f7fa !important;
 }
 
-.navbar-container strong a {
+.desktop-menu details.dropdown summary {
+    color: #ffffff !important;
+    background-color: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    margin-bottom: 0 !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    gap: 0.25rem !important;
+    padding: 0.25rem 0.5rem !important;
+    cursor: pointer;
+}
+
+.desktop-menu details.dropdown summary::after {
+    display: none !important;
+    content: none !important;
+}
+
+.navbar-container nav > ul > li > strong > a {
+    color: #ffffff !important;
+    text-decoration: none;
     font-weight: 700;
     font-size: 1.1rem;
+}
+
+.navbar-container nav > ul > li > strong > a:hover {
+    color: #e0f7fa !important;
 }
 
 /* Desktop vs Mobile Menu Visibility */
