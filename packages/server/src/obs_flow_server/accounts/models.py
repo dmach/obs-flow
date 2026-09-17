@@ -13,7 +13,8 @@ class User(AbstractUser):
     username_lower = models.CharField(max_length=150, unique=True)
     full_name = models.CharField(max_length=255, null=True, blank=True)
     description = models.TextField(null=True, blank=True)
-    oidc_sub = models.UUIDField(unique=True, null=True, blank=True)
+    oidc_sub = models.CharField(max_length=255, unique=True, null=True, blank=True)
+    is_local_account = models.BooleanField(default=False)
     account_type = models.CharField(
         max_length=10,
         choices=AccountType.choices,

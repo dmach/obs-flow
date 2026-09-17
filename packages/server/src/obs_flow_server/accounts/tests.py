@@ -1,3 +1,51 @@
 from django.test import TestCase
 
-# Create your tests here.
+from .models import Group, User
+
+
+class UserModelTests(TestCase):
+    def test_user_creation_with_local_account(self):
+        user = User.objects.create_user(
+            username="TestUser",
+            password="password123",
+            is_local_account=True
+        )
+        self.assertTrue(user.is_local_account)
+        self.assertIsNone(user.oidc_sub)
+        self.assertEqual(user.username_lower, "testuser")
+        self.assertTrue(user.check_password("password123"))
+
+    def test_user_creation_external_account(self):
+        user = User.objects.create(
+            username="ExtUser",
+            is_local_account=False,
+            oidc_sub="auth0|123456"
+        )
+        user.set_unusable_password()
+        user.save()
+
+        self.assertFalse(user.is_local_account)
+        self.assertEqual(user.oidc_sub, "auth0|123456")
+        self.assertEqual(user.username_lower, "extuser")
+        self.assertFalse(user.has_usable_password())
+
+    def test_username_lower_is_automatic(self):
+        user = User.objects.create(username="CamelCaseUser")
+        self.assertEqual(user.username_lower, "camelcaseuser")
+
+        user.username = "NEWNAME"
+        user.save()
+
+        user.refresh_from_db()
+        self.assertEqual(user.username_lower, "newname")
+
+class GroupModelTests(TestCase):
+    def test_group_name_lower_is_automatic(self):
+        group = Group.objects.create(name="AdminGroup")
+        self.assertEqual(group.name_lower, "admingroup")
+
+        group.name = "NEWGROUP"
+        group.save()
+
+        group.refresh_from_db()
+        self.assertEqual(group.name_lower, "newgroup")
