@@ -15,7 +15,6 @@ Including another URLconf
     2. Add a URL to urlpatterns:  path('blog/', include('blog.urls'))
 """
 
-from django.contrib import admin
 from django.urls import path
 
 import core.views as core_views
@@ -23,7 +22,6 @@ import pull_requests.views as pr_views
 import staging.views as staging_views
 
 urlpatterns = [
-    path("admin/", admin.site.urls),
     path("", core_views.home, name="home"),
     path("git-mappings/", core_views.git_mapping_list, name="git_mapping_list"),
     path("pull-requests/", pr_views.pr_list, name="pr_list"),
