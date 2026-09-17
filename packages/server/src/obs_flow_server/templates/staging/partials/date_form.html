@@ -1,11 +1,9 @@
 <div id="{{ date_type }}-date-container" class="sidebar-section">
     <h4>{% if date_type == "embargo" %}Embargo Date{% else %}Release Date{% endif %}</h4>
-    <form hx-post="{% url 'staging_edit_date' batch.id date_type %}" hx-target="#{{ date_type }}-date-container" hx-swap="outerHTML" class="date-form">
+    <form hx-post="{% url 'staging_edit_date' batch.id date_type %}" hx-target="#{{ date_type }}-date-container" hx-swap="outerHTML">
         {% csrf_token %}
-        <input type="datetime-local" name="date_value" value="{{ current_val }}" class="date-input">
-        <div class="date-actions">
-            <button type="submit" class="btn-sm">Save</button>
-            <button type="button" hx-get="{% url 'staging_date_display' batch.id date_type %}" hx-target="#{{ date_type }}-date-container" hx-swap="outerHTML" class="secondary outline btn-sm">Cancel</button>
-        </div>
+        <input type="datetime-local" name="date_value" value="{{ current_val }}">
+        <button type="submit">Save</button>
+        <button type="button" hx-get="{% url 'staging_date_display' batch.id date_type %}" hx-target="#{{ date_type }}-date-container" hx-swap="outerHTML" class="secondary outline">Cancel</button>
     </form>
 </div>

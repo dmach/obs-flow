@@ -11,14 +11,11 @@
     </ul>
 </nav>
 
-<header class="detail-header">
-    <h2 class="mb-0">{{ batch.title|default:"Staging Batch" }} <span class="muted detail-id">#{{ batch.id }}</span></h2>
-</header>
+<h2>{{ batch.title|default:"Staging Batch" }} <span class="muted">#{{ batch.id }}</span></h2>
 
 <div class="layout-with-sidebar">
-    <!-- Left Column: Main Content -->
     <div>
-        <section class="detail-section">
+        <section>
             <h3>Included Pull Requests</h3>
             {% if pull_requests_data %}
                 <table class="striped">
@@ -36,7 +33,7 @@
                                 <td data-label="ID"><a href="{% url 'pr_detail' item.pr.id %}">{{ item.pr.target.owner }}/{{ item.pr.target.repo }}#{{ item.pr.number }}</a></td>
                                 <td data-label="Title">{{ item.pr.title }}</td>
                                 <td data-label="Reviews">{{ item.accepted_reviews }}/{{ item.total_reviews }}</td>
-                                <td data-label="State"><span class="badge badge-{{ item.pr.state }}">{{ item.pr.state }}</span></td>
+                                <td data-label="State">{{ item.pr.state }}</td>
                             </tr>
                         {% endfor %}
                     </tbody>
@@ -81,7 +78,7 @@
                                         -
                                     {% endif %}
                                 </td>
-                                <td data-label="State"><span class="badge badge-{{ review.state }}">{{ review.state }}</span></td>
+                                <td data-label="State">{{ review.state }}</td>
                                 <td data-label="Date">{{ review.updated_at|date:"Y-m-d H:i" }}</td>
                                 <td data-label="Justification">{{ review.justification|default:"-" }}</td>
                                 <td data-label="URL">
@@ -127,9 +124,8 @@
         </section>
     </div>
 
-    <!-- Right Column: Sidebar Metadata -->
     <aside>
-        <article class="p-1">
+        <article>
             <div class="sidebar-section">
                 <h4>State</h4>
                 <p>{{ batch.state }}</p>

@@ -30,6 +30,7 @@ class LocalLoginFormView(TemplateView):
         context = super().get_context_data(**kwargs)
         context["form"] = AuthenticationForm()
         context["next"] = self.request.GET.get("next", "")
+        context["is_htmx"] = bool(self.request.headers.get("HX-Request"))
         return context
 
 

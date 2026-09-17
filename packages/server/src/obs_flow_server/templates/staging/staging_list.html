@@ -3,12 +3,10 @@
 {% block title %}Staging Batches - OBS Flow{% endblock %}
 
 {% block content %}
-<div class="page-header">
-    <h2>Staging Batches <span class="badge">{{ total_count }}</span></h2>
-</div>
+<h2>Staging Batches <small>{{ total_count }}</small></h2>
 
-<details class="filter-panel" {% if request.GET %}open{% endif %}>
-    <summary>Toggle Search & Filters</summary>
+<details class="filter-panel" {% if base_query %}open{% endif %}>
+    <summary>Search &amp; Filters</summary>
     <div class="filter-panel-body">
         <form method="GET" action="" data-clean-url="true">
             <fieldset>
@@ -16,15 +14,9 @@
                 <div class="grid">
                     {% for field, exact_field in form.target_fields %}
                     <div>
-                        <div class="filter-field-header">
-                            <label for="{{ field.id_for_label }}">{{ field.label }}</label>
-                            {% if exact_field %}
-                            <label class="filter-exact-label">
-                                {{ exact_field }} Exact
-                            </label>
-                            {% endif %}
-                        </div>
+                        {{ field.label_tag }}
                         {{ field }}
+                        {% if exact_field %}<label>{{ exact_field }} {{ exact_field.label }}</label>{% endif %}
                     </div>
                     {% endfor %}
                 </div>
@@ -35,15 +27,9 @@
                 <div class="grid">
                     {% for field, exact_field in form.pr_fields %}
                     <div>
-                        <div class="filter-field-header">
-                            <label for="{{ field.id_for_label }}">{{ field.label }}</label>
-                            {% if exact_field %}
-                            <label class="filter-exact-label">
-                                {{ exact_field }} Exact
-                            </label>
-                            {% endif %}
-                        </div>
+                        {{ field.label_tag }}
                         {{ field }}
+                        {% if exact_field %}<label>{{ exact_field }} {{ exact_field.label }}</label>{% endif %}
                     </div>
                     {% endfor %}
                 </div>
@@ -54,15 +40,9 @@
                 <div class="grid">
                     {% for field, exact_field in form.pr_source_fields %}
                     <div>
-                        <div class="filter-field-header">
-                            <label for="{{ field.id_for_label }}">{{ field.label }}</label>
-                            {% if exact_field %}
-                            <label class="filter-exact-label">
-                                {{ exact_field }} Exact
-                            </label>
-                            {% endif %}
-                        </div>
+                        {{ field.label_tag }}
                         {{ field }}
+                        {% if exact_field %}<label>{{ exact_field }} {{ exact_field.label }}</label>{% endif %}
                     </div>
                     {% endfor %}
                 </div>
@@ -73,24 +53,16 @@
                 <div class="grid">
                     {% for field, exact_field in form.pr_target_fields %}
                     <div>
-                        <div class="filter-field-header">
-                            <label for="{{ field.id_for_label }}">{{ field.label }}</label>
-                            {% if exact_field %}
-                            <label class="filter-exact-label">
-                                {{ exact_field }} Exact
-                            </label>
-                            {% endif %}
-                        </div>
+                        {{ field.label_tag }}
                         {{ field }}
+                        {% if exact_field %}<label>{{ exact_field }} {{ exact_field.label }}</label>{% endif %}
                     </div>
                     {% endfor %}
                 </div>
             </fieldset>
 
-            <div class="filter-actions">
-                <button type="button" class="secondary outline" onclick="window.location.href='?'">Reset</button>
-                <button type="submit">Apply Filter</button>
-            </div>
+            <a href="?" role="button" class="secondary outline">Reset</a>
+            <button type="submit">Apply Filter</button>
         </form>
     </div>
 </details>
@@ -100,31 +72,31 @@
         <thead>
             <tr>
                 <th>
-                    <a href="?sort={% if current_sort == 'id' %}-id{% else %}id{% endif %}{{ base_query }}" class="sort-link">
+                    <a href="?sort={% if current_sort == 'id' %}-id{% else %}id{% endif %}{{ base_query }}">
                         ID
                         {% if current_sort == 'id' %}▲{% elif current_sort == '-id' %}▼{% endif %}
                     </a>
                 </th>
                 <th>
-                    <a href="?sort={% if current_sort == 'title' %}-title{% else %}title{% endif %}{{ base_query }}" class="sort-link">
+                    <a href="?sort={% if current_sort == 'title' %}-title{% else %}title{% endif %}{{ base_query }}">
                         Title
                         {% if current_sort == 'title' %}▲{% elif current_sort == '-title' %}▼{% endif %}
                     </a>
                 </th>
                 <th>
-                    <a href="?sort={% if current_sort == 'project__name' %}-project__name{% else %}project__name{% endif %}{{ base_query }}" class="sort-link">
+                    <a href="?sort={% if current_sort == 'project__name' %}-project__name{% else %}project__name{% endif %}{{ base_query }}">
                         Project
                         {% if current_sort == 'project__name' %}▲{% elif current_sort == '-project__name' %}▼{% endif %}
                     </a>
                 </th>
                 <th>
-                    <a href="?sort={% if current_sort == 'author__username' %}-author__username{% else %}author__username{% endif %}{{ base_query }}" class="sort-link">
+                    <a href="?sort={% if current_sort == 'author__username' %}-author__username{% else %}author__username{% endif %}{{ base_query }}">
                         Author
                         {% if current_sort == 'author__username' %}▲{% elif current_sort == '-author__username' %}▼{% endif %}
                     </a>
                 </th>
                 <th>
-                    <a href="?sort={% if current_sort == 'state' %}-state{% else %}state{% endif %}{{ base_query }}" class="sort-link">
+                    <a href="?sort={% if current_sort == 'state' %}-state{% else %}state{% endif %}{{ base_query }}">
                         State
                         {% if current_sort == 'state' %}▲{% elif current_sort == '-state' %}▼{% endif %}
                     </a>
@@ -138,33 +110,33 @@
                     <td data-label="Title">{{ batch.title|default:"(No Title)" }}</td>
                     <td data-label="Project">{{ batch.project.name }}</td>
                     <td data-label="Author">{{ batch.author.username|default:"(Automated)" }}</td>
-                    <td data-label="State"><span class="badge badge-{{ batch.state }}">{{ batch.state }}</span></td>
+                    <td data-label="State">{{ batch.state }}</td>
                 </tr>
             {% endfor %}
         </tbody>
     </table>
 
     {% if page_obj.has_other_pages %}
-    <nav aria-label="pagination" class="pagination-nav">
-      <ul class="pagination-list">
-        {% if page_obj.has_previous %}
-          <li><a href="?page=1{{ filter_query }}" role="button" class="outline secondary">&laquo;&laquo; First</a></li>
-          <li><a href="?page={{ page_obj.previous_page_number }}{{ filter_query }}" role="button" class="outline secondary">&laquo; Previous</a></li>
-        {% else %}
-          <li><a href="#" aria-disabled="true" role="button" class="outline secondary disabled">&laquo;&laquo; First</a></li>
-          <li><a href="#" aria-disabled="true" role="button" class="outline secondary disabled">&laquo; Previous</a></li>
-        {% endif %}
+    <nav aria-label="pagination">
+        <ul>
+            {% if page_obj.has_previous %}
+            <li><a href="?page=1{{ filter_query }}">First</a></li>
+            <li><a href="?page={{ page_obj.previous_page_number }}{{ filter_query }}">Previous</a></li>
+            {% else %}
+            <li><span aria-disabled="true">First</span></li>
+            <li><span aria-disabled="true">Previous</span></li>
+            {% endif %}
 
-        <li class="pagination-info">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</li>
+            <li>Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</li>
 
-        {% if page_obj.has_next %}
-          <li><a href="?page={{ page_obj.next_page_number }}{{ filter_query }}" role="button" class="outline secondary">Next &raquo;</a></li>
-          <li><a href="?page={{ page_obj.paginator.num_pages }}{{ filter_query }}" role="button" class="outline secondary">Last &raquo;&raquo;</a></li>
-        {% else %}
-          <li><a href="#" aria-disabled="true" role="button" class="outline secondary disabled">Next &raquo;</a></li>
-          <li><a href="#" aria-disabled="true" role="button" class="outline secondary disabled">Last &raquo;&raquo;</a></li>
-        {% endif %}
-      </ul>
+            {% if page_obj.has_next %}
+            <li><a href="?page={{ page_obj.next_page_number }}{{ filter_query }}">Next</a></li>
+            <li><a href="?page={{ page_obj.paginator.num_pages }}{{ filter_query }}">Last</a></li>
+            {% else %}
+            <li><span aria-disabled="true">Next</span></li>
+            <li><span aria-disabled="true">Last</span></li>
+            {% endif %}
+        </ul>
     </nav>
     {% endif %}
 {% else %}

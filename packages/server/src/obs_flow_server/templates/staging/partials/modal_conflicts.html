@@ -1,8 +1,8 @@
 <dialog open id="staging-modal">
     <form id="staging-modal-close" method="dialog" hx-get="{% url 'home' %}" hx-select="#modal-container" hx-target="#modal-container" hx-swap="innerHTML" hx-trigger="submit, keyup[key=='Escape'] from:body"></form>
-    <article class="modal-wide modal-type-warning">
+    <article>
         <header>
-            <h3 style="margin-bottom: 0;">Conflict Warning</h3>
+            <h3>Conflict Warning</h3>
         </header>
         <form id="staging-conflict-form" hx-post="{% url 'staging_ui_modal_confirm_add' %}" hx-target="#modal-container">
             {% csrf_token %}
@@ -26,19 +26,16 @@
             </ul>
 
             <p>How would you like to proceed?</p>
-
-            <div class="modal-actions-stacked">
-                <button type="submit" name="resolution" value="safe" class="secondary">
-                    Exclude conflicting and add only safe PRs
-                </button>
-                <button type="submit" name="resolution" value="all" class="primary">
-                    Add all anyway (PRs will be in multiple batches)
-                </button>
-            </div>
         </form>
         <footer>
-            <button class="secondary outline modal-cancel-full" form="staging-modal-close">
+            <button class="secondary outline" form="staging-modal-close">
                 Cancel Action
+            </button>
+            <button type="submit" name="resolution" value="safe" class="secondary" form="staging-conflict-form">
+                Add only safe PRs
+            </button>
+            <button type="submit" name="resolution" value="all" class="primary" form="staging-conflict-form">
+                Add all anyway
             </button>
         </footer>
     </article>

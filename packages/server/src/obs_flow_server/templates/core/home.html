@@ -3,15 +3,15 @@
 {% block title %}Welcome - OBS Flow{% endblock %}
 
 {% block content %}
-<article class="p-1 hero-article">
-    <h1>Welcome to OBS Flow</h1>
-    <p class="muted hero-subtitle">
-        Workflow orchestration service for Open Build Service (OBS).<br />
+<article class="hero">
+    <header>
+        <h1>Welcome to OBS Flow</h1>
+    </header>
+    <p>
+        Workflow orchestration service for Open Build Service (OBS).<br>
         Manage pull requests, staging batches, and their reviews with ease.
     </p>
-    <div class="hero-actions">
-        <a href="{% url 'pr_list' %}" role="button">View Pull Requests</a>
-        <a href="{% url 'staging_list' %}" role="button" class="secondary">View Staging Batches</a>
-    </div>
+    <a href="{% url 'pr_list' %}" role="button">View Pull Requests</a>
+    <a href="{% url 'staging_list' %}" role="button" class="secondary">View Staging Batches</a>
 </article>
 {% endblock %}

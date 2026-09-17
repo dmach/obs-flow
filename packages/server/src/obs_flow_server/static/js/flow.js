@@ -19,7 +19,7 @@ function initTheme() {
  * This should be executed as early as possible in the <head> to prevent FOUC.
  */
 function initFontSize() {
-    const savedSize = localStorage.getItem("font-size") || "small";
+    const savedSize = localStorage.getItem("font-size") || "medium";
     document.documentElement.setAttribute("data-font-size", savedSize);
 }
 
@@ -53,7 +53,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // Font Size Switcher
     const fontBtns = document.querySelectorAll('.font-size-btn');
     if (fontBtns.length > 0) {
-        const currentSize = document.documentElement.getAttribute("data-font-size") || "small";
+        const currentSize = document.documentElement.getAttribute("data-font-size") || "medium";
 
         // Highlight the active button on load
         fontBtns.forEach(btn => {
