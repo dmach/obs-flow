@@ -474,7 +474,7 @@ class TestStagingUIModalCsrf(TransactionTestCase):
         self.assertEqual(response.status_code, 403)
 
     def test_select_batch_accepts_request_with_csrf_header(self):
-        """htmx sends the token in the X-CSRFToken header (see hx-headers in base.html)."""
+        """htmx sends the token in the X-CSRFToken header (see hx-headers:inherited in base.html)."""
         client = Client(enforce_csrf_checks=True)
         client.get(reverse("pr_list"))
         token = client.cookies["csrftoken"].value
