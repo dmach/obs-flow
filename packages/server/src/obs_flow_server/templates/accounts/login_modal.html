@@ -2,7 +2,7 @@
 
 {% block content %}
 <dialog open id="login-modal">
-    <form id="login-modal-close" method="dialog" {% if is_htmx %}hx-get="{% url 'home' %}" hx-target="#modal-container" hx-swap="innerHTML"{% endif %}></form>
+    <form id="login-modal-close" method="dialog" {% if is_htmx %}hx-get="{% url 'home' %}" hx-target="#modal-container" hx-swap="innerHTML" hx-trigger="submit, keyup[key=='Escape'] from:body"{% endif %}></form>
     <article class="modal-type-info" style="max-width: 450px; margin: 0 auto;">
         <header>
             <h3 style="margin-bottom: 0; text-align: center;">Log In</h3>
