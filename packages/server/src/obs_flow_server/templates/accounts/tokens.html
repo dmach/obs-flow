@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+
+{% block content %}
+<article>
+    <header>
+        <h2 style="margin-bottom: 0.5rem;">API Tokens</h2>
+        <p class="muted" style="margin-bottom: 0;">Manage your personal access tokens for authenticating with the CLI and API.</p>
+    </header>
+
+    {% if new_token %}
+        <div style="border: 1px solid var(--pico-ins-color); border-radius: var(--pico-border-radius); padding: 1.5rem; margin-bottom: 2rem; background-color: rgba(46, 125, 50, 0.1);">
+            <h4 style="color: var(--pico-ins-color); margin-top: 0; margin-bottom: 0.5rem;">Token Generated Successfully!</h4>
+            <p style="margin-bottom: 1rem;">Make sure to copy your personal access token now. <strong>You won't be able to see it again!</strong></p>
+            <div style="display: flex; gap: 1rem; align-items: center;">
+                <code style="font-size: 1.2rem; padding: 0.5rem 1rem; background-color: var(--pico-code-background-color); border-radius: var(--pico-border-radius); flex-grow: 1; word-break: break-all;">{{ new_token }}</code>
+            </div>
+        </div>
+    {% endif %}
+
+    <section style="margin-bottom: 3rem;">
+        <h3>Generate New Token</h3>
+        <form method="post" style="display: flex; gap: 1rem; align-items: flex-end;">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="create">
+            <div style="flex-grow: 1; margin-bottom: 0;">
+                <label for="description" style="margin-bottom: 0.5rem;">Description</label>
+                <input type="text" id="description" name="description" placeholder="e.g., CLI Token" required style="margin-bottom: 0;">
+            </div>
+            <button type="submit" style="margin-bottom: 0; width: auto;">Generate</button>
+        </form>
+    </section>
+
+    <section>
+        <h3>Active Tokens</h3>
+        {% if tokens %}
+            <table class="striped">
+                <thead>
+                    <tr>
+                        <th>Token</th>
+                        <th>Description</th>
+                        <th>Created At</th>
+                        <th>Last Used</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for token in tokens %}
+                        <tr>
+                            <td><code>flow-...{{ token.last_eight }}</code></td>
+                            <td>{{ token.description|default:"—" }}</td>
+                            <td>{{ token.created_at|date:"Y-m-d H:i" }}</td>
+                            <td>
+                                {% if token.last_used_at %}
+                                    {{ token.last_used_at|date:"Y-m-d H:i" }}
+                                {% else %}
+                                    <span class="muted">Never</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <form method="post" style="margin: 0; display: inline;">
+                                    {% csrf_token %}
+                                    <input type="hidden" name="action" value="delete">
+                                    <input type="hidden" name="token_id" value="{{ token.id }}">
+                                    <button type="submit" class="secondary outline" style="padding: 0.25rem 0.75rem; font-size: 0.85rem; margin: 0; width: auto;">Revoke</button>
+                                </form>
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        {% else %}
+            <p class="muted">You don't have any active personal access tokens yet.</p>
+        {% endif %}
+    </section>
+</article>
+{% endblock %}

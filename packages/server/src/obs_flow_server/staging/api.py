@@ -27,7 +27,7 @@ from obs_flow_common.messages import (
 from obs_flow_server.api import api
 
 import hashlib
-from accounts.helpers import build_user_dto
+from accounts.helpers import build_user_dto, get_authenticated_user, get_auth_header
 from accounts.models import User, Group
 from core.models import Project
 from pull_requests.models import PullRequest
@@ -176,31 +176,29 @@ def show_staging_endpoint(request, staging_id: int):
 
 
 @api.post("/api/v1/staging/create")
-@sync_to_async
-def create_staging_endpoint(payload: StagingCreateRequest):
-    try:
-        project = Project.objects.get(name=payload.project)
-    except Project.DoesNotExist:
-        return HttpResponseBadRequest(f"Project not found: {payload.project}")
+async def create_staging_endpoint(payload: StagingCreateRequest, request):
+    def do_create():
+        try:
+            project = Project.objects.get(name=payload.project)
+        except Project.DoesNotExist:
+            return HttpResponseBadRequest(f"Project not found: {payload.project}")
 
-    try:
-        admin_user = User.objects.get(username="admin")
-    except User.DoesNotExist:
-        admin_user = User.objects.first()
+        user = get_authenticated_user(request)
 
-    batch = StagingBatch.objects.create(
-        project=project,
-        title=payload.title,
-        author=admin_user,
-        embargo_date=timezone.datetime.fromisoformat(payload.embargo_date) if payload.embargo_date else None,
-        release_date=timezone.datetime.fromisoformat(payload.release_date) if payload.release_date else None,
-    )
+        batch = StagingBatch.objects.create(
+            project=project,
+            title=payload.title,
+            author=user,
+            embargo_date=timezone.datetime.fromisoformat(payload.embargo_date) if payload.embargo_date else None,
+            release_date=timezone.datetime.fromisoformat(payload.release_date) if payload.release_date else None,
+        )
 
-    # Create revision 1 (empty)
-    create_staging_revision(batch, [])
+        # Create revision 1 (empty)
+        create_staging_revision(batch, [])
 
-    detail = batch_to_detail(batch)
-    return msgspec.structs.asdict(detail)
+        detail = batch_to_detail(batch)
+        return msgspec.structs.asdict(detail)
+    return await sync_to_async(do_create)()
 
 
 @api.post("/api/v1/staging/edit")
@@ -312,13 +310,13 @@ def show_staging_review_endpoint(payload: StagingReviewShowRequest):
 
 @api.post("/api/v1/staging_review/approve")
 @sync_to_async
-def approve_staging_review_endpoint(payload: StagingReviewApproveRequest):
+def approve_staging_review_endpoint(payload: StagingReviewApproveRequest, request):
     batch = StagingBatch.objects.get(id=payload.staging_id)
 
     review = get_review_for_request(batch, payload.reviewer)
     review.state = StagingReview.State.ACCEPTED
-    admin_user = User.objects.get(username="admin")
-    review.actor = admin_user
+    user = get_authenticated_user(request)
+    review.actor = user
     review.justification = None
     review.save()
 
@@ -328,13 +326,13 @@ def approve_staging_review_endpoint(payload: StagingReviewApproveRequest):
 
 @api.post("/api/v1/staging_review/decline")
 @sync_to_async
-def decline_staging_review_endpoint(payload: StagingReviewDeclineRequest):
+def decline_staging_review_endpoint(payload: StagingReviewDeclineRequest, request):
     batch = StagingBatch.objects.get(id=payload.staging_id)
 
     review = get_review_for_request(batch, payload.reviewer)
     review.state = StagingReview.State.REJECTED
-    admin_user = User.objects.get(username="admin")
-    review.actor = admin_user
+    user = get_authenticated_user(request)
+    review.actor = user
     review.justification = payload.message
     review.save()
 
@@ -344,13 +342,13 @@ def decline_staging_review_endpoint(payload: StagingReviewDeclineRequest):
 
 @api.post("/api/v1/staging_review/needinfo")
 @sync_to_async
-def needinfo_staging_review_endpoint(payload: StagingReviewNeedInfoRequest):
+def needinfo_staging_review_endpoint(payload: StagingReviewNeedInfoRequest, request):
     batch = StagingBatch.objects.get(id=payload.staging_id)
 
     review = get_review_for_request(batch, payload.reviewer)
     review.state = StagingReview.State.NEEDINFO
-    admin_user = User.objects.get(username="admin")
-    review.actor = admin_user
+    user = get_authenticated_user(request)
+    review.actor = user
     review.justification = payload.message
     review.save()
 
@@ -360,7 +358,7 @@ def needinfo_staging_review_endpoint(payload: StagingReviewNeedInfoRequest):
 
 @api.post("/api/v1/staging_review/clear_needinfo")
 @sync_to_async
-def clear_needinfo_staging_review_endpoint(payload: StagingReviewClearNeedInfoRequest):
+def clear_needinfo_staging_review_endpoint(payload: StagingReviewClearNeedInfoRequest, request):
     batch = StagingBatch.objects.get(id=payload.staging_id)
     latest_rev = batch.revisions.order_by("-revision_number").first()
     if not latest_rev:
@@ -368,12 +366,12 @@ def clear_needinfo_staging_review_endpoint(payload: StagingReviewClearNeedInfoRe
 
     # Clear needinfo on all reviews for this batch revision that are in NEEDINFO state
     reviews = latest_rev.reviews.filter(state=StagingReview.State.NEEDINFO)
-    admin_user = User.objects.get(username="admin")
+    user = get_authenticated_user(request)
 
     last_review = None
     for review in reviews:
         review.state = StagingReview.State.PENDING
-        review.actor = admin_user
+        review.actor = user
         review.justification = payload.message
         review.save()
         last_review = review
@@ -387,13 +385,13 @@ def clear_needinfo_staging_review_endpoint(payload: StagingReviewClearNeedInfoRe
 
 @api.post("/api/v1/staging_review/reopen")
 @sync_to_async
-def reopen_staging_review_endpoint(payload: StagingReviewReopenRequest):
+def reopen_staging_review_endpoint(payload: StagingReviewReopenRequest, request):
     batch = StagingBatch.objects.get(id=payload.staging_id)
 
     review = get_review_for_request(batch, payload.reviewer)
     review.state = StagingReview.State.PENDING
-    admin_user = User.objects.get(username="admin")
-    review.actor = admin_user
+    user = get_authenticated_user(request)
+    review.actor = user
     review.justification = payload.message
     review.save()
 

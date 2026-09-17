@@ -2,7 +2,8 @@ from django.db import IntegrityError
 from django.test import TestCase, override_settings
 from django.urls import reverse
 
-from .models import Group, User
+from .helpers import generate_secure_token, get_authenticated_user
+from .models import Group, Token, User
 
 
 class UserModelTests(TestCase):
@@ -157,3 +158,88 @@ class AuthViewsTests(TestCase):
         })
         self.assertEqual(response.status_code, 200)
         self.assertFormError(response.context["form"], None, "Please enter a correct username and password. Note that both fields may be case-sensitive.")
+
+
+class TokenTests(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(
+            username="tokenuser",
+            password="password123",
+            is_local_account=True
+        )
+        # Ensure admin user exists for fallback test
+        User.objects.get_or_create(username="admin", defaults={"is_local_account": True})
+
+    def test_token_generation_and_hashing(self):
+        raw_token, last_eight, token_hash = generate_secure_token()
+        self.assertTrue(raw_token.startswith("flow-"))
+        self.assertEqual(len(raw_token), 69)
+        self.assertEqual(last_eight, raw_token[-8:])
+        self.assertEqual(len(token_hash), 64)
+
+    def test_token_webui_flow(self):
+        self.client.login(username="tokenuser", password="password123")
+
+        # 1. View token list (should be empty)
+        response = self.client.get(reverse("token_list"))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "You don't have any active personal access tokens yet.")
+
+        # 2. Create a new token
+        response = self.client.post(reverse("token_list"), {
+            "action": "create",
+            "description": "My Test Token",
+        })
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Token Generated Successfully!")
+        self.assertContains(response, "My Test Token")
+
+        # Verify token was created in DB
+        token = Token.objects.get(user=self.user)
+        self.assertEqual(token.description, "My Test Token")
+        self.assertEqual(len(token.last_eight), 8)
+
+        # 3. View token list again (raw token should NOT be displayed anymore)
+        response = self.client.get(reverse("token_list"))
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, "Token Generated Successfully!")
+        self.assertContains(response, f"flow-...{token.last_eight}")
+
+        # 4. Revoke the token
+        response = self.client.post(reverse("token_list"), {
+            "action": "delete",
+            "token_id": token.id,
+        })
+        self.assertRedirects(response, reverse("token_list"))
+        self.assertFalse(Token.objects.filter(user=self.user).exists())
+
+    def test_api_token_authentication(self):
+        raw_token, last_eight, token_hash = generate_secure_token()
+        token = Token.objects.create(
+            user=self.user,
+            last_eight=last_eight,
+            token_hash=token_hash,
+            description="API Test Token",
+        )
+
+        # Authenticate with valid token
+        auth_header = f"Bearer {raw_token}"
+        request = {"headers": {"authorization": auth_header}}
+        authenticated_user = get_authenticated_user(request)
+        self.assertEqual(authenticated_user, self.user)
+
+        # Verify last_used_at was updated
+        token.refresh_from_db()
+        self.assertIsNotNone(token.last_used_at)
+
+        # Authenticate with invalid token
+        with self.assertRaises(ValueError):
+            get_authenticated_user({"headers": {"authorization": "Bearer invalid-token"}})
+
+        # Authenticate with invalid header format
+        with self.assertRaises(ValueError):
+            get_authenticated_user({"headers": {"authorization": "invalid-format"}})
+
+        # Authenticate with no header (should raise ValueError)
+        with self.assertRaises(ValueError):
+            get_authenticated_user({"headers": {}})

@@ -25,6 +25,7 @@
                 <li><a href="{% url 'pr_list' %}">Pull Requests</a></li>
                 <li><a href="{% url 'staging_list' %}">Staging Batches</a></li>
                 {% if user.is_authenticated %}
+                    <li><a href="{% url 'token_list' %}">Tokens</a></li>
                     <li><span class="secondary" style="margin-right: 10px;">Logged in as <strong>{{ user.username }}</strong></span></li>
                     <li><a href="#" hx-post="{% url 'logout' %}" hx-trigger="click" class="secondary outline" role="button" style="padding: 0.25rem 0.75rem;">Logout</a></li>
                 {% else %}
@@ -38,6 +39,7 @@
                     <li><a href="{% url 'pr_list' %}">Pull Requests</a></li>
                     <li><a href="{% url 'staging_list' %}">Staging Batches</a></li>
                     {% if user.is_authenticated %}
+                        <li><a href="{% url 'token_list' %}">Tokens</a></li>
                         <li><span class="secondary">Logged in as <strong>{{ user.username }}</strong></span></li>
                         <li><a href="#" hx-post="{% url 'logout' %}" hx-trigger="click">Logout</a></li>
                     {% else %}

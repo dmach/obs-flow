@@ -112,10 +112,19 @@ class TestStagingCreationWithReviewConfig(TransactionTestCase):
             "project": "openSUSE:Factory",
             "title": "Factory Staging Batch A",
         }
+        from accounts.helpers import generate_secure_token
+        from accounts.models import Token
+        raw_token, last_eight, token_hash = generate_secure_token()
+        Token.objects.create(
+            user=user_darix,
+            last_eight=last_eight,
+            token_hash=token_hash,
+        )
         with TestClient(api) as client:
             response = client.post(
                 "/api/v1/staging/create",
                 content=json.dumps(payload),
+                headers={"Authorization": f"Bearer {raw_token}"},
             )
         self.assertEqual(response.status_code, 200)
         res_data = response.json()
@@ -205,10 +214,21 @@ class TestStagingBatchRevision(TransactionTestCase):
             "project": "openSUSE:Factory",
             "title": "Revision Test Batch",
         }
+        from accounts.models import User
+        user = User.objects.first()
+        from accounts.helpers import generate_secure_token
+        from accounts.models import Token
+        raw_token, last_eight, token_hash = generate_secure_token()
+        Token.objects.create(
+            user=user,
+            last_eight=last_eight,
+            token_hash=token_hash,
+        )
         with TestClient(api) as client:
             response = client.post(
                 "/api/v1/staging/create",
                 content=json.dumps(payload),
+                headers={"Authorization": f"Bearer {raw_token}"},
             )
         self.assertEqual(response.status_code, 200)
         res_data = response.json()
