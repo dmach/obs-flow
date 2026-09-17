@@ -4,35 +4,27 @@
 
 {% block content %}
 <section>
-    <div class="page-header">
-        <h2>Git Mappings <span class="badge">{{ total_count }}</span></h2>
-    </div>
+    <h2>Git Mappings <small>{{ total_count }}</small></h2>
     <p class="muted">Mappings between git branches and projects/packages.</p>
 
-    <details class="filter-panel" {% if request.GET %}open{% endif %}>
-        <summary>Toggle Search & Filters</summary>
+    <details class="filter-panel" {% if base_query %}open{% endif %}>
+        <summary>Search &amp; Filters</summary>
         <div class="filter-panel-body">
             <form method="GET" action="">
                 <div class="grid">
                     {% for field, exact_field in form.s_fields %}
                     <div>
-                        <div class="filter-field-header">
-                            <label for="{{ field.id_for_label }}">{{ field.label }}</label>
-                            {% if exact_field %}
-                            <label class="filter-exact-label">
-                                {{ exact_field }} Exact
-                            </label>
-                            {% endif %}
-                        </div>
+                        {{ field.label_tag }}
                         {{ field }}
+                        {% if exact_field %}
+                        <label>{{ exact_field }} {{ exact_field.label }}</label>
+                        {% endif %}
                     </div>
                     {% endfor %}
                 </div>
 
-                <div class="filter-actions">
-                    <button type="button" class="secondary outline" onclick="window.location.href='?'">Reset</button>
-                    <button type="submit">Apply Filter</button>
-                </div>
+                <a href="?" role="button" class="secondary outline">Reset</a>
+                <button type="submit">Apply Filter</button>
             </form>
         </div>
     </details>
@@ -42,37 +34,37 @@
             <thead>
                 <tr>
                     <th>
-                        <a href="?sort={% if current_sort == 'id' %}-id{% else %}id{% endif %}{{ base_query }}" class="sort-link">
+                        <a href="?sort={% if current_sort == 'id' %}-id{% else %}id{% endif %}{{ base_query }}">
                             ID
                             {% if current_sort == 'id' %}▲{% elif current_sort == '-id' %}▼{% endif %}
                         </a>
                     </th>
                     <th>
-                        <a href="?sort={% if current_sort == 'owner' %}-owner{% else %}owner{% endif %}{{ base_query }}" class="sort-link">
+                        <a href="?sort={% if current_sort == 'owner' %}-owner{% else %}owner{% endif %}{{ base_query }}">
                             Owner
                             {% if current_sort == 'owner' %}▲{% elif current_sort == '-owner' %}▼{% endif %}
                         </a>
                     </th>
                     <th>
-                        <a href="?sort={% if current_sort == 'repo' %}-repo{% else %}repo{% endif %}{{ base_query }}" class="sort-link">
+                        <a href="?sort={% if current_sort == 'repo' %}-repo{% else %}repo{% endif %}{{ base_query }}">
                             Repository
                             {% if current_sort == 'repo' %}▲{% elif current_sort == '-repo' %}▼{% endif %}
                         </a>
                     </th>
                     <th>
-                        <a href="?sort={% if current_sort == 'branch' %}-branch{% else %}branch{% endif %}{{ base_query }}" class="sort-link">
+                        <a href="?sort={% if current_sort == 'branch' %}-branch{% else %}branch{% endif %}{{ base_query }}">
                             Branch
                             {% if current_sort == 'branch' %}▲{% elif current_sort == '-branch' %}▼{% endif %}
                         </a>
                     </th>
                     <th>
-                        <a href="?sort={% if current_sort == 'project__name' %}-project__name{% else %}project__name{% endif %}{{ base_query }}" class="sort-link">
+                        <a href="?sort={% if current_sort == 'project__name' %}-project__name{% else %}project__name{% endif %}{{ base_query }}">
                             Target Project
                             {% if current_sort == 'project__name' %}▲{% elif current_sort == '-project__name' %}▼{% endif %}
                         </a>
                     </th>
                     <th>
-                        <a href="?sort={% if current_sort == 'package__name' %}-package__name{% else %}package__name{% endif %}{{ base_query }}" class="sort-link">
+                        <a href="?sort={% if current_sort == 'package__name' %}-package__name{% else %}package__name{% endif %}{{ base_query }}">
                             Target Package
                             {% if current_sort == 'package__name' %}▲{% elif current_sort == '-package__name' %}▼{% endif %}
                         </a>
@@ -94,26 +86,26 @@
         </table>
 
         {% if page_obj.has_other_pages %}
-        <nav aria-label="pagination" class="pagination-nav">
-          <ul class="pagination-list">
-            {% if page_obj.has_previous %}
-              <li><a href="?page=1{{ filter_query }}" role="button" class="outline secondary">&laquo;&laquo; First</a></li>
-              <li><a href="?page={{ page_obj.previous_page_number }}{{ filter_query }}" role="button" class="outline secondary">&laquo; Previous</a></li>
-            {% else %}
-              <li><a href="#" aria-disabled="true" role="button" class="outline secondary disabled">&laquo;&laquo; First</a></li>
-              <li><a href="#" aria-disabled="true" role="button" class="outline secondary disabled">&laquo; Previous</a></li>
-            {% endif %}
+        <nav aria-label="pagination">
+            <ul>
+                {% if page_obj.has_previous %}
+                <li><a href="?page=1{{ filter_query }}">First</a></li>
+                <li><a href="?page={{ page_obj.previous_page_number }}{{ filter_query }}">Previous</a></li>
+                {% else %}
+                <li><span aria-disabled="true">First</span></li>
+                <li><span aria-disabled="true">Previous</span></li>
+                {% endif %}
 
-            <li class="pagination-info">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</li>
+                <li>Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</li>
 
-            {% if page_obj.has_next %}
-              <li><a href="?page={{ page_obj.next_page_number }}{{ filter_query }}" role="button" class="outline secondary">Next &raquo;</a></li>
-              <li><a href="?page={{ page_obj.paginator.num_pages }}{{ filter_query }}" role="button" class="outline secondary">Last &raquo;&raquo;</a></li>
-            {% else %}
-              <li><a href="#" aria-disabled="true" role="button" class="outline secondary disabled">Next &raquo;</a></li>
-              <li><a href="#" aria-disabled="true" role="button" class="outline secondary disabled">Last &raquo;&raquo;</a></li>
-            {% endif %}
-          </ul>
+                {% if page_obj.has_next %}
+                <li><a href="?page={{ page_obj.next_page_number }}{{ filter_query }}">Next</a></li>
+                <li><a href="?page={{ page_obj.paginator.num_pages }}{{ filter_query }}">Last</a></li>
+                {% else %}
+                <li><span aria-disabled="true">Next</span></li>
+                <li><span aria-disabled="true">Last</span></li>
+                {% endif %}
+            </ul>
         </nav>
         {% endif %}
     {% else %}

@@ -1,8 +1,8 @@
 <dialog open id="staging-modal">
-    <form id="staging-modal-close" method="dialog"></form>
-    <article class="modal-type-info">
+    <form id="staging-modal-close" method="dialog" hx-get="{% url 'home' %}" hx-select="#modal-container" hx-target="#modal-container" hx-swap="innerHTML" hx-trigger="submit, keyup[key=='Escape'] from:body"></form>
+    <article>
         <header>
-            <h3 style="margin-bottom: 0;">Stage Selected Pull Requests</h3>
+            <h3>Stage Selected Pull Requests</h3>
         </header>
         <form id="staging-action-form" hx-post="{% url 'staging_ui_modal_confirm_add' %}" hx-target="#modal-container">
             {% csrf_token %}

@@ -1,0 +1,45 @@
+{% extends extends_template|default:"base.html" %}
+
+{% block content %}
+<dialog open id="login-modal">
+    <form id="login-modal-close" method="dialog" {% if is_htmx %}hx-get="{% url 'home' %}" hx-select="#modal-container" hx-target="#modal-container" hx-swap="innerHTML" hx-trigger="submit, keyup[key=='Escape'] from:body"{% endif %}></form>
+    <article>
+        <header>
+            <h3>Log In</h3>
+        </header>
+
+        {% if auth_oidc_enabled %}
+            <a href="#" role="button" class="primary">Login with SSO</a>
+        {% endif %}
+
+        {% if auth_local_enabled %}
+            {% if auth_oidc_enabled and not form.errors %}
+                {# Both enabled and no errors: SSO is prominent, local login is collapsed behind HTMX #}
+                <div id="local-login-section">
+                    <hr>
+                    <button class="secondary outline"
+                            hx-get="{% url 'local_login_form' %}?next={{ next|urlencode }}"
+                            hx-target="#local-login-section"
+                            hx-swap="outerHTML">
+                        Use local account
+                    </button>
+                </div>
+            {% else %}
+                {# Only local enabled, or there are errors: show form directly #}
+                {% include "accounts/partials/local_login_form.html" %}
+            {% endif %}
+        {% endif %}
+
+        <footer>
+            {% if is_htmx %}
+                <button class="secondary outline" form="login-modal-close">Cancel</button>
+            {% else %}
+                <a href="{% url 'home' %}" role="button" class="secondary outline">Cancel</a>
+            {% endif %}
+            {% if auth_local_enabled %}
+                <button type="submit" class="primary local-login-submit" form="local-login-form">Log In</button>
+            {% endif %}
+        </footer>
+    </article>
+</dialog>
+{% endblock %}

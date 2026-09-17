@@ -9,12 +9,12 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css">
     <link rel="stylesheet" href="{% static 'css/flow.css' %}">
     <script src="{% static 'js/flow.js' %}"></script>
-    <script src="https://unpkg.com/htmx.org@2.0.1/dist/htmx.min.js"></script>
+    <script src="https://unpkg.com/htmx.org@4.0.0/dist/htmx.min.js"></script>
 </head>
-{# hx-headers is inherited by every htmx request on the page, so all non-GET #}
+{# hx-headers:inherited is inherited by every htmx request on the page, so all non-GET #}
 {# requests carry the CSRF token without any JavaScript. Rendering the token #}
 {# here also makes Django set the csrftoken cookie on every page. #}
-<body hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'>
+<body hx-headers:inherited='{"X-CSRFToken": "{{ csrf_token }}"}'>
     <header class="navbar-container">
         <nav class="container">
             <ul>
@@ -24,6 +24,19 @@
                 <li><a href="{% url 'git_mapping_list' %}">Git Mappings</a></li>
                 <li><a href="{% url 'pr_list' %}">Pull Requests</a></li>
                 <li><a href="{% url 'staging_list' %}">Staging Batches</a></li>
+                {% if user.is_authenticated %}
+                    <li>
+                        <details class="dropdown" dir="rtl">
+                            <summary dir="ltr"><strong>{{ user.username }}</strong></summary>
+                            <ul>
+                                <li><a href="{% url 'token_list' %}">Tokens</a></li>
+                                <li><a href="#" hx-post="{% url 'logout' %}" hx-trigger="click">Logout</a></li>
+                            </ul>
+                        </details>
+                    </li>
+                {% else %}
+                    <li><a href="{% url 'login' %}?next={{ request.path|urlencode }}" hx-get="{% url 'login' %}?next={{ request.path|urlencode }}" hx-target="#modal-container" hx-swap="innerHTML">Log In</a></li>
+                {% endif %}
             </ul>
             <details class="mobile-menu dropdown">
                 <summary role="button" class="secondary outline">Menu</summary>
@@ -31,6 +44,13 @@
                     <li><a href="{% url 'git_mapping_list' %}">Git Mappings</a></li>
                     <li><a href="{% url 'pr_list' %}">Pull Requests</a></li>
                     <li><a href="{% url 'staging_list' %}">Staging Batches</a></li>
+                    {% if user.is_authenticated %}
+                        <li><a href="{% url 'token_list' %}">Tokens</a></li>
+                        <li>Logged in as <strong>{{ user.username }}</strong></li>
+                        <li><a href="#" hx-post="{% url 'logout' %}" hx-trigger="click">Logout</a></li>
+                    {% else %}
+                        <li><a href="{% url 'login' %}?next={{ request.path|urlencode }}" hx-get="{% url 'login' %}?next={{ request.path|urlencode }}" hx-target="#modal-container" hx-swap="innerHTML">Log In</a></li>
+                    {% endif %}
                 </ul>
             </details>
         </nav>
@@ -43,22 +63,19 @@
     <div id="modal-container"></div>
     {% include "partials/toasts.html" %}
 
-    <footer class="container page-footer">
+    <footer class="container">
         <small>
-            <div>
-                <a href="#" class="secondary">Documentation</a> &bull;
-                <a href="#" class="secondary">File a bug</a> &bull;
-                <a href="#" class="secondary">Support</a> &bull;
-                <a href="#" class="secondary">Source Code</a>
-            </div>
-            <div style="margin-top: 0.75rem;">
-                <a href="#" id="theme-toggle" class="secondary">Toggle Theme</a> &bull;
-                <span class="font-size-switcher">
-                    <a href="#" data-size="small" class="font-size-btn" aria-label="Small font" title="Small font"></a>
-                    <a href="#" data-size="medium" class="font-size-btn" aria-label="Medium font" title="Medium font"></a>
-                    <a href="#" data-size="large" class="font-size-btn" aria-label="Large font" title="Large font"></a>
-                </span>
-            </div>
+            <a href="#" class="secondary">Documentation</a> &bull;
+            <a href="#" class="secondary">File a bug</a> &bull;
+            <a href="#" class="secondary">Support</a> &bull;
+            <a href="#" class="secondary">Source Code</a>
+            <br>
+            <a href="#" id="theme-toggle" class="secondary">Toggle Theme</a> &bull;
+            <span class="font-size-switcher">
+                <button type="button" data-size="small" class="font-size-btn" aria-label="Small font" title="Small font"></button>
+                <button type="button" data-size="medium" class="font-size-btn" aria-label="Medium font" title="Medium font"></button>
+                <button type="button" data-size="large" class="font-size-btn" aria-label="Large font" title="Large font"></button>
+            </span>
         </small>
     </footer>
 </body>

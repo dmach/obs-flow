@@ -31,7 +31,6 @@ ALLOWED_HOSTS = []
 # Application definition
 
 INSTALLED_APPS = [
-    "django.contrib.admin",
     "django.contrib.auth",
     "django.contrib.contenttypes",
     "django.contrib.sessions",
@@ -133,3 +132,16 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 import os
 GITEA_URL = os.environ.get("GITEA_URL")
 GITEA_TOKEN = os.environ.get("GITEA_TOKEN")
+
+AUTH_LOCAL_ENABLED = os.environ.get("AUTH_LOCAL_ENABLED", "True").lower() == "true"
+AUTH_OIDC_ENABLED = os.environ.get("AUTH_OIDC_ENABLED", "False").lower() == "true"
+
+if not (AUTH_LOCAL_ENABLED or AUTH_OIDC_ENABLED):
+    raise ValueError("At least one authentication method must be enabled.")
+
+AUTHENTICATION_BACKENDS = []
+if AUTH_LOCAL_ENABLED:
+    AUTHENTICATION_BACKENDS.append("django.contrib.auth.backends.ModelBackend")
+
+LOGIN_URL = "login"
+LOGIN_REDIRECT_URL = "home"

@@ -1,0 +1,18 @@
+<form id="local-login-form" method="post" action="{% url 'login' %}">
+    {% csrf_token %}
+    <input type="hidden" name="next" value="{{ next|default:'' }}">
+
+    {% if form.errors %}
+        {% for field, errors in form.errors.items %}
+            {% for error in errors %}
+                <p class="muted">{{ error }}</p>
+            {% endfor %}
+        {% endfor %}
+    {% endif %}
+
+    <label for="id_username">Username</label>
+    <input type="text" name="username" autofocus required id="id_username" placeholder="Enter your username">
+
+    <label for="id_password">Password</label>
+    <input type="password" name="password" required id="id_password" placeholder="Enter your password">
+</form>

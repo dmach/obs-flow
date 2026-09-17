@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+
+{% block title %}API Tokens - OBS Flow{% endblock %}
+
+{% block content %}
+<article>
+    <header>
+        <h2>API Tokens</h2>
+        <p>Manage your personal access tokens for authenticating with the CLI and API.</p>
+    </header>
+
+    {% if new_token %}
+        <article>
+            <header>
+                <h3>Token Generated Successfully!</h3>
+            </header>
+            <p>Make sure to copy your personal access token now. <strong>You won't be able to see it again!</strong></p>
+            <pre><code>{{ new_token }}</code></pre>
+        </article>
+    {% endif %}
+
+    <section>
+        <h3>Generate New Token</h3>
+        <form method="post">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="create">
+            <div class="grid">
+                <div>
+                    <label for="description">Description</label>
+                    <input type="text" id="description" name="description" placeholder="e.g., CLI Token" required>
+                </div>
+                <button type="submit">Generate</button>
+            </div>
+        </form>
+    </section>
+
+    <section>
+        <h3>Active Tokens</h3>
+        {% if tokens %}
+            <table class="striped">
+                <thead>
+                    <tr>
+                        <th>Token</th>
+                        <th>Description</th>
+                        <th>Created At</th>
+                        <th>Last Used</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for token in tokens %}
+                        <tr>
+                            <td><code>flow-...{{ token.last_eight }}</code></td>
+                            <td>{{ token.description|default:"—" }}</td>
+                            <td>{{ token.created_at|date:"Y-m-d H:i" }}</td>
+                            <td>
+                                {% if token.last_used_at %}
+                                    {{ token.last_used_at|date:"Y-m-d H:i" }}
+                                {% else %}
+                                    <span class="muted">Never</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <form method="post">
+                                    {% csrf_token %}
+                                    <input type="hidden" name="action" value="delete">
+                                    <input type="hidden" name="token_id" value="{{ token.id }}">
+                                    <button type="submit" class="secondary outline">Revoke</button>
+                                </form>
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        {% else %}
+            <p class="muted">You don't have any active personal access tokens yet.</p>
+        {% endif %}
+    </section>
+</article>
+{% endblock %}

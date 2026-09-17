@@ -17,12 +17,13 @@ class Connection:
     and keep-alive, and provides helper methods to perform requests.
     """
 
-    def __init__(self, base_url: str, timeout: float = 10.0) -> None:
+    def __init__(self, base_url: str, timeout: float = 10.0, token: str | None = None) -> None:
         """Initializes the connection.
 
         Args:
             base_url: The base URL of the OBS Flow server (e.g., 'http://localhost:8000').
             timeout: Default timeout in seconds for all requests.
+            token: Optional personal access token for authentication.
         """
         self.base_url = base_url.rstrip("/")
         self.timeout = timeout
@@ -31,6 +32,8 @@ class Connection:
             "Content-Type": "application/json",
             "Accept": "application/json",
         })
+        if token:
+            self.session.headers["Authorization"] = f"Bearer {token}"
 
     def post(self, path: str, data: bytes) -> bytes:
         """Sends a POST request with raw bytes and returns raw bytes response.
@@ -67,14 +70,15 @@ class Connection:
         self.close()
 
 
-def create_connection(base_url: str, timeout: float = 10.0) -> Connection:
+def create_connection(base_url: str, timeout: float = 10.0, token: str | None = None) -> Connection:
     """Initializes and returns a Connection instance.
 
     Args:
         base_url: The base URL of the OBS Flow server.
         timeout: Default timeout in seconds for all requests.
+        token: Optional personal access token for authentication.
 
     Returns:
         An initialized Connection instance.
     """
-    return Connection(base_url=base_url, timeout=timeout)
+    return Connection(base_url=base_url, timeout=timeout, token=token)
