@@ -1,5 +1,5 @@
 <dialog open id="staging-modal">
-    <form id="staging-modal-close" method="dialog" hx-get="{% url 'home' %}" hx-target="#modal-container" hx-swap="innerHTML" hx-trigger="submit, keyup[key=='Escape'] from:body"></form>
+    <form id="staging-modal-close" method="dialog" hx-get="{% url 'home' %}" hx-select="#modal-container" hx-target="#modal-container" hx-swap="innerHTML" hx-trigger="submit, keyup[key=='Escape'] from:body"></form>
     <article class="modal-wide modal-type-warning">
         <header>
             <h3 style="margin-bottom: 0;">Conflict Warning</h3>
