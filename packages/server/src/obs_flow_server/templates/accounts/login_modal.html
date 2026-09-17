@@ -1,0 +1,50 @@
+{% extends extends_template|default:"base.html" %}
+
+{% block content %}
+<dialog open id="login-modal">
+    <form id="login-modal-close" method="dialog" {% if is_htmx %}hx-get="{% url 'home' %}" hx-target="#modal-container" hx-swap="innerHTML"{% endif %}></form>
+    <article class="modal-type-info" style="max-width: 450px; margin: 0 auto;">
+        <header>
+            <h3 style="margin-bottom: 0; text-align: center;">Log In</h3>
+        </header>
+
+        <div style="display: flex; flex-direction: column; gap: 1.5rem; padding: 1rem 0;">
+            {% if auth_oidc_enabled %}
+                {# SSO is preferred and prominent #}
+                <div style="text-align: center;">
+                    <a href="#" role="button" class="primary" style="width: 100%; display: inline-flex; justify-content: center; align-items: center; gap: 0.5rem;">
+                        Login with SSO
+                    </a>
+                </div>
+            {% endif %}
+
+            {% if auth_local_enabled %}
+                {% if auth_oidc_enabled and not form.errors %}
+                    {# Both enabled and no errors: SSO is prominent, local login is collapsed behind HTMX #}
+                    <div style="text-align: center;" id="local-login-section">
+                        <hr data-content="OR" class="hr-text" style="margin: 1rem 0;">
+                        <button class="secondary outline"
+                                style="width: 100%;"
+                                hx-get="{% url 'local_login_form' %}?next={{ next|urlencode }}"
+                                hx-target="#local-login-section"
+                                hx-swap="outerHTML">
+                            Use local account
+                        </button>
+                    </div>
+                {% else %}
+                    {# Only local enabled, or there are errors: show form directly #}
+                    {% include "accounts/partials/local_login_form.html" %}
+                {% endif %}
+            {% endif %}
+        </div>
+
+        <footer>
+            {% if is_htmx %}
+                <button class="secondary outline" form="login-modal-close" style="width: 100%;">Cancel</button>
+            {% else %}
+                <a href="{% url 'home' %}" role="button" class="secondary outline" style="width: 100%; text-align: center;">Cancel</a>
+            {% endif %}
+        </footer>
+    </article>
+</dialog>
+{% endblock %}

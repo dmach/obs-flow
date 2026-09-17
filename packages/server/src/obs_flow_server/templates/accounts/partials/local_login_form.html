@@ -1,0 +1,26 @@
+<form method="post" action="{% url 'login' %}">
+    {% csrf_token %}
+    <input type="hidden" name="next" value="{{ next|default:'' }}">
+
+    {% if form.errors %}
+        <div class="error-message" style="color: var(--pico-error-color); margin-bottom: 1rem; font-size: 0.9rem;">
+            {% for field, errors in form.errors.items %}
+                {% for error in errors %}
+                    <p style="margin: 0;">{{ error }}</p>
+                {% endfor %}
+            {% endfor %}
+        </div>
+    {% endif %}
+
+    <div style="margin-bottom: 1rem;">
+        <label for="id_username">Username</label>
+        <input type="text" name="username" autofocus required id="id_username" placeholder="Enter your username">
+    </div>
+
+    <div style="margin-bottom: 1.5rem;">
+        <label for="id_password">Password</label>
+        <input type="password" name="password" required id="id_password" placeholder="Enter your password">
+    </div>
+
+    <button type="submit" class="primary" style="width: 100%;">Log In</button>
+</form>

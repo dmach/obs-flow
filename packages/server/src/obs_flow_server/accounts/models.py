@@ -57,6 +57,11 @@ class User(AbstractBaseUser):
             return False
         return super().has_usable_password()
 
+    def check_password(self, raw_password):
+        if self.password is None:
+            return False
+        return super().check_password(raw_password)
+
     def save(self, *args, **kwargs):
         self.username_lower = self.username.lower()
         super().save(*args, **kwargs)

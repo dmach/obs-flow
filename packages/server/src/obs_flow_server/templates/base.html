@@ -24,6 +24,12 @@
                 <li><a href="{% url 'git_mapping_list' %}">Git Mappings</a></li>
                 <li><a href="{% url 'pr_list' %}">Pull Requests</a></li>
                 <li><a href="{% url 'staging_list' %}">Staging Batches</a></li>
+                {% if user.is_authenticated %}
+                    <li><span class="secondary" style="margin-right: 10px;">Logged in as <strong>{{ user.username }}</strong></span></li>
+                    <li><a href="#" hx-post="{% url 'logout' %}" hx-trigger="click" class="secondary outline" role="button" style="padding: 0.25rem 0.75rem;">Logout</a></li>
+                {% else %}
+                    <li><a href="{% url 'login' %}?next={{ request.path|urlencode }}" hx-get="{% url 'login' %}?next={{ request.path|urlencode }}" hx-target="#modal-container" hx-swap="innerHTML" class="primary" role="button" style="padding: 0.25rem 0.75rem;">Login</a></li>
+                {% endif %}
             </ul>
             <details class="mobile-menu dropdown">
                 <summary role="button" class="secondary outline">Menu</summary>
@@ -31,6 +37,12 @@
                     <li><a href="{% url 'git_mapping_list' %}">Git Mappings</a></li>
                     <li><a href="{% url 'pr_list' %}">Pull Requests</a></li>
                     <li><a href="{% url 'staging_list' %}">Staging Batches</a></li>
+                    {% if user.is_authenticated %}
+                        <li><span class="secondary">Logged in as <strong>{{ user.username }}</strong></span></li>
+                        <li><a href="#" hx-post="{% url 'logout' %}" hx-trigger="click">Logout</a></li>
+                    {% else %}
+                        <li><a href="{% url 'login' %}?next={{ request.path|urlencode }}" hx-get="{% url 'login' %}?next={{ request.path|urlencode }}" hx-target="#modal-container" hx-swap="innerHTML">Login</a></li>
+                    {% endif %}
                 </ul>
             </details>
         </nav>
