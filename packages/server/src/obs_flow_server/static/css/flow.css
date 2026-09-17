@@ -96,8 +96,16 @@
     .navbar-container .mobile-menu ul { background-color: var(--pico-card-background-color); }
 }
 
-/* Pico stretches submit buttons to 100%; keep them at their natural size. */
-button[type="submit"] { width: auto; }
+/* Pico stretches buttons to 100%; keep them at their natural size.
+   Explicit types override Pico's [type=...] margin rule so buttons stay equally tall. */
+button,
+[type="submit"],
+[type="button"],
+[type="reset"],
+[role="button"] {
+    width: auto !important;
+    margin: 0;
+}
 
 /* Lightweight table row highlight on pointer devices. */
 @media (min-width: 769px) {
@@ -134,16 +142,6 @@ dialog article > footer {
     justify-content: flex-end;
     align-items: stretch;
     gap: 0.5rem;
-}
-
-/* Explicit types override Pico's [type=...] margin rule so footer buttons stay equally tall. */
-dialog article > footer button,
-dialog article > footer [type="submit"],
-dialog article > footer [type="button"],
-dialog article > footer [type="reset"],
-dialog article > footer [role="button"] {
-    width: auto;
-    margin: 0;
 }
 
 /* The submit button only makes sense once the local login form is on the page;

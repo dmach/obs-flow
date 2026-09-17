@@ -24,13 +24,11 @@
         <form method="post">
             {% csrf_token %}
             <input type="hidden" name="action" value="create">
-            <div class="grid">
-                <div>
-                    <label for="description">Description</label>
-                    <input type="text" id="description" name="description" placeholder="e.g., CLI Token" required>
-                </div>
+            <label for="description">Description</label>
+            <fieldset role="group">
+                <input type="text" id="description" name="description" placeholder="e.g., CLI Token" required>
                 <button type="submit">Generate</button>
-            </div>
+            </fieldset>
         </form>
     </section>
 
