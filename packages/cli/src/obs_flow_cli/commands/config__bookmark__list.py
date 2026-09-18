@@ -1,0 +1,32 @@
+import click
+
+
+@click.command(name="list")
+@click.option("--name", "names", multiple=True, help="Filter by exact bookmark name(s). Can be specified multiple times.")
+@click.option("--name-contains", "name_contains", multiple=True, help="Filter by partial bookmark name(s). Can be specified multiple times.")
+def cli(names: tuple[str, ...], name_contains: tuple[str, ...]) -> None:
+    """List bookmarks."""
+
+    import os
+    from obs_flow_client import list_bookmarks
+    from obs_flow_common.messages import BookmarkListRequest
+    from ..helpers import get_connection
+    from ..output.bookmark import BookmarkRenderer
+
+    req = BookmarkListRequest(
+        names=list(names) if names else None,
+        name_contains=list(name_contains) if name_contains else None,
+    )
+
+    with get_connection() as conn:
+        res = list_bookmarks(conn, req)
+
+    if not res.bookmarks:
+        click.echo("No bookmarks found.", err=True)
+        return
+
+    verbose = os.getenv("OBS_FLOW_VERBOSE") == "1"
+    output = os.getenv("OBS_FLOW_OUTPUT")
+
+    renderer = BookmarkRenderer(res.bookmarks)
+    renderer.render(fmt=output, verbose=verbose)

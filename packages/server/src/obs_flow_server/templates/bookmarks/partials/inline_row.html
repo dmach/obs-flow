@@ -1,0 +1,19 @@
+<tr id="bookmark-row-{{ bookmark.id }}">
+    <td class="checkbox-cell">
+        <input type="checkbox" name="selected_bookmarks" value="{{ bookmark.id }}">
+    </td>
+    <td data-label="Name">
+        <strong>{{ bookmark.name }}</strong>
+    </td>
+    <td data-label="URL">
+        <a href="{{ bookmark.url }}"><code>{{ bookmark.url }}</code></a>
+    </td>
+    <td>
+        <button class="secondary outline contrast"
+                hx-get="{% url 'bookmark_edit_inline' bookmark.id %}"
+                hx-target="#bookmark-row-{{ bookmark.id }}"
+                hx-swap="outerHTML">
+            Edit
+        </button>
+    </td>
+</tr>

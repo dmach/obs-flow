@@ -1,3 +1,14 @@
+from obs_flow_common.messages.bookmarks import (
+    BookmarkDTO,
+    BookmarkListRequest,
+    BookmarkListResponse,
+    BookmarkAddRequest,
+    BookmarkAddResponse,
+    BookmarkRemoveRequest,
+    BookmarkRemoveResponse,
+    BookmarkImportRequest,
+    BookmarkImportResponse,
+)
 from obs_flow_common.messages.core import (
     UserDTO,
     GitMappingDetail,
@@ -60,6 +71,15 @@ from obs_flow_common.messages.staging import (
 )
 
 __all__ = [
+    "BookmarkDTO",
+    "BookmarkListRequest",
+    "BookmarkListResponse",
+    "BookmarkAddRequest",
+    "BookmarkAddResponse",
+    "BookmarkRemoveRequest",
+    "BookmarkRemoveResponse",
+    "BookmarkImportRequest",
+    "BookmarkImportResponse",
     "UserDTO",
     "GitMappingDetail",
     "GitMappingListRequest",

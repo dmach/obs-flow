@@ -4,6 +4,12 @@ Provides programmatic access to the OBS Flow API.
 """
 
 from obs_flow_client.connection import Connection, create_connection
+from obs_flow_client.bookmarks import (
+    list_bookmarks,
+    add_bookmark,
+    remove_bookmark,
+    import_bookmarks,
+)
 from obs_flow_client.git_mapping import (
     list_git_mappings,
     add_git_mapping,
@@ -37,6 +43,7 @@ from obs_flow_client.staging import (
 
 __all__ = [
     "Connection",
+    "add_bookmark",
     "add_git_mapping",
     "add_review_config",
     "add_to_staging",
@@ -50,11 +57,14 @@ __all__ = [
     "decline_staging_review",
     "edit_git_mapping",
     "edit_staging",
+    "import_bookmarks",
+    "list_bookmarks",
     "list_git_mappings",
     "list_review_configs",
     "needinfo_review",
     "needinfo_staging_review",
     "remove_from_staging",
+    "remove_bookmark",
     "remove_git_mapping",
     "remove_review_config",
     "reopen_review",

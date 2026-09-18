@@ -1,0 +1,19 @@
+<dialog open id="bookmark-modal">
+    <form id="bookmark-modal-close" method="dialog"></form>
+    <article class="modal-type-warning">
+        <header>
+            <h3>Confirm Deletion</h3>
+        </header>
+        <form id="bookmark-delete-form" hx-post="{% url 'bookmark_delete_bulk' %}" hx-target="#modal-container">
+            {% csrf_token %}
+            {% for id in selected_ids %}
+                <input type="hidden" name="selected_bookmarks" value="{{ id }}">
+            {% endfor %}
+            <p>Are you sure you want to delete <strong>{{ count }}</strong> bookmark(s)? This action cannot be undone.</p>
+        </form>
+        <footer>
+            <button class="secondary outline" form="bookmark-modal-close">Cancel</button>
+            <button type="submit" class="primary" form="bookmark-delete-form">Delete</button>
+        </footer>
+    </article>
+</dialog>
