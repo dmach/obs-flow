@@ -243,3 +243,64 @@ class TokenTests(TestCase):
         # Authenticate with no header (should raise ValueError)
         with self.assertRaises(ValueError):
             get_authenticated_user({"headers": {}})
+
+
+class UserPreferencesTests(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(
+            username="prefuser",
+            password="password123",
+            is_local_account=True
+        )
+
+    def test_default_preferences(self):
+        # Accessing properties should return defaults if no preferences object exists
+        self.assertEqual(self.user.theme_preference, "auto")
+        self.assertEqual(self.user.font_size_preference, 14)
+
+    def test_preferences_creation_and_update(self):
+        self.client.login(username="prefuser", password="password123")
+
+        # GET preferences page (should create preferences object)
+        response = self.client.get(reverse("preferences"))
+        self.assertEqual(response.status_code, 200)
+        self.assertTemplateUsed(response, "accounts/preferences.html")
+
+        from accounts.models import UserPreferences
+        self.assertTrue(UserPreferences.objects.filter(user=self.user).exists())
+        prefs = UserPreferences.objects.get(user=self.user)
+        self.assertEqual(prefs.theme, "auto")
+        self.assertEqual(prefs.font_size, 14)
+
+        # POST valid preferences update
+        response = self.client.post(reverse("preferences"), {
+            "theme": "dark",
+            "font_size": 16,
+        })
+        self.assertRedirects(response, reverse("preferences"))
+
+        prefs.refresh_from_db()
+        self.assertEqual(prefs.theme, "dark")
+        self.assertEqual(prefs.font_size, 16)
+        self.assertEqual(self.user.theme_preference, "dark")
+        self.assertEqual(self.user.font_size_preference, 16)
+
+    def test_preferences_validation(self):
+        self.client.login(username="prefuser", password="password123")
+
+        # POST invalid font size (too small)
+        response = self.client.post(reverse("preferences"), {
+            "theme": "light",
+            "font_size": 10,
+        })
+        self.assertEqual(response.status_code, 200)
+        self.assertFormError(response.context["form"], "font_size", "Font size must be between 12 and 20.")
+
+        # POST invalid font size (too large)
+        response = self.client.post(reverse("preferences"), {
+            "theme": "light",
+            "font_size": 22,
+        })
+        self.assertEqual(response.status_code, 200)
+        self.assertFormError(response.context["form"], "font_size", "Font size must be between 12 and 20.")
+

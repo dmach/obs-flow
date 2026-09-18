@@ -1,38 +1,6 @@
 /* OBS Flow - minimal custom layer on top of stock Pico CSS. */
 
-/* Font size switcher */
-:root[data-font-size="small"] { --pico-font-size: 12px; }
-:root[data-font-size="medium"] { --pico-font-size: 14px; }
-:root[data-font-size="large"] { --pico-font-size: 16px; }
-
 .muted { color: var(--pico-muted-color); }
-
-.font-size-switcher {
-    display: inline-flex;
-    align-items: center;
-    gap: 1px;
-    margin-left: 0.5rem;
-}
-
-.font-size-btn {
-    display: inline-block;
-    width: 0.75em;
-    height: 0.75em;
-    padding: 0;
-    margin: 0;
-    border: none;
-    border-radius: 2px;
-    line-height: 0;
-    background-color: var(--pico-muted-border-color);
-    cursor: pointer;
-    transition: background-color 0.2s ease;
-}
-
-.font-size-btn[data-size="small"] { width: 0.55em; height: 0.55em; }
-.font-size-btn[data-size="large"] { width: 0.95em; height: 0.95em; }
-
-.font-size-btn:hover { background-color: var(--pico-muted-color); }
-.font-size-btn.active { background-color: var(--pico-primary); }
 
 /* SUSE green navbar */
 .navbar-container {
