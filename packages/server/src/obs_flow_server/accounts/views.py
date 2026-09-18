@@ -6,8 +6,9 @@ from django.http import HttpResponse
 from django.contrib.auth.decorators import login_required
 from django.shortcuts import render, redirect
 from django.views.decorators.http import require_http_methods
-from accounts.models import Token
+from accounts.models import Token, UserPreferences
 from accounts.helpers import generate_secure_token
+from accounts.forms import PreferencesForm
 
 
 class LoginModalView(LoginView):
@@ -73,3 +74,20 @@ def token_list(request):
         "tokens": tokens,
         "new_token": new_token,
     })
+
+
+@login_required
+@require_http_methods(["GET", "POST"])
+def preferences(request):
+    user_prefs, created = UserPreferences.objects.get_or_create(user=request.user)
+
+    if request.method == "POST":
+        form = PreferencesForm(request.POST, instance=user_prefs)
+        if form.is_valid():
+            form.save()
+            return redirect("preferences")
+    else:
+        form = PreferencesForm(instance=user_prefs)
+
+    return render(request, "accounts/preferences.html", {"form": form})
+

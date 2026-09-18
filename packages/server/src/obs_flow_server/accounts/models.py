@@ -66,6 +66,20 @@ class User(AbstractBaseUser):
         self.username_lower = self.username.lower()
         super().save(*args, **kwargs)
 
+    @property
+    def theme_preference(self):
+        try:
+            return self.preferences.theme
+        except UserPreferences.DoesNotExist:
+            return "auto"
+
+    @property
+    def font_size_preference(self):
+        try:
+            return self.preferences.font_size
+        except UserPreferences.DoesNotExist:
+            return 14
+
     def __str__(self):
         return self.username
 
@@ -105,3 +119,17 @@ class Token(models.Model):
 
     def __str__(self):
         return f"Token for {self.user.username} (flow-...{self.last_eight})"
+
+
+class UserPreferences(models.Model):
+    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name="preferences")
+    theme = models.CharField(
+        max_length=10,
+        choices=[("auto", "Auto"), ("light", "Light"), ("dark", "Dark")],
+        default="auto",
+    )
+    font_size = models.IntegerField(default=14)
+
+    def __str__(self):
+        return f"Preferences for {self.user.username}"
+

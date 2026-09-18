@@ -1,6 +1,8 @@
 {% load static %}
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en"
+      {% if user.is_authenticated and user.theme_preference != 'auto' %}data-theme="{{ user.theme_preference }}"{% endif %}
+      {% if user.is_authenticated %}style="--pico-font-size: {{ user.font_size_preference }}px;"{% endif %}>
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -29,6 +31,7 @@
                         <details class="dropdown" dir="rtl">
                             <summary dir="ltr"><strong>{{ user.username }}</strong></summary>
                             <ul>
+                                <li><a href="{% url 'preferences' %}">Preferences</a></li>
                                 <li><a href="{% url 'token_list' %}">Tokens</a></li>
                                 <li><a href="#" hx-post="{% url 'logout' %}" hx-trigger="click">Logout</a></li>
                             </ul>
@@ -45,6 +48,7 @@
                     <li><a href="{% url 'pr_list' %}">Pull Requests</a></li>
                     <li><a href="{% url 'staging_list' %}">Staging Batches</a></li>
                     {% if user.is_authenticated %}
+                        <li><a href="{% url 'preferences' %}">Preferences</a></li>
                         <li><a href="{% url 'token_list' %}">Tokens</a></li>
                         <li>Logged in as <strong>{{ user.username }}</strong></li>
                         <li><a href="#" hx-post="{% url 'logout' %}" hx-trigger="click">Logout</a></li>
@@ -69,13 +73,6 @@
             <a href="#" class="secondary">File a bug</a> &bull;
             <a href="#" class="secondary">Support</a> &bull;
             <a href="#" class="secondary">Source Code</a>
-            <br>
-            <a href="#" id="theme-toggle" class="secondary">Toggle Theme</a> &bull;
-            <span class="font-size-switcher">
-                <button type="button" data-size="small" class="font-size-btn" aria-label="Small font" title="Small font"></button>
-                <button type="button" data-size="medium" class="font-size-btn" aria-label="Medium font" title="Medium font"></button>
-                <button type="button" data-size="large" class="font-size-btn" aria-label="Large font" title="Large font"></button>
-            </span>
         </small>
     </footer>
 </body>

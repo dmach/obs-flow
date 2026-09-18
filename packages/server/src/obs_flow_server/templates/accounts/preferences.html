@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+
+{% block title %}Preferences - OBS Flow{% endblock %}
+
+{% block content %}
+<article>
+    <header>
+        <h2>Preferences</h2>
+        <p>Customize your user interface settings.</p>
+    </header>
+
+    <form method="post">
+        {% csrf_token %}
+
+        <label for="{{ form.theme.id_for_label }}">Theme</label>
+        {{ form.theme }}
+        {% if form.theme.errors %}
+            <p style="color: var(--pico-form-element-invalid-border-color);"><small>{{ form.theme.errors.0 }}</small></p>
+        {% endif %}
+
+        <label for="{{ form.font_size.id_for_label }}">Font Size (12-20 px)</label>
+        {{ form.font_size }}
+        {% if form.font_size.errors %}
+            <p style="color: var(--pico-form-element-invalid-border-color);"><small>{{ form.font_size.errors.0 }}</small></p>
+        {% endif %}
+
+        <button type="submit">Save Preferences</button>
+    </form>
+</article>
+{% endblock %}
