@@ -24,7 +24,7 @@ def test_cli_config_git_mapping_list():
             package=None,
         )
     ]
-    with patch("obs_flow_client.list_git_mappings") as mock_list:
+    with patch("obs_flow_client.git_mapping_list") as mock_list:
         mock_list.return_value = GitMappingListResponse(mappings=mock_mappings)
         result = runner.invoke(main, ["config", "git-mapping", "list"])
 
@@ -46,7 +46,7 @@ def test_cli_config_git_mapping_add():
         project="openSUSE:Factory",
         package=None,
     )
-    with patch("obs_flow_client.add_git_mapping") as mock_add:
+    with patch("obs_flow_client.git_mapping_add") as mock_add:
         mock_add.return_value = GitMappingAddResponse(mapping=mock_mapping)
         result = runner.invoke(
             main,
@@ -92,7 +92,7 @@ def test_cli_config_git_mapping_add_missing_options():
 
 def test_cli_config_git_mapping_remove():
     runner = CliRunner()
-    with patch("obs_flow_client.remove_git_mapping") as mock_remove:
+    with patch("obs_flow_client.git_mapping_remove") as mock_remove:
         mock_remove.return_value = GitMappingRemoveResponse(success=True)
         result = runner.invoke(main, ["config", "git-mapping", "remove", "--id", "1"])
 
@@ -110,7 +110,7 @@ def test_cli_config_git_mapping_edit():
         project="openSUSE:Factory",
         package=None,
     )
-    with patch("obs_flow_client.edit_git_mapping") as mock_edit:
+    with patch("obs_flow_client.git_mapping_edit") as mock_edit:
         mock_edit.return_value = GitMappingEditResponse(mapping=mock_mapping)
         result = runner.invoke(
             main,

@@ -7,12 +7,12 @@ def cli(staging_id: int) -> None:
     """Show staging batch details."""
 
     import os
-    from obs_flow_client import show_staging
+    from obs_flow_client import staging_show
     from ..helpers import get_connection
     from ..output.staging import StagingRenderer
 
     with get_connection() as conn:
-        res = show_staging(conn, staging_id)
+        res = staging_show(conn, staging_id)
 
     verbose = os.getenv("OBS_FLOW_VERBOSE") == "1"
     output = os.getenv("OBS_FLOW_OUTPUT")

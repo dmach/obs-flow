@@ -8,7 +8,7 @@ def cli(name: str, url: str) -> None:
     """Add a new bookmark."""
 
     import os
-    from obs_flow_client import add_bookmark
+    from obs_flow_client import bookmark_add
     from obs_flow_common.messages import BookmarkAddRequest
     from ..helpers import get_connection
     from ..output.bookmark import BookmarkRenderer
@@ -16,7 +16,7 @@ def cli(name: str, url: str) -> None:
     req = BookmarkAddRequest(name=name, url=url)
 
     with get_connection() as conn:
-        res = add_bookmark(conn, req)
+        res = bookmark_add(conn, req)
 
     verbose = os.getenv("OBS_FLOW_VERBOSE") == "1"
     output = os.getenv("OBS_FLOW_OUTPUT")

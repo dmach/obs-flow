@@ -7,14 +7,14 @@ def cli(name: str) -> None:
     """Show a bookmark's URL."""
 
     import sys
-    from obs_flow_client import list_bookmarks
+    from obs_flow_client import bookmark_list
     from obs_flow_common.messages import BookmarkListRequest
     from ..helpers import get_connection
 
     req = BookmarkListRequest()
 
     with get_connection() as conn:
-        res = list_bookmarks(conn, req)
+        res = bookmark_list(conn, req)
 
     bookmark = next((b for b in res.bookmarks if b.name.lower() == name.lower()), None)
     if not bookmark:

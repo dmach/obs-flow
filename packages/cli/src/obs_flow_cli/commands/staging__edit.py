@@ -10,7 +10,7 @@ def cli(staging_id: int, title: str | None, embargo_date: str | None, release_da
     """Edit an existing staging batch."""
 
     import os
-    from obs_flow_client import edit_staging
+    from obs_flow_client import staging_edit
     from obs_flow_common.messages import StagingEditRequest
     from ..helpers import get_connection
     from ..output.staging import StagingRenderer
@@ -22,7 +22,7 @@ def cli(staging_id: int, title: str | None, embargo_date: str | None, release_da
         release_date=release_date,
     )
     with get_connection() as conn:
-        res = edit_staging(conn, req)
+        res = staging_edit(conn, req)
 
     verbose = os.getenv("OBS_FLOW_VERBOSE") == "1"
     output = os.getenv("OBS_FLOW_OUTPUT")

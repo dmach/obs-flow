@@ -9,7 +9,7 @@ def cli(staging_id: int, reviewer: str | None, override: bool) -> None:
     """Approve a staging batch review."""
 
     import os
-    from obs_flow_client import approve_staging_review
+    from obs_flow_client import staging_review_approve
     from obs_flow_common.messages import StagingReviewApproveRequest
     from ..helpers import get_connection
     from ..output.review import ReviewRenderer
@@ -20,7 +20,7 @@ def cli(staging_id: int, reviewer: str | None, override: bool) -> None:
         override=override,
     )
     with get_connection() as conn:
-        res = approve_staging_review(conn, req)
+        res = staging_review_approve(conn, req)
 
     verbose = os.getenv("OBS_FLOW_VERBOSE") == "1"
     output = os.getenv("OBS_FLOW_OUTPUT")

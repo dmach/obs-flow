@@ -11,7 +11,7 @@ def cli(pull_request_id: str, reviewer: str | None, override: bool) -> None:
     """Approve a pull request review."""
 
     import os
-    from obs_flow_client import approve_review
+    from obs_flow_client import pr_review_approve
     from obs_flow_common.messages import PRReviewApproveRequest
     from ..helpers import get_connection
     from ..output.review import ReviewRenderer
@@ -22,7 +22,7 @@ def cli(pull_request_id: str, reviewer: str | None, override: bool) -> None:
         override=override,
     )
     with get_connection() as conn:
-        res = approve_review(conn, req)
+        res = pr_review_approve(conn, req)
 
     verbose = os.getenv("OBS_FLOW_VERBOSE") == "1"
     output = os.getenv("OBS_FLOW_OUTPUT")

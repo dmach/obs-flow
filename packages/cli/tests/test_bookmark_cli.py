@@ -22,7 +22,7 @@ def test_cli_bookmark_list():
             url="/foo",
         )
     ]
-    with patch("obs_flow_client.list_bookmarks") as mock_list:
+    with patch("obs_flow_client.bookmark_list") as mock_list:
         mock_list.return_value = BookmarkListResponse(bookmarks=mock_bookmarks)
         result = runner.invoke(main, ["config", "bookmark", "list", "--name", "My Filter", "--name-contains", "Filter"])
 
@@ -39,7 +39,7 @@ def test_cli_bookmark_add():
         name="My Filter",
         url="/foo",
     )
-    with patch("obs_flow_client.add_bookmark") as mock_add:
+    with patch("obs_flow_client.bookmark_add") as mock_add:
         mock_add.return_value = BookmarkAddResponse(bookmark=mock_bookmark)
         result = runner.invoke(main, ["config", "bookmark", "add", "My Filter", "/foo"])
 
@@ -51,7 +51,7 @@ def test_cli_bookmark_add():
 
 def test_cli_bookmark_remove_success():
     runner = CliRunner()
-    with patch("obs_flow_client.remove_bookmark") as mock_remove:
+    with patch("obs_flow_client.bookmark_remove") as mock_remove:
         mock_remove.return_value = BookmarkRemoveResponse(success=True)
         result = runner.invoke(main, ["config", "bookmark", "remove", "My Filter"])
 
@@ -61,7 +61,7 @@ def test_cli_bookmark_remove_success():
 
 def test_cli_bookmark_remove_failure():
     runner = CliRunner()
-    with patch("obs_flow_client.remove_bookmark") as mock_remove:
+    with patch("obs_flow_client.bookmark_remove") as mock_remove:
         mock_remove.return_value = BookmarkRemoveResponse(success=False)
         result = runner.invoke(main, ["config", "bookmark", "remove", "My Filter"])
 
@@ -78,7 +78,7 @@ def test_cli_bookmark_show_success():
             url="/foo",
         )
     ]
-    with patch("obs_flow_client.list_bookmarks") as mock_list:
+    with patch("obs_flow_client.bookmark_list") as mock_list:
         mock_list.return_value = BookmarkListResponse(bookmarks=mock_bookmarks)
         result = runner.invoke(main, ["config", "bookmark", "show", "My Filter"])
 
@@ -88,7 +88,7 @@ def test_cli_bookmark_show_success():
 
 def test_cli_bookmark_show_not_found():
     runner = CliRunner()
-    with patch("obs_flow_client.list_bookmarks") as mock_list:
+    with patch("obs_flow_client.bookmark_list") as mock_list:
         mock_list.return_value = BookmarkListResponse(bookmarks=[])
         result = runner.invoke(main, ["config", "bookmark", "show", "My Filter"])
 
@@ -105,7 +105,7 @@ def test_cli_bookmark_import_success(tmp_path):
     file_path = tmp_path / "bookmarks.json"
     file_path.write_text(json.dumps(bookmarks_data))
 
-    with patch("obs_flow_client.import_bookmarks") as mock_import:
+    with patch("obs_flow_client.bookmark_import") as mock_import:
         mock_import.return_value = BookmarkImportResponse(imported_count=2, updated_count=0)
         result = runner.invoke(main, ["config", "bookmark", "import", str(file_path)])
 
@@ -121,7 +121,7 @@ def test_cli_bookmark_import_with_force(tmp_path):
     file_path = tmp_path / "bookmarks.json"
     file_path.write_text(json.dumps(bookmarks_data))
 
-    with patch("obs_flow_client.import_bookmarks") as mock_import:
+    with patch("obs_flow_client.bookmark_import") as mock_import:
         mock_import.return_value = BookmarkImportResponse(imported_count=0, updated_count=1)
         result = runner.invoke(main, ["config", "bookmark", "import", str(file_path), "--force"])
 

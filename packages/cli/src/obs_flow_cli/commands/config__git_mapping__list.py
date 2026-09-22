@@ -6,14 +6,14 @@ def cli() -> None:
     """List git mappings."""
 
     import os
-    from obs_flow_client import list_git_mappings
+    from obs_flow_client import git_mapping_list
     from obs_flow_common.messages import GitMappingListRequest
     from ..helpers import get_connection
     from ..output.git_mapping import GitMappingRenderer
 
     req = GitMappingListRequest()
     with get_connection() as conn:
-        res = list_git_mappings(conn, req)
+        res = git_mapping_list(conn, req)
 
     if not res.mappings:
         click.echo("No git mappings found.", err=True)

@@ -12,9 +12,9 @@ from obs_flow_server.api import api
 # Client and CLI imports for testing
 from obs_flow_client import (
     Connection,
-    add_review_config,
-    remove_review_config,
-    list_review_configs,
+    review_config_add,
+    review_config_remove,
+    review_config_list,
 )
 from obs_flow_common.messages import (
     ReviewConfigDTO,
@@ -33,7 +33,7 @@ from obs_flow_cli.commands.config__review import cli as review_config_cli
 class TestReviewConfigEndpoints(TransactionTestCase):
     fixtures = ["opensuse_data.json"]
 
-    def test_add_review_config_user(self):
+    def test_review_config_add_user(self):
         """Verify adding a review configuration for a user."""
         payload = {
             "project": "openSUSE:Factory",
@@ -67,7 +67,7 @@ class TestReviewConfigEndpoints(TransactionTestCase):
             reviewer_user__username="darix"
         ).exists())
 
-    def test_add_review_config_group(self):
+    def test_review_config_add_group(self):
         """Verify adding a review configuration for a group."""
         payload = {
             "project": "openSUSE:Factory",
@@ -90,7 +90,7 @@ class TestReviewConfigEndpoints(TransactionTestCase):
         })
         self.assertEqual(config_detail["type"], "staging")
 
-    def test_add_review_config_dynamic_role(self):
+    def test_review_config_add_dynamic_role(self):
         """Verify adding a review configuration for a dynamic role."""
         payload = {
             "project": "openSUSE:Factory",
@@ -112,7 +112,7 @@ class TestReviewConfigEndpoints(TransactionTestCase):
         })
         self.assertEqual(config_detail["type"], "package")
 
-    def test_add_review_config_same_reviewer_different_type(self):
+    def test_review_config_add_same_reviewer_different_type(self):
         """Verify that the same reviewer can have configurations for different types."""
         payload1 = {
             "project": "openSUSE:Factory",
@@ -148,7 +148,7 @@ class TestReviewConfigEndpoints(TransactionTestCase):
             reviewer_user__username="darix"
         ).exists())
 
-    def test_add_review_config_duplicate_fails(self):
+    def test_review_config_add_duplicate_fails(self):
         """Verify that adding a duplicate review configuration for the same reviewer and type fails."""
         payload = {
             "project": "openSUSE:Factory",
@@ -169,7 +169,7 @@ class TestReviewConfigEndpoints(TransactionTestCase):
         self.assertEqual(response2.status_code, 400)
         self.assertIn("already exists", response2.text)
 
-    def test_add_review_config_with_dependencies(self):
+    def test_review_config_add_with_dependencies(self):
         """Verify adding a review configuration that depends on other configurations."""
         # First, add dependency configurations
         project = Project.objects.get(name="openSUSE:Factory")
@@ -241,7 +241,7 @@ class TestReviewConfigEndpoints(TransactionTestCase):
         self.assertEqual(response.status_code, 404)
         self.assertIn("User matching query does not exist", response.text)
 
-    def test_list_review_configs(self):
+    def test_review_config_list(self):
         """Verify listing review configurations for a project."""
         project = Project.objects.get(name="openSUSE:Factory")
         ReviewConfig.objects.create(
@@ -289,7 +289,7 @@ class TestReviewConfigEndpoints(TransactionTestCase):
             "email": None,
         })
 
-    def test_remove_review_config_by_reviewer(self):
+    def test_review_config_remove_by_reviewer(self):
         """Verify removing a review configuration by reviewer string."""
         project = Project.objects.get(name="openSUSE:Factory")
         config = ReviewConfig.objects.create(
@@ -328,8 +328,8 @@ class TestReviewConfigEndpoints(TransactionTestCase):
 
 class TestClientLibrary(TransactionTestCase):
     @patch.object(Connection, "post")
-    def test_add_review_config_client(self, mock_post):
-        """Verify client library add_review_config function."""
+    def test_review_config_add_client(self, mock_post):
+        """Verify client library review_config_add function."""
         dto = ReviewConfigDTO(
             id=1,
             project="openSUSE:Factory",
@@ -347,14 +347,14 @@ class TestClientLibrary(TransactionTestCase):
             reviewer="darix",
             depends_on=[]
         )
-        res = add_review_config(conn, req)
+        res = review_config_add(conn, req)
         self.assertEqual(res.data.id, 1)
         self.assertEqual(res.data.reviewer, PersonReviewerDTO(username="darix", full_name="Marcus Rueckert", email="mrueckert@suse.com", is_active=True))
         mock_post.assert_called_once_with("/api/v1/review-config/add", data=msgspec.json.encode(req))
 
     @patch.object(Connection, "post")
-    def test_remove_review_config_client(self, mock_post):
-        """Verify client library remove_review_config function."""
+    def test_review_config_remove_client(self, mock_post):
+        """Verify client library review_config_remove function."""
         dto = ReviewConfigDTO(
             id=1,
             project="openSUSE:Factory",
@@ -371,14 +371,14 @@ class TestClientLibrary(TransactionTestCase):
             type="project",
             reviewer="darix"
         )
-        res = remove_review_config(conn, req)
+        res = review_config_remove(conn, req)
         self.assertEqual(res.data.id, 1)
         self.assertEqual(res.data.reviewer, PersonReviewerDTO(username="darix", full_name="Marcus Rueckert", email="mrueckert@suse.com", is_active=True))
         mock_post.assert_called_once_with("/api/v1/review-config/remove", data=msgspec.json.encode(req))
 
     @patch.object(Connection, "post")
-    def test_list_review_configs_client(self, mock_post):
-        """Verify client library list_review_configs function."""
+    def test_review_config_list_client(self, mock_post):
+        """Verify client library review_config_list function."""
         dto = ReviewConfigDTO(
             id=1,
             project="openSUSE:Factory",
@@ -394,15 +394,15 @@ class TestClientLibrary(TransactionTestCase):
             project="openSUSE:Factory",
             type="project"
         )
-        res = list_review_configs(conn, req)
+        res = review_config_list(conn, req)
         self.assertEqual(len(res.data), 1)
         self.assertEqual(res.data[0].reviewer, PersonReviewerDTO(username="darix", full_name="Marcus Rueckert", email="mrueckert@suse.com", is_active=True))
         mock_post.assert_called_once_with("/api/v1/review-config/list", data=msgspec.json.encode(req))
 
 
 class TestCLIManagement(TransactionTestCase):
-    @patch("obs_flow_client.add_review_config")
-    def test_cli_add_review_config(self, mock_add):
+    @patch("obs_flow_client.review_config_add")
+    def test_cli_review_config_add(self, mock_add):
         """Verify CLI config review add command."""
         dto = ReviewConfigDTO(
             id=1,
@@ -424,8 +424,8 @@ class TestCLIManagement(TransactionTestCase):
         self.assertIn("Reviewer", result.output)
         self.assertIn("darix", result.output)
 
-    @patch("obs_flow_client.remove_review_config")
-    def test_cli_remove_review_config(self, mock_remove):
+    @patch("obs_flow_client.review_config_remove")
+    def test_cli_review_config_remove(self, mock_remove):
         """Verify CLI config review remove command."""
         dto = ReviewConfigDTO(
             id=1,
@@ -447,8 +447,8 @@ class TestCLIManagement(TransactionTestCase):
         self.assertIn("Reviewer", result.output)
         self.assertIn("darix", result.output)
 
-    @patch("obs_flow_client.list_review_configs")
-    def test_cli_list_review_configs(self, mock_list):
+    @patch("obs_flow_client.review_config_list")
+    def test_cli_review_config_list(self, mock_list):
         """Verify CLI config review list command."""
         dto = ReviewConfigDTO(
             id=1,

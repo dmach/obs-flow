@@ -10,7 +10,7 @@ def cli(staging_id: int, message: str, reviewer: str | None, override: bool) -> 
     """Reopen a declined staging batch review."""
 
     import os
-    from obs_flow_client import reopen_staging_review
+    from obs_flow_client import staging_review_reopen
     from obs_flow_common.messages import StagingReviewReopenRequest
     from ..helpers import get_connection
     from ..output.review import ReviewRenderer
@@ -25,7 +25,7 @@ def cli(staging_id: int, message: str, reviewer: str | None, override: bool) -> 
         override=override,
     )
     with get_connection() as conn:
-        res = reopen_staging_review(conn, req)
+        res = staging_review_reopen(conn, req)
 
     verbose = os.getenv("OBS_FLOW_VERBOSE") == "1"
     output = os.getenv("OBS_FLOW_OUTPUT")

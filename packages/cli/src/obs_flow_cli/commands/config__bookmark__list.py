@@ -8,7 +8,7 @@ def cli(names: tuple[str, ...], name_contains: tuple[str, ...]) -> None:
     """List bookmarks."""
 
     import os
-    from obs_flow_client import list_bookmarks
+    from obs_flow_client import bookmark_list
     from obs_flow_common.messages import BookmarkListRequest
     from ..helpers import get_connection
     from ..output.bookmark import BookmarkRenderer
@@ -19,7 +19,7 @@ def cli(names: tuple[str, ...], name_contains: tuple[str, ...]) -> None:
     )
 
     with get_connection() as conn:
-        res = list_bookmarks(conn, req)
+        res = bookmark_list(conn, req)
 
     if not res.bookmarks:
         click.echo("No bookmarks found.", err=True)

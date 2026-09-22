@@ -19,7 +19,7 @@ def cli(
     """Edit a git mapping."""
 
     import os
-    from obs_flow_client import edit_git_mapping
+    from obs_flow_client import git_mapping_edit
     from obs_flow_common.messages import GitMappingEditRequest
     from ..helpers import get_connection
     from ..output.git_mapping import GitMappingRenderer
@@ -33,7 +33,7 @@ def cli(
         package=package,
     )
     with get_connection() as conn:
-        res = edit_git_mapping(conn, req)
+        res = git_mapping_edit(conn, req)
 
     verbose = os.getenv("OBS_FLOW_VERBOSE") == "1"
     output = os.getenv("OBS_FLOW_OUTPUT")

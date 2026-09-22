@@ -12,7 +12,7 @@ def cli(project: str, type: str, user: str | None, group: str | None, role: str 
     """Add or update a review configuration."""
 
     import os
-    from obs_flow_client import add_review_config
+    from obs_flow_client import review_config_add
     from obs_flow_common.messages import ReviewConfigAddRequest
     from ..helpers import get_connection
     from ..output.review_config import ReviewConfigRenderer
@@ -37,7 +37,7 @@ def cli(project: str, type: str, user: str | None, group: str | None, role: str 
         depends_on=list(depends_on),
     )
     with get_connection() as conn:
-        res = add_review_config(conn, req)
+        res = review_config_add(conn, req)
 
     verbose = os.getenv("OBS_FLOW_VERBOSE") == "1"
     output = os.getenv("OBS_FLOW_OUTPUT")

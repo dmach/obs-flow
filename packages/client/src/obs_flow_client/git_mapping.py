@@ -19,7 +19,7 @@ from obs_flow_common.messages import (
 from obs_flow_client.connection import Connection
 
 
-def list_git_mappings(conn: Connection, req: GitMappingListRequest) -> GitMappingListResponse:
+def git_mapping_list(conn: Connection, req: GitMappingListRequest) -> GitMappingListResponse:
     """Retrieves a list of all git mappings.
 
     Args:
@@ -34,7 +34,7 @@ def list_git_mappings(conn: Connection, req: GitMappingListRequest) -> GitMappin
     return msgspec.json.decode(response_bytes, type=GitMappingListResponse)
 
 
-def add_git_mapping(conn: Connection, req: GitMappingAddRequest) -> GitMappingAddResponse:
+def git_mapping_add(conn: Connection, req: GitMappingAddRequest) -> GitMappingAddResponse:
     """Adds a new git mapping.
 
     Args:
@@ -49,7 +49,7 @@ def add_git_mapping(conn: Connection, req: GitMappingAddRequest) -> GitMappingAd
     return msgspec.json.decode(response_bytes, type=GitMappingAddResponse)
 
 
-def remove_git_mapping(conn: Connection, req: GitMappingRemoveRequest) -> GitMappingRemoveResponse:
+def git_mapping_remove(conn: Connection, req: GitMappingRemoveRequest) -> GitMappingRemoveResponse:
     """Removes an existing git mapping.
 
     Args:
@@ -64,7 +64,7 @@ def remove_git_mapping(conn: Connection, req: GitMappingRemoveRequest) -> GitMap
     return msgspec.json.decode(response_bytes, type=GitMappingRemoveResponse)
 
 
-def edit_git_mapping(conn: Connection, req: GitMappingEditRequest) -> GitMappingEditResponse:
+def git_mapping_edit(conn: Connection, req: GitMappingEditRequest) -> GitMappingEditResponse:
     """Edits an existing git mapping.
 
     Args:

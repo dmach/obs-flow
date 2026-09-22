@@ -17,7 +17,7 @@ def cli(owner: str, repo: str, branch: str, project: str | None, package: str | 
         raise click.UsageError("--project must be specified when --package is provided.")
 
     import os
-    from obs_flow_client import add_git_mapping
+    from obs_flow_client import git_mapping_add
     from obs_flow_common.messages import GitMappingAddRequest
     from ..helpers import get_connection
     from ..output.git_mapping import GitMappingRenderer
@@ -30,7 +30,7 @@ def cli(owner: str, repo: str, branch: str, project: str | None, package: str | 
         package=package,
     )
     with get_connection() as conn:
-        res = add_git_mapping(conn, req)
+        res = git_mapping_add(conn, req)
 
     verbose = os.getenv("OBS_FLOW_VERBOSE") == "1"
     output = os.getenv("OBS_FLOW_OUTPUT")

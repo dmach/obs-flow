@@ -8,7 +8,7 @@ def cli(file_path: str, force: bool) -> None:
     """Import bookmarks from a JSON file."""
 
     import json
-    from obs_flow_client import import_bookmarks
+    from obs_flow_client import bookmark_import
     from obs_flow_common.messages import BookmarkImportRequest, BookmarkAddRequest
     from ..helpers import get_connection
 
@@ -30,6 +30,6 @@ def cli(file_path: str, force: bool) -> None:
     req = BookmarkImportRequest(items=items, force=force)
 
     with get_connection() as conn:
-        res = import_bookmarks(conn, req)
+        res = bookmark_import(conn, req)
 
     click.echo(f"Successfully imported {res.imported_count} bookmark(s) and updated {res.updated_count} bookmark(s).")
