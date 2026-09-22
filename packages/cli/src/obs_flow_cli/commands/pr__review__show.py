@@ -10,7 +10,7 @@ def cli(pull_request_id: str, reviewer: str | None) -> None:
     """Show pull request review details."""
 
     import os
-    from obs_flow_client import show_review
+    from obs_flow_client import pr_review_show
     from obs_flow_common.messages import PRReviewShowRequest
     from ..helpers import get_connection
     from ..output.review import ReviewRenderer
@@ -20,7 +20,7 @@ def cli(pull_request_id: str, reviewer: str | None) -> None:
         reviewer=reviewer,
     )
     with get_connection() as conn:
-        res = show_review(conn, req)
+        res = pr_review_show(conn, req)
 
     if not res.reviews:
         click.echo("No reviews found.", err=True)

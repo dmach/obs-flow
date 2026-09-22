@@ -12,7 +12,7 @@ def cli(pull_request_id: str, message: str, reviewer: str | None, override: bool
     """Put a pull request review in a needinfo state."""
 
     import os
-    from obs_flow_client import needinfo_review
+    from obs_flow_client import pr_review_needinfo
     from obs_flow_common.messages import PRReviewNeedInfoRequest
     from ..helpers import get_connection
     from ..output.review import ReviewRenderer
@@ -27,7 +27,7 @@ def cli(pull_request_id: str, message: str, reviewer: str | None, override: bool
         override=override,
     )
     with get_connection() as conn:
-        res = needinfo_review(conn, req)
+        res = pr_review_needinfo(conn, req)
 
     verbose = os.getenv("OBS_FLOW_VERBOSE") == "1"
     output = os.getenv("OBS_FLOW_OUTPUT")

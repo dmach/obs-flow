@@ -28,7 +28,7 @@ from obs_flow_common.messages import (
 from obs_flow_client.connection import Connection
 
 
-def show_staging(conn: Connection, staging_id: int) -> StagingDetail:
+def staging_show(conn: Connection, staging_id: int) -> StagingDetail:
     """Retrieves details for a staging batch.
 
     Args:
@@ -42,7 +42,7 @@ def show_staging(conn: Connection, staging_id: int) -> StagingDetail:
     return msgspec.json.decode(response_bytes, type=StagingDetail)
 
 
-def create_staging(conn: Connection, req: StagingCreateRequest) -> StagingCreateResponse:
+def staging_create(conn: Connection, req: StagingCreateRequest) -> StagingCreateResponse:
     """Creates a new staging batch.
 
     Args:
@@ -57,7 +57,7 @@ def create_staging(conn: Connection, req: StagingCreateRequest) -> StagingCreate
     return msgspec.json.decode(response_bytes, type=StagingCreateResponse)
 
 
-def edit_staging(conn: Connection, req: StagingEditRequest) -> StagingEditResponse:
+def staging_edit(conn: Connection, req: StagingEditRequest) -> StagingEditResponse:
     """Edits an existing staging batch.
 
     Args:
@@ -72,7 +72,7 @@ def edit_staging(conn: Connection, req: StagingEditRequest) -> StagingEditRespon
     return msgspec.json.decode(response_bytes, type=StagingEditResponse)
 
 
-def add_to_staging(conn: Connection, req: StagingAddRequest) -> StagingAddResponse:
+def staging_add(conn: Connection, req: StagingAddRequest) -> StagingAddResponse:
     """Adds pull requests to a staging batch.
 
     Args:
@@ -87,7 +87,7 @@ def add_to_staging(conn: Connection, req: StagingAddRequest) -> StagingAddRespon
     return msgspec.json.decode(response_bytes, type=StagingAddResponse)
 
 
-def remove_from_staging(conn: Connection, req: StagingRemoveRequest) -> StagingRemoveResponse:
+def staging_remove(conn: Connection, req: StagingRemoveRequest) -> StagingRemoveResponse:
     """Removes pull requests from a staging batch.
 
     Args:
@@ -106,7 +106,7 @@ def remove_from_staging(conn: Connection, req: StagingRemoveRequest) -> StagingR
 # Staging Review Functions
 # =====================================================================
 
-def show_staging_review(
+def staging_review_show(
     conn: Connection, req: StagingReviewShowRequest
 ) -> StagingReviewShowResponse:
     """Retrieves review details for a staging batch.
@@ -123,7 +123,7 @@ def show_staging_review(
     return msgspec.json.decode(response_bytes, type=StagingReviewShowResponse)
 
 
-def approve_staging_review(
+def staging_review_approve(
     conn: Connection, req: StagingReviewApproveRequest
 ) -> StagingReviewActionResponse:
     """Approves a staging batch review.
@@ -140,7 +140,7 @@ def approve_staging_review(
     return msgspec.json.decode(response_bytes, type=StagingReviewActionResponse)
 
 
-def decline_staging_review(
+def staging_review_decline(
     conn: Connection, req: StagingReviewDeclineRequest
 ) -> StagingReviewActionResponse:
     """Declines a staging batch review.
@@ -157,7 +157,7 @@ def decline_staging_review(
     return msgspec.json.decode(response_bytes, type=StagingReviewActionResponse)
 
 
-def needinfo_staging_review(
+def staging_review_needinfo(
     conn: Connection, req: StagingReviewNeedInfoRequest
 ) -> StagingReviewActionResponse:
     """Puts a staging batch review in needinfo state.
@@ -174,7 +174,7 @@ def needinfo_staging_review(
     return msgspec.json.decode(response_bytes, type=StagingReviewActionResponse)
 
 
-def clear_needinfo_staging_review(
+def staging_review_clear_needinfo(
     conn: Connection, req: StagingReviewClearNeedInfoRequest
 ) -> StagingReviewActionResponse:
     """Clears needinfo state on a staging batch review.
@@ -191,7 +191,7 @@ def clear_needinfo_staging_review(
     return msgspec.json.decode(response_bytes, type=StagingReviewActionResponse)
 
 
-def reopen_staging_review(
+def staging_review_reopen(
     conn: Connection, req: StagingReviewReopenRequest
 ) -> StagingReviewActionResponse:
     """Reopens a declined staging batch review.

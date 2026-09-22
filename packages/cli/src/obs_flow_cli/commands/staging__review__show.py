@@ -8,7 +8,7 @@ def cli(staging_id: int, reviewer: str | None) -> None:
     """Show staging batch review details."""
 
     import os
-    from obs_flow_client import show_staging_review
+    from obs_flow_client import staging_review_show
     from obs_flow_common.messages import StagingReviewShowRequest
     from ..helpers import get_connection
     from ..output.review import ReviewRenderer
@@ -18,7 +18,7 @@ def cli(staging_id: int, reviewer: str | None) -> None:
         reviewer=reviewer,
     )
     with get_connection() as conn:
-        res = show_staging_review(conn, req)
+        res = staging_review_show(conn, req)
 
     if not res.reviews:
         click.echo("No reviews found.", err=True)

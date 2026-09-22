@@ -6,14 +6,14 @@ import click
 def cli(name: str) -> None:
     """Remove a bookmark."""
 
-    from obs_flow_client import remove_bookmark
+    from obs_flow_client import bookmark_remove
     from obs_flow_common.messages import BookmarkRemoveRequest
     from ..helpers import get_connection
 
     req = BookmarkRemoveRequest(name=name)
 
     with get_connection() as conn:
-        res = remove_bookmark(conn, req)
+        res = bookmark_remove(conn, req)
 
     if res.success:
         click.echo(f"Successfully removed bookmark '{name}'.")

@@ -10,7 +10,7 @@ def cli(project: str, title: str | None, embargo_date: str | None, release_date:
     """Create a new staging batch."""
 
     import os
-    from obs_flow_client import create_staging
+    from obs_flow_client import staging_create
     from obs_flow_common.messages import StagingCreateRequest
     from ..helpers import get_connection
     from ..output.staging import StagingRenderer
@@ -22,7 +22,7 @@ def cli(project: str, title: str | None, embargo_date: str | None, release_date:
         release_date=release_date,
     )
     with get_connection() as conn:
-        res = create_staging(conn, req)
+        res = staging_create(conn, req)
 
     verbose = os.getenv("OBS_FLOW_VERBOSE") == "1"
     output = os.getenv("OBS_FLOW_OUTPUT")

@@ -9,7 +9,7 @@ def cli(staging_id: int, message: str, override: bool) -> None:
     """Clear needinfo, actor is the staging author."""
 
     import os
-    from obs_flow_client import clear_needinfo_staging_review
+    from obs_flow_client import staging_review_clear_needinfo
     from obs_flow_common.messages import StagingReviewClearNeedInfoRequest
     from ..helpers import get_connection
     from ..output.review import ReviewRenderer
@@ -23,7 +23,7 @@ def cli(staging_id: int, message: str, override: bool) -> None:
         override=override,
     )
     with get_connection() as conn:
-        res = clear_needinfo_staging_review(conn, req)
+        res = staging_review_clear_needinfo(conn, req)
 
     verbose = os.getenv("OBS_FLOW_VERBOSE") == "1"
     output = os.getenv("OBS_FLOW_OUTPUT")

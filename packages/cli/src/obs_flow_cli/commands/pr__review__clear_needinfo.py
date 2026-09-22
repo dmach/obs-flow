@@ -11,7 +11,7 @@ def cli(pull_request_id: str, message: str, override: bool) -> None:
     """Clear needinfo state on pull request reviews."""
 
     import os
-    from obs_flow_client import clear_needinfo_review
+    from obs_flow_client import pr_review_clear_needinfo
     from obs_flow_common.messages import PRReviewClearNeedInfoRequest
     from ..helpers import get_connection
     from ..output.review import ReviewRenderer
@@ -25,7 +25,7 @@ def cli(pull_request_id: str, message: str, override: bool) -> None:
         override=override,
     )
     with get_connection() as conn:
-        res = clear_needinfo_review(conn, req)
+        res = pr_review_clear_needinfo(conn, req)
 
     verbose = os.getenv("OBS_FLOW_VERBOSE") == "1"
     output = os.getenv("OBS_FLOW_OUTPUT")

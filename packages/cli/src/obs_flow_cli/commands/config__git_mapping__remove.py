@@ -6,13 +6,13 @@ import click
 def cli(id: int) -> None:
     """Remove a git mapping."""
 
-    from obs_flow_client import remove_git_mapping
+    from obs_flow_client import git_mapping_remove
     from obs_flow_common.messages import GitMappingRemoveRequest
     from ..helpers import get_connection
 
     req = GitMappingRemoveRequest(id=id)
     with get_connection() as conn:
-        res = remove_git_mapping(conn, req)
+        res = git_mapping_remove(conn, req)
 
     if res.success:
         click.echo(f"Successfully removed git mapping with ID {id}.")

@@ -8,7 +8,7 @@ def cli(project: str, type: str | None) -> None:
     """List review configurations."""
 
     import os
-    from obs_flow_client import list_review_configs
+    from obs_flow_client import review_config_list
     from obs_flow_common.messages import ReviewConfigListRequest
     from ..helpers import get_connection
     from ..output.review_config import ReviewConfigRenderer
@@ -18,7 +18,7 @@ def cli(project: str, type: str | None) -> None:
         type=type,
     )
     with get_connection() as conn:
-        res = list_review_configs(conn, req)
+        res = review_config_list(conn, req)
 
     if not res.data:
         click.echo("No review configurations found.", err=True)

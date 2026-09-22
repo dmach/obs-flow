@@ -19,7 +19,7 @@ from obs_flow_common.messages import (
 from obs_flow_client.connection import Connection
 
 
-def list_bookmarks(conn: Connection, req: BookmarkListRequest) -> BookmarkListResponse:
+def bookmark_list(conn: Connection, req: BookmarkListRequest) -> BookmarkListResponse:
     """Retrieves a list of bookmarks.
 
     Args:
@@ -34,7 +34,7 @@ def list_bookmarks(conn: Connection, req: BookmarkListRequest) -> BookmarkListRe
     return msgspec.json.decode(response_bytes, type=BookmarkListResponse)
 
 
-def add_bookmark(conn: Connection, req: BookmarkAddRequest) -> BookmarkAddResponse:
+def bookmark_add(conn: Connection, req: BookmarkAddRequest) -> BookmarkAddResponse:
     """Adds a new bookmark.
 
     Args:
@@ -49,7 +49,7 @@ def add_bookmark(conn: Connection, req: BookmarkAddRequest) -> BookmarkAddRespon
     return msgspec.json.decode(response_bytes, type=BookmarkAddResponse)
 
 
-def remove_bookmark(conn: Connection, req: BookmarkRemoveRequest) -> BookmarkRemoveResponse:
+def bookmark_remove(conn: Connection, req: BookmarkRemoveRequest) -> BookmarkRemoveResponse:
     """Removes an existing bookmark.
 
     Args:
@@ -64,7 +64,7 @@ def remove_bookmark(conn: Connection, req: BookmarkRemoveRequest) -> BookmarkRem
     return msgspec.json.decode(response_bytes, type=BookmarkRemoveResponse)
 
 
-def import_bookmarks(conn: Connection, req: BookmarkImportRequest) -> BookmarkImportResponse:
+def bookmark_import(conn: Connection, req: BookmarkImportRequest) -> BookmarkImportResponse:
     """Imports bookmarks from a list.
 
     Args:
