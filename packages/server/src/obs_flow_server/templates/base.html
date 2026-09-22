@@ -2,7 +2,7 @@
 <!DOCTYPE html>
 <html lang="en"
       {% if user.is_authenticated and user.theme_preference != 'auto' %}data-theme="{{ user.theme_preference }}"{% endif %}
-      {% if user.is_authenticated %}style="--pico-font-size: {{ user.font_size_preference }}px;"{% endif %}>
+      style="--pico-font-size: {% if user.is_authenticated %}{{ user.font_size_preference }}{% else %}14{% endif %}px;">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
