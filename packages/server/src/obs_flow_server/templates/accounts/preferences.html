@@ -24,6 +24,12 @@
             <p style="color: var(--pico-form-element-invalid-border-color);"><small>{{ form.font_size.errors.0 }}</small></p>
         {% endif %}
 
+        <label for="{{ form.page_size.id_for_label }}">Page Size (100-1000)</label>
+        {{ form.page_size }}
+        {% if form.page_size.errors %}
+            <p style="color: var(--pico-form-element-invalid-border-color);"><small>{{ form.page_size.errors.0 }}</small></p>
+        {% endif %}
+
         <button type="submit">Save Preferences</button>
     </form>
 </article>

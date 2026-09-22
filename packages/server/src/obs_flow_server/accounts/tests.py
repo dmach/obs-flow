@@ -271,19 +271,23 @@ class UserPreferencesTests(TestCase):
         prefs = UserPreferences.objects.get(user=self.user)
         self.assertEqual(prefs.theme, "auto")
         self.assertEqual(prefs.font_size, 14)
+        self.assertEqual(prefs.page_size, 100)
 
         # POST valid preferences update
         response = self.client.post(reverse("preferences"), {
             "theme": "dark",
             "font_size": 16,
+            "page_size": 200,
         })
         self.assertRedirects(response, reverse("preferences"))
 
         prefs.refresh_from_db()
         self.assertEqual(prefs.theme, "dark")
         self.assertEqual(prefs.font_size, 16)
+        self.assertEqual(prefs.page_size, 200)
         self.assertEqual(self.user.theme_preference, "dark")
         self.assertEqual(self.user.font_size_preference, 16)
+        self.assertEqual(self.user.page_size, 200)
 
     def test_preferences_validation(self):
         self.client.login(username="prefuser", password="password123")
@@ -292,6 +296,7 @@ class UserPreferencesTests(TestCase):
         response = self.client.post(reverse("preferences"), {
             "theme": "light",
             "font_size": 10,
+            "page_size": 100,
         })
         self.assertEqual(response.status_code, 200)
         self.assertFormError(response.context["form"], "font_size", "Font size must be between 12 and 20.")
@@ -300,7 +305,26 @@ class UserPreferencesTests(TestCase):
         response = self.client.post(reverse("preferences"), {
             "theme": "light",
             "font_size": 22,
+            "page_size": 100,
         })
         self.assertEqual(response.status_code, 200)
         self.assertFormError(response.context["form"], "font_size", "Font size must be between 12 and 20.")
+
+        # POST invalid page size (too small)
+        response = self.client.post(reverse("preferences"), {
+            "theme": "light",
+            "font_size": 14,
+            "page_size": 50,
+        })
+        self.assertEqual(response.status_code, 200)
+        self.assertFormError(response.context["form"], "page_size", "Page size must be between 100 and 1000.")
+
+        # POST invalid page size (too large)
+        response = self.client.post(reverse("preferences"), {
+            "theme": "light",
+            "font_size": 14,
+            "page_size": 2000,
+        })
+        self.assertEqual(response.status_code, 200)
+        self.assertFormError(response.context["form"], "page_size", "Page size must be between 100 and 1000.")
 

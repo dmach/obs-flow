@@ -80,6 +80,13 @@ class User(AbstractBaseUser):
         except UserPreferences.DoesNotExist:
             return 14
 
+    @property
+    def page_size(self):
+        try:
+            return self.preferences.page_size
+        except UserPreferences.DoesNotExist:
+            return 100
+
     def __str__(self):
         return self.username
 
@@ -129,6 +136,7 @@ class UserPreferences(models.Model):
         default="auto",
     )
     font_size = models.IntegerField(default=14)
+    page_size = models.IntegerField(default=100)
 
     def __str__(self):
         return f"Preferences for {self.user.username}"
