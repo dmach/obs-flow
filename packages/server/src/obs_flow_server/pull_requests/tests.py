@@ -329,6 +329,11 @@ class TestPRViews(TransactionTestCase):
     def test_pr_list_filtering_and_pagination(self):
         """Verify that the PR list page correctly filters and paginates pull requests."""
         from django.test import Client
+        from accounts.models import User, UserPreferences
+
+        # Create a user with page_size=200 and log them in
+        user = User.objects.create_user(username="testuser", password="password123", is_local_account=True)
+        UserPreferences.objects.create(user=user, page_size=200)
 
         project = Project.objects.create(name="suse:obs-flow")
         git_mapping = GitMapping.objects.create(owner="suse", repo="obs-flow", branch="main", project=project)
@@ -351,6 +356,7 @@ class TestPRViews(TransactionTestCase):
             )
 
         client = Client()
+        client.login(username="testuser", password="password123")
 
         # 1. Test pagination (page 1 should have 200 items, page 2 should have 5 items)
         response = client.get("/pull-requests/")

@@ -100,7 +100,8 @@ def pr_list(request):
 
     qs = qs.order_by(sort_param)
 
-    paginator = Paginator(qs, 200)
+    page_size = request.user.page_size if request.user.is_authenticated else 100
+    paginator = Paginator(qs, page_size)
     page_number = request.GET.get("page")
     page_obj = paginator.get_page(page_number)
 
