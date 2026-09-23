@@ -4,6 +4,7 @@ Provides programmatic access to the OBS Flow API.
 """
 
 from obs_flow_client.connection import Connection, create_connection
+from obs_flow_client.config import ConnectionConfig, load_connection_config, load_raw_config
 from obs_flow_client.bookmarks import (
     bookmark_add,
     bookmark_import,
@@ -43,6 +44,9 @@ from obs_flow_client.staging import (
 
 __all__ = [
     "Connection",
+    "ConnectionConfig",
+    "load_connection_config",
+    "load_raw_config",
     "bookmark_add",
     "bookmark_import",
     "bookmark_list",

@@ -10,10 +10,9 @@ from obs_flow_cli.types import PR_ID
 def cli(staging_id: int, pull_request_ids: tuple[str, ...], allow_duplicates: bool) -> None:
     """Add pull requests to a staging batch."""
 
-    import os
     from obs_flow_client import staging_add
     from obs_flow_common.messages import StagingAddRequest
-    from ..helpers import get_connection
+    from ..helpers import get_connection, get_config
     from ..output.staging import StagingRenderer
 
     req = StagingAddRequest(
@@ -25,8 +24,7 @@ def cli(staging_id: int, pull_request_ids: tuple[str, ...], allow_duplicates: bo
     with get_connection() as conn:
         res = staging_add(conn, req)
 
-    verbose = os.getenv("OBS_FLOW_VERBOSE") == "1"
-    output = os.getenv("OBS_FLOW_OUTPUT")
+    config = get_config()
 
     renderer = StagingRenderer(res)
-    renderer.render(fmt=output, verbose=verbose)
+    renderer.render(fmt=config.output, verbose=config.verbose)

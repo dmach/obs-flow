@@ -37,28 +37,30 @@ class LazyGroup(click.Group):
         """
         Lists all available commands by scanning the flat commands directory.
         """
-        if not os.path.exists(COMMANDS_FOLDER):
-            return []
-
         commands: list[str] = []
 
-        for filename in os.listdir(COMMANDS_FOLDER):
-            if not filename.endswith(".py") or filename == "__init__.py":
-                continue
+        if os.path.exists(COMMANDS_FOLDER):
+            for filename in os.listdir(COMMANDS_FOLDER):
+                if not filename.endswith(".py") or filename == "__init__.py":
+                    continue
 
-            if self.cmd_prefix:
-                prefix = f"{self.cmd_prefix}__"
-                if filename.startswith(prefix):
-                    # Extract the direct child name
-                    # e.g., cmd__subcmd.py -> subcmd
-                    # e.g., cmd__subcmd__subsubcmd.py -> ignore (not a direct child)
-                    rest = filename[len(prefix) : -3]
-                    if "__" not in rest:
-                        # Map underscores to hyphens for user-friendly CLI command names
-                        commands.append(rest.replace("_", "-"))
-            else:
-                if "__" not in filename:
-                    commands.append(filename[:-3].replace("_", "-"))
+                if self.cmd_prefix:
+                    prefix = f"{self.cmd_prefix}__"
+                    if filename.startswith(prefix):
+                        # Extract the direct child name
+                        # e.g., cmd__subcmd.py -> subcmd
+                        # e.g., cmd__subcmd__subsubcmd.py -> ignore (not a direct child)
+                        rest = filename[len(prefix) : -3]
+                        if "__" not in rest:
+                            # Map underscores to hyphens for user-friendly CLI command names
+                            commands.append(rest.replace("_", "-"))
+                else:
+                    if "__" not in filename:
+                        commands.append(filename[:-3].replace("_", "-"))
+
+        for cmd in self.commands:
+            if cmd not in commands:
+                commands.append(cmd)
 
         commands.sort()
         return commands
@@ -67,13 +69,22 @@ class LazyGroup(click.Group):
         """
         Loads and returns the requested command dynamically.
         """
+        if name in self.commands:
+            return self.commands[name]
+
         # Map hyphens back to underscores to find the correct Python module
         module_suffix = name.replace("-", "_")
 
         if self.cmd_prefix:
             module_name = f"{COMMANDS_MODULE.__name__}.{self.cmd_prefix}__{module_suffix}"
+            file_name = f"{self.cmd_prefix}__{module_suffix}.py"
         else:
             module_name = f"{COMMANDS_MODULE.__name__}.{module_suffix}"
+            file_name = f"{module_suffix}.py"
+
+        file_path = os.path.join(COMMANDS_FOLDER, file_name)
+        if not os.path.exists(file_path):
+            return None
 
         try:
             mod = importlib.import_module(module_name)

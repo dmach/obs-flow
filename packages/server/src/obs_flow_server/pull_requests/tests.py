@@ -196,7 +196,7 @@ class TestPRSyncEndpoint(TransactionTestCase):
         self.assertEqual(pr.title, "New Title")
         self.assertEqual(pr.is_draft, False)
         self.assertEqual(pr.is_mergeable, True)
-        
+
         # Verify both revisions exist
         self.assertEqual(pr.revisions.count(), 2)
 

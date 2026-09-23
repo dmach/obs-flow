@@ -10,8 +10,9 @@ from .lazy_group import LazyGroup
 @click.option("-v", "--verbose", is_flag=True, help="Enable verbose output")
 @click.option("--output", type=click.Choice(["text", "json"], case_sensitive=False), help="Output format.")
 @click.option("--traceback", is_flag=True, help="Show full traceback on error")
+@click.option("--login", help="The login configuration to use.")
 @click.pass_context
-def main(ctx: click.Context, verbose: bool, output: str, traceback: bool) -> None:
+def main(ctx: click.Context, verbose: bool, output: str, traceback: bool, login: str | None) -> None:
     """
     flow: OBS Flow command-line interface
     """
@@ -19,12 +20,7 @@ def main(ctx: click.Context, verbose: bool, output: str, traceback: bool) -> Non
     ctx.obj["output"] = output
     ctx.obj["verbose"] = verbose
     ctx.obj["traceback"] = traceback
-    if output:
-        os.environ["OBS_FLOW_OUTPUT"] = output
-    if verbose:
-        os.environ["OBS_FLOW_VERBOSE"] = "1"
-    if traceback:
-        os.environ["OBS_FLOW_TRACEBACK"] = "1"
+    ctx.obj["login"] = login
 
 
 def run() -> None:
@@ -32,11 +28,17 @@ def run() -> None:
     Entrypoint that runs the main CLI.
     """
     from requests.exceptions import HTTPError
+    from .helpers import get_config
 
     try:
         main()
     except HTTPError as e:
-        if "--traceback" in sys.argv or os.environ.get("OBS_FLOW_TRACEBACK") == "1":
+        try:
+            show_traceback = get_config().traceback
+        except Exception:
+            show_traceback = "--traceback" in sys.argv or os.environ.get("OBS_FLOW_TRACEBACK") == "1"
+
+        if show_traceback:
             raise
         print(str(e), file=sys.stderr)
         if e.response is not None:

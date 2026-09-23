@@ -10,10 +10,9 @@ from obs_flow_cli.types import PR_ID
 def cli(pull_request_id: str, message: str, override: bool) -> None:
     """Clear needinfo state on pull request reviews."""
 
-    import os
     from obs_flow_client import pr_review_clear_needinfo
     from obs_flow_common.messages import PRReviewClearNeedInfoRequest
-    from ..helpers import get_connection
+    from ..helpers import get_connection, get_config
     from ..output.review import ReviewRenderer
 
     if not message.strip():
@@ -27,8 +26,7 @@ def cli(pull_request_id: str, message: str, override: bool) -> None:
     with get_connection() as conn:
         res = pr_review_clear_needinfo(conn, req)
 
-    verbose = os.getenv("OBS_FLOW_VERBOSE") == "1"
-    output = os.getenv("OBS_FLOW_OUTPUT")
+    config = get_config()
 
     renderer = ReviewRenderer(res.review)
-    renderer.render(fmt=output, verbose=verbose)
+    renderer.render(fmt=config.output, verbose=config.verbose)
