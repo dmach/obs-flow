@@ -1,3 +1,4 @@
+import os
 import json
 import msgspec
 from unittest.mock import MagicMock, patch
@@ -401,6 +402,21 @@ class TestClientLibrary(TransactionTestCase):
 
 
 class TestCLIManagement(TransactionTestCase):
+    def setUp(self):
+        super().setUp()
+        self.env_patcher = patch.dict(
+            os.environ,
+            {
+                "OBS_FLOW_CONFIG": "/dev/null",
+                "OBS_FLOW_SERVER_URL": "http://localhost:8000",
+            },
+        )
+        self.env_patcher.start()
+
+    def tearDown(self):
+        self.env_patcher.stop()
+        super().tearDown()
+
     @patch("obs_flow_client.review_config_add")
     def test_cli_review_config_add(self, mock_add):
         """Verify CLI config review add command."""

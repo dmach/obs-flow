@@ -7,10 +7,9 @@ import click
 def cli(project: str, type: str | None) -> None:
     """List review configurations."""
 
-    import os
     from obs_flow_client import review_config_list
     from obs_flow_common.messages import ReviewConfigListRequest
-    from ..helpers import get_connection
+    from ..helpers import get_connection, get_config
     from ..output.review_config import ReviewConfigRenderer
 
     req = ReviewConfigListRequest(
@@ -24,8 +23,7 @@ def cli(project: str, type: str | None) -> None:
         click.echo("No review configurations found.", err=True)
         return
 
-    verbose = os.getenv("OBS_FLOW_VERBOSE") == "1"
-    output = os.getenv("OBS_FLOW_OUTPUT")
+    config = get_config()
 
     renderer = ReviewConfigRenderer(res.data)
-    renderer.render(fmt=output, verbose=verbose)
+    renderer.render(fmt=config.output, verbose=config.verbose)

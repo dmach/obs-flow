@@ -11,10 +11,9 @@ from obs_flow_cli.types import PR_ID
 def cli(pull_request_id: str, message: str, reviewer: str | None, override: bool) -> None:
     """Decline a pull request review."""
 
-    import os
     from obs_flow_client import pr_review_decline
     from obs_flow_common.messages import PRReviewDeclineRequest
-    from ..helpers import get_connection
+    from ..helpers import get_connection, get_config
     from ..output.review import ReviewRenderer
 
     if not message.strip():
@@ -29,8 +28,7 @@ def cli(pull_request_id: str, message: str, reviewer: str | None, override: bool
     with get_connection() as conn:
         res = pr_review_decline(conn, req)
 
-    verbose = os.getenv("OBS_FLOW_VERBOSE") == "1"
-    output = os.getenv("OBS_FLOW_OUTPUT")
+    config = get_config()
 
     renderer = ReviewRenderer(res.review)
-    renderer.render(fmt=output, verbose=verbose)
+    renderer.render(fmt=config.output, verbose=config.verbose)

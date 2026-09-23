@@ -17,23 +17,44 @@ class Connection:
     and keep-alive, and provides helper methods to perform requests.
     """
 
-    def __init__(self, base_url: str, timeout: float = 10.0, token: str | None = None) -> None:
+    def __init__(
+        self,
+        base_url: str | None = None,
+        timeout: float = 10.0,
+        token: str | None = None,
+        config: "ConnectionConfig | None" = None,
+    ) -> None:
         """Initializes the connection.
 
         Args:
-            base_url: The base URL of the OBS Flow server (e.g., 'http://localhost:8000').
+            base_url: The base URL of the OBS Flow server.
             timeout: Default timeout in seconds for all requests.
             token: Optional personal access token for authentication.
+            config: Optional ConnectionConfig instance.
         """
-        self.base_url = base_url.rstrip("/")
+        from obs_flow_client.config import ConnectionConfig
+
+        if config is None:
+            if base_url is None:
+                from obs_flow_client.config import load_connection_config
+                config = load_connection_config()
+            else:
+                config = ConnectionConfig(url=base_url, token=token)
+
+        self.config = config
+
+        if not config.url:
+            raise ValueError("OBS Flow server URL is not configured.")
+
+        self.base_url = config.url.rstrip("/")
         self.timeout = timeout
         self.session = requests.Session()
         self.session.headers.update({
             "Content-Type": "application/json",
             "Accept": "application/json",
         })
-        if token:
-            self.session.headers["Authorization"] = f"Bearer {token}"
+        if config.token:
+            self.session.headers["Authorization"] = f"Bearer {config.token}"
 
     def post(self, path: str, data: bytes) -> bytes:
         """Sends a POST request with raw bytes and returns raw bytes response.
@@ -70,15 +91,21 @@ class Connection:
         self.close()
 
 
-def create_connection(base_url: str, timeout: float = 10.0, token: str | None = None) -> Connection:
+def create_connection(
+    base_url: str | None = None,
+    timeout: float = 10.0,
+    token: str | None = None,
+    config: "ConnectionConfig | None" = None,
+) -> Connection:
     """Initializes and returns a Connection instance.
 
     Args:
         base_url: The base URL of the OBS Flow server.
         timeout: Default timeout in seconds for all requests.
         token: Optional personal access token for authentication.
+        config: Optional ConnectionConfig instance.
 
     Returns:
         An initialized Connection instance.
     """
-    return Connection(base_url=base_url, timeout=timeout, token=token)
+    return Connection(base_url=base_url, timeout=timeout, token=token, config=config)

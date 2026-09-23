@@ -5,10 +5,9 @@ import click
 def cli() -> None:
     """List git mappings."""
 
-    import os
     from obs_flow_client import git_mapping_list
     from obs_flow_common.messages import GitMappingListRequest
-    from ..helpers import get_connection
+    from ..helpers import get_connection, get_config
     from ..output.git_mapping import GitMappingRenderer
 
     req = GitMappingListRequest()
@@ -19,8 +18,7 @@ def cli() -> None:
         click.echo("No git mappings found.", err=True)
         return
 
-    verbose = os.getenv("OBS_FLOW_VERBOSE") == "1"
-    output = os.getenv("OBS_FLOW_OUTPUT")
+    config = get_config()
 
     renderer = GitMappingRenderer(res.mappings)
-    renderer.render(fmt=output, verbose=verbose)
+    renderer.render(fmt=config.output, verbose=config.verbose)

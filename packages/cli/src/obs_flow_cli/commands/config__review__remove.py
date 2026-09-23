@@ -10,10 +10,9 @@ import click
 def cli(project: str, type: str, user: str | None, group: str | None, role: str | None) -> None:
     """Remove a review configuration."""
 
-    import os
     from obs_flow_client import review_config_remove
     from obs_flow_common.messages import ReviewConfigRemoveRequest
-    from ..helpers import get_connection
+    from ..helpers import get_connection, get_config
     from ..output.review_config import ReviewConfigRenderer
 
     # exactly one of user, group, or role must be provided
@@ -38,8 +37,7 @@ def cli(project: str, type: str, user: str | None, group: str | None, role: str 
     with get_connection() as conn:
         res = review_config_remove(conn, req)
 
-    verbose = os.getenv("OBS_FLOW_VERBOSE") == "1"
-    output = os.getenv("OBS_FLOW_OUTPUT")
+    config = get_config()
 
     renderer = ReviewConfigRenderer([res.data])
-    renderer.render(fmt=output, verbose=verbose)
+    renderer.render(fmt=config.output, verbose=config.verbose)

@@ -9,10 +9,9 @@ from obs_flow_cli.types import PR_ID
 def cli(staging_id: int, pull_request_ids: tuple[str, ...]) -> None:
     """Remove pull requests from a staging batch."""
 
-    import os
     from obs_flow_client import staging_remove
     from obs_flow_common.messages import StagingRemoveRequest
-    from ..helpers import get_connection
+    from ..helpers import get_connection, get_config
     from ..output.staging import StagingRenderer
 
     req = StagingRemoveRequest(
@@ -22,8 +21,7 @@ def cli(staging_id: int, pull_request_ids: tuple[str, ...]) -> None:
     with get_connection() as conn:
         res = staging_remove(conn, req)
 
-    verbose = os.getenv("OBS_FLOW_VERBOSE") == "1"
-    output = os.getenv("OBS_FLOW_OUTPUT")
+    config = get_config()
 
     renderer = StagingRenderer(res)
-    renderer.render(fmt=output, verbose=verbose)
+    renderer.render(fmt=config.output, verbose=config.verbose)

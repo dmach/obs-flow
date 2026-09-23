@@ -7,10 +7,9 @@ import click
 def cli(staging_id: int, reviewer: str | None) -> None:
     """Show staging batch review details."""
 
-    import os
     from obs_flow_client import staging_review_show
     from obs_flow_common.messages import StagingReviewShowRequest
-    from ..helpers import get_connection
+    from ..helpers import get_connection, get_config
     from ..output.review import ReviewRenderer
 
     req = StagingReviewShowRequest(
@@ -24,8 +23,7 @@ def cli(staging_id: int, reviewer: str | None) -> None:
         click.echo("No reviews found.", err=True)
         return
 
-    verbose = os.getenv("OBS_FLOW_VERBOSE") == "1"
-    output = os.getenv("OBS_FLOW_OUTPUT")
+    config = get_config()
 
     renderer = ReviewRenderer(res.reviews)
-    renderer.render(fmt=output, verbose=verbose)
+    renderer.render(fmt=config.output, verbose=config.verbose)
