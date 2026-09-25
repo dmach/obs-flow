@@ -58,3 +58,4 @@
 - would it be possible to create a feature to remember any current URL within the service as a shortcut? that might solve quick links to anywhere (e.g. list of PRs + filter)
 - search similar pull requests (e.g. there's a typo in a PR and others suffer from the same issue too -> review and decline them at once)
 - be able to propagate one source change to multiple packages in multiple projects (magical inheritance is probably unwanted, projects frequently have different acceptance criteria, but maintainers need something easy to use)
+- possibility to disable interactive prompts (better for scripting and AI, the tools won't end up hanging on the prompts)
