@@ -62,4 +62,5 @@
 - patchinfo should be located under patchinfo/YYYY/MM/*.xml
 - packages should be located under packages/<prefix>/<name>
 - reconsider using submodules - forking a project frequently leads to broken submodule paths (they're relative; ../../owner/repo usually works, ../repo does not)
+- glossary
 
