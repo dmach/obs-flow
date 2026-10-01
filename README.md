@@ -61,4 +61,5 @@
 - possibility to disable interactive prompts (better for scripting and AI, the tools won't end up hanging on the prompts)
 - patchinfo should be located under patchinfo/YYYY/MM/*.xml
 - packages should be located under packages/<prefix>/<name>
+- reconsider using submodules - forking a project frequently leads to broken submodule paths (they're relative; ../../owner/repo usually works, ../repo does not)
 
