@@ -1,6 +1,6 @@
 <tr id="bookmark-row-{{ bookmark.id }}">
     <td class="checkbox-cell">
-        <input type="checkbox" disabled>
+        <input type="checkbox" disabled aria-label="Editing">
     </td>
     <td colspan="2">
         <form id="edit-form-{{ bookmark.id }}"
@@ -9,33 +9,29 @@
               hx-swap="outerHTML">
             <div class="grid">
                 <div>
-                    <input type="text" name="name" value="{{ name }}" placeholder="Name" aria-invalid="{% if errors.name %}true{% endif %}">
+                    <input type="text" name="name" value="{{ name }}" placeholder="Name" aria-label="Name" aria-invalid="{% if errors.name %}true{% endif %}">
                     {% if errors.name %}
-                        <small>{{ errors.name }}</small>
+                        <small class="error">{{ errors.name }}</small>
                     {% endif %}
                 </div>
                 <div>
-                    <input type="text" name="url" value="{{ url }}" placeholder="URL" aria-invalid="{% if errors.url %}true{% endif %}">
+                    <input type="text" name="url" value="{{ url }}" placeholder="URL" aria-label="URL" aria-invalid="{% if errors.url %}true{% endif %}">
                     {% if errors.url %}
-                        <small>{{ errors.url }}</small>
+                        <small class="error">{{ errors.url }}</small>
                     {% endif %}
                 </div>
             </div>
         </form>
     </td>
     <td>
-        <div>
-            <button class="primary"
-                    form="edit-form-{{ bookmark.id }}"
-                    type="submit">
-                Save
-            </button>
-            <button class="secondary outline"
+        <div class="actions">
+            <button class="secondary"
                     hx-get="{% url 'bookmark_cancel_edit' bookmark.id %}"
                     hx-target="#bookmark-row-{{ bookmark.id }}"
                     hx-swap="outerHTML">
                 Cancel
             </button>
+            <button form="edit-form-{{ bookmark.id }}" type="submit">Save</button>
         </div>
     </td>
 </tr>

@@ -3,34 +3,36 @@
 {% block title %}Preferences - OBS Flow{% endblock %}
 
 {% block content %}
-<article>
-    <header>
-        <h2>Preferences</h2>
-        <p>Customize your user interface settings.</p>
-    </header>
+<div class="page-header">
+    <h1>Preferences</h1>
+</div>
+<p class="muted">Customize your user interface settings.</p>
 
+<article>
     <form method="post">
         {% csrf_token %}
 
         <label for="{{ form.theme.id_for_label }}">Theme</label>
         {{ form.theme }}
         {% if form.theme.errors %}
-            <p style="color: var(--pico-form-element-invalid-border-color);"><small>{{ form.theme.errors.0 }}</small></p>
+            <small class="error">{{ form.theme.errors.0 }}</small>
         {% endif %}
 
         <label for="{{ form.font_size.id_for_label }}">Font Size (12-20 px)</label>
         {{ form.font_size }}
         {% if form.font_size.errors %}
-            <p style="color: var(--pico-form-element-invalid-border-color);"><small>{{ form.font_size.errors.0 }}</small></p>
+            <small class="error">{{ form.font_size.errors.0 }}</small>
         {% endif %}
 
         <label for="{{ form.page_size.id_for_label }}">Page Size (100-1000)</label>
         {{ form.page_size }}
         {% if form.page_size.errors %}
-            <p style="color: var(--pico-form-element-invalid-border-color);"><small>{{ form.page_size.errors.0 }}</small></p>
+            <small class="error">{{ form.page_size.errors.0 }}</small>
         {% endif %}
 
-        <button type="submit">Save Preferences</button>
+        <div class="actions">
+            <button type="submit">Save Preferences</button>
+        </div>
     </form>
 </article>
 {% endblock %}

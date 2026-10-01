@@ -1,3 +1,15 @@
+// "Select all" checkboxes: <input type="checkbox" data-select-all="NAME"> toggles every
+// checkbox named NAME. Delegated on document so it also covers rows swapped in by htmx.
+document.addEventListener('change', (e) => {
+    const name = e.target.dataset?.selectAll;
+    if (!name) {
+        return;
+    }
+    document.querySelectorAll(`input[type="checkbox"][name="${name}"]`).forEach(cb => {
+        cb.checked = e.target.checked;
+    });
+});
+
 // Bind event listeners once the DOM is fully loaded
 document.addEventListener('DOMContentLoaded', () => {
     // Submit GET forms without sending empty form fields, which is much cleaner and user-friendly.

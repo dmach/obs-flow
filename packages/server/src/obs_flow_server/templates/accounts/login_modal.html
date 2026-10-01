@@ -17,7 +17,7 @@
                 {# Both enabled and no errors: SSO is prominent, local login is collapsed behind HTMX #}
                 <div id="local-login-section">
                     <hr>
-                    <button class="secondary outline"
+                    <button class="secondary"
                             hx-get="{% url 'local_login_form' %}?next={{ next|urlencode }}"
                             hx-target="#local-login-section"
                             hx-swap="outerHTML">
@@ -32,9 +32,9 @@
 
         <footer>
             {% if is_htmx %}
-                <button class="secondary outline" form="login-modal-close">Cancel</button>
+                <button class="secondary" form="login-modal-close">Cancel</button>
             {% else %}
-                <a href="{% url 'home' %}" role="button" class="secondary outline">Cancel</a>
+                <a href="{% url 'home' %}" role="button" class="secondary">Cancel</a>
             {% endif %}
             {% if auth_local_enabled %}
                 <button type="submit" class="primary local-login-submit" form="local-login-form">Log In</button>

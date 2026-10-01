@@ -3,63 +3,35 @@
 {% block title %}Pull Requests - OBS Flow{% endblock %}
 
 {% block content %}
-<h2>Pull Requests <small>{{ total_count }}</small></h2>
+<div class="page-header">
+    <h1>Pull Requests <span class="counter">{{ total_count }}</span></h1>
+</div>
 
 <details class="filter-panel" {% if base_query %}open{% endif %}>
     <summary>Search &amp; Filters</summary>
     <div class="filter-panel-body">
         <form method="GET" action="" data-clean-url="true">
-            <div class="grid">
-                {% for field, exact_field in form.primary_fields %}
-                <div>
-                    {{ field.label_tag }}
-                    {{ field }}
-                    {% if exact_field %}<label>{{ exact_field }} {{ exact_field.label }}</label>{% endif %}
-                </div>
-                {% endfor %}
-            </div>
+            {% include "partials/filter_fields.html" with fields=form.primary_fields %}
 
             <fieldset>
                 <legend>Source Filter</legend>
-                <div class="grid">
-                    {% for field, exact_field in form.source_fields %}
-                    <div>
-                        {{ field.label_tag }}
-                        {{ field }}
-                        {% if exact_field %}<label>{{ exact_field }} {{ exact_field.label }}</label>{% endif %}
-                    </div>
-                    {% endfor %}
-                </div>
+                {% include "partials/filter_fields.html" with fields=form.source_fields %}
             </fieldset>
 
             <fieldset>
                 <legend>Target Filter</legend>
-                <div class="grid">
-                    {% for field, exact_field in form.target_fields %}
-                    <div>
-                        {{ field.label_tag }}
-                        {{ field }}
-                        {% if exact_field %}<label>{{ exact_field }} {{ exact_field.label }}</label>{% endif %}
-                    </div>
-                    {% endfor %}
-                </div>
+                {% include "partials/filter_fields.html" with fields=form.target_fields %}
             </fieldset>
 
             <fieldset>
                 <legend>Reviewer Filter</legend>
-                <div class="grid">
-                    {% for field, exact_field in form.reviewer_fields %}
-                    <div>
-                        {{ field.label_tag }}
-                        {{ field }}
-                        {% if exact_field %}<label>{{ exact_field }} {{ exact_field.label }}</label>{% endif %}
-                    </div>
-                    {% endfor %}
-                </div>
+                {% include "partials/filter_fields.html" with fields=form.reviewer_fields %}
             </fieldset>
 
-            <a href="?" role="button" class="secondary outline">Reset</a>
-            <button type="submit">Apply Filter</button>
+            <div class="actions">
+                <a href="?" role="button" class="secondary">Reset</a>
+                <button type="submit">Apply Filter</button>
+            </div>
         </form>
     </div>
 </details>
@@ -70,17 +42,19 @@
 
     <form hx-post="{% url 'staging_ui_modal_select_batch' %}" hx-target="#modal-container">
         {% csrf_token %}
-        <button type="submit" class="primary">Stage Selected</button>
-        <label for="select-mode" role="button" class="secondary outline mobile-only select-mode-label">
-            <span class="select-mode-on">Select Mode</span>
-            <span class="select-mode-off">Exit Select Mode</span>
-        </label>
+        <div class="table-toolbar">
+            <button type="submit">Stage Selected</button>
+            <label for="select-mode" role="button" class="secondary mobile-only select-mode-label">
+                <span class="select-mode-on">Select Mode</span>
+                <span class="select-mode-off">Exit Select Mode</span>
+            </label>
+        </div>
 
         <div id="pr-table-container">
-            <table class="striped">
+            <table class="data-table">
                 <thead>
                     <tr>
-                        <th class="checkbox-cell">Select</th>
+                        <th class="checkbox-cell"><span class="visually-hidden">Select</span></th>
                         <th>
                             <a href="?sort={% if current_sort == 'id' %}-id{% else %}id{% endif %}{{ base_query }}">
                                 ID
@@ -123,22 +97,28 @@
                     {% for pr in page_obj %}
                         <tr>
                             <td class="checkbox-cell" data-label="Select">
-                                <input type="checkbox" name="selected_prs" value="{{ pr.id }}" class="pr-checkbox">
+                                <input type="checkbox" name="selected_prs" value="{{ pr.id }}" aria-label="Select {{ pr.target.owner }}/{{ pr.target.repo }}#{{ pr.number }}">
                             </td>
-                            <td data-label="ID"><a href="{% url 'pr_detail' pr.id %}">{{ pr.target.owner }}/{{ pr.target.repo }}#{{ pr.number }}</a></td>
+                            <td data-label="ID"><a href="{% url 'pr_detail' pr.id %}" class="id-link">{{ pr.target.owner }}/{{ pr.target.repo }}#{{ pr.number }}</a></td>
                             <td data-label="Title">{{ pr.title }}</td>
                             <td data-label="Author">{{ pr.author.username }}</td>
                             <td data-label="Target Branch"><code>{{ pr.target.branch }}</code></td>
                             <td data-label="Mergeable">
                                 {% if pr.is_mergeable == True %}
-                                    yes
+                                    <span class="text-success">yes</span>
                                 {% elif pr.is_mergeable == False %}
-                                    no
+                                    <span class="text-danger">no</span>
                                 {% else %}
-                                    unknown
+                                    <span class="muted">unknown</span>
                                 {% endif %}
                             </td>
-                            <td data-label="State">{{ pr.state }}</td>
+                            <td data-label="State">
+                                {% if pr.is_draft and pr.state == "open" %}
+                                    <span class="state state-sm" data-state="draft">Draft</span>
+                                {% else %}
+                                    <span class="state state-sm" data-state="{{ pr.state }}">{{ pr.get_state_display }}</span>
+                                {% endif %}
+                            </td>
                         </tr>
                     {% endfor %}
                 </tbody>
@@ -146,30 +126,11 @@
         </div>
     </form>
 
-    {% if page_obj.has_other_pages %}
-    <nav aria-label="pagination">
-        <ul>
-            {% if page_obj.has_previous %}
-            <li><a href="?page=1{{ filter_query }}">First</a></li>
-            <li><a href="?page={{ page_obj.previous_page_number }}{{ filter_query }}">Previous</a></li>
-            {% else %}
-            <li><span aria-disabled="true">First</span></li>
-            <li><span aria-disabled="true">Previous</span></li>
-            {% endif %}
-
-            <li>Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</li>
-
-            {% if page_obj.has_next %}
-            <li><a href="?page={{ page_obj.next_page_number }}{{ filter_query }}">Next</a></li>
-            <li><a href="?page={{ page_obj.paginator.num_pages }}{{ filter_query }}">Last</a></li>
-            {% else %}
-            <li><span aria-disabled="true">Next</span></li>
-            <li><span aria-disabled="true">Last</span></li>
-            {% endif %}
-        </ul>
-    </nav>
-    {% endif %}
+    {% include "partials/pagination.html" %}
 {% else %}
-    <p class="muted">No pull requests found.</p>
+    <div class="blankslate">
+        <h3>No pull requests found</h3>
+        {% if base_query %}<p>Try changing or <a href="?">resetting the filters</a>.</p>{% endif %}
+    </div>
 {% endif %}
 {% endblock %}

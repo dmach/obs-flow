@@ -3,76 +3,74 @@
 {% block title %}API Tokens - OBS Flow{% endblock %}
 
 {% block content %}
-<article>
-    <header>
-        <h2>API Tokens</h2>
-        <p>Manage your personal access tokens for authenticating with the CLI and API.</p>
-    </header>
+<div class="page-header">
+    <h1>API Tokens</h1>
+</div>
+<p class="muted">Manage your personal access tokens for authenticating with the CLI and API.</p>
 
-    {% if new_token %}
-        <article>
-            <header>
-                <h3>Token Generated Successfully!</h3>
-            </header>
-            <p>Make sure to copy your personal access token now. <strong>You won't be able to see it again!</strong></p>
-            <pre><code>{{ new_token }}</code></pre>
-        </article>
-    {% endif %}
+{% if new_token %}
+    <div class="flash flash-success">
+        <h3>Token Generated Successfully!</h3>
+        <p>Make sure to copy your personal access token now. <strong>You won't be able to see it again!</strong></p>
+        <pre><code>{{ new_token }}</code></pre>
+    </div>
+{% endif %}
 
-    <section>
-        <h3>Generate New Token</h3>
-        <form method="post">
-            {% csrf_token %}
-            <input type="hidden" name="action" value="create">
-            <label for="description">Description</label>
-            <fieldset role="group">
-                <input type="text" id="description" name="description" placeholder="e.g., CLI Token" required>
-                <button type="submit">Generate</button>
-            </fieldset>
-        </form>
-    </section>
+<section>
+    <h2>Generate New Token</h2>
+    <form method="post">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="create">
+        <label for="description">Description</label>
+        <fieldset role="group">
+            <input type="text" id="description" name="description" placeholder="e.g., CLI Token" required>
+            <button type="submit">Generate</button>
+        </fieldset>
+    </form>
+</section>
 
-    <section>
-        <h3>Active Tokens</h3>
-        {% if tokens %}
-            <table class="striped">
-                <thead>
+<section>
+    <h2>Active Tokens</h2>
+    {% if tokens %}
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Token</th>
+                    <th>Description</th>
+                    <th>Created At</th>
+                    <th>Last Used</th>
+                    <th><span class="visually-hidden">Action</span></th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for token in tokens %}
                     <tr>
-                        <th>Token</th>
-                        <th>Description</th>
-                        <th>Created At</th>
-                        <th>Last Used</th>
-                        <th>Action</th>
+                        <td data-label="Token"><code>flow-...{{ token.last_eight }}</code></td>
+                        <td data-label="Description">{{ token.description|default:"—" }}</td>
+                        <td data-label="Created At">{{ token.created_at|date:"Y-m-d H:i" }}</td>
+                        <td data-label="Last Used">
+                            {% if token.last_used_at %}
+                                {{ token.last_used_at|date:"Y-m-d H:i" }}
+                            {% else %}
+                                <span class="muted">Never</span>
+                            {% endif %}
+                        </td>
+                        <td data-label="Action">
+                            <form method="post">
+                                {% csrf_token %}
+                                <input type="hidden" name="action" value="delete">
+                                <input type="hidden" name="token_id" value="{{ token.id }}">
+                                <button type="submit" class="danger">Revoke</button>
+                            </form>
+                        </td>
                     </tr>
-                </thead>
-                <tbody>
-                    {% for token in tokens %}
-                        <tr>
-                            <td><code>flow-...{{ token.last_eight }}</code></td>
-                            <td>{{ token.description|default:"—" }}</td>
-                            <td>{{ token.created_at|date:"Y-m-d H:i" }}</td>
-                            <td>
-                                {% if token.last_used_at %}
-                                    {{ token.last_used_at|date:"Y-m-d H:i" }}
-                                {% else %}
-                                    <span class="muted">Never</span>
-                                {% endif %}
-                            </td>
-                            <td>
-                                <form method="post">
-                                    {% csrf_token %}
-                                    <input type="hidden" name="action" value="delete">
-                                    <input type="hidden" name="token_id" value="{{ token.id }}">
-                                    <button type="submit" class="secondary outline">Revoke</button>
-                                </form>
-                            </td>
-                        </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        {% else %}
-            <p class="muted">You don't have any active personal access tokens yet.</p>
-        {% endif %}
-    </section>
-</article>
+                {% endfor %}
+            </tbody>
+        </table>
+    {% else %}
+        <div class="blankslate">
+            <p>You don't have any active personal access tokens yet.</p>
+        </div>
+    {% endif %}
+</section>
 {% endblock %}

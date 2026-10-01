@@ -1,68 +1,378 @@
-/* OBS Flow - minimal custom layer on top of stock Pico CSS. */
+/* OBS Flow - GitHub (Primer) look on top of stock Pico CSS v2.
+   See DESIGN.md for the design system this file implements. */
 
-.muted { color: var(--pico-muted-color); }
+/* ------------------------------------------------------------------ */
+/* Theme selection                                                     */
+/* ------------------------------------------------------------------ */
 
-/* SUSE green navbar */
-.navbar-container {
-    background-color: #30ba7c;
+/* light-dark() below resolves against color-scheme, which follows the
+   user's theme preference (no data-theme attribute = follow the OS). */
+:root:not([data-theme]) { color-scheme: light dark; }
+[data-theme="light"]    { color-scheme: light; }
+[data-theme="dark"]     { color-scheme: dark; }
+
+/* ------------------------------------------------------------------ */
+/* Tokens (one block, both themes)                                     */
+/* ------------------------------------------------------------------ */
+
+:root {
+    --gh-font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans", Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji";
+    --gh-font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+
+    --gh-bg-default:          light-dark(#ffffff, #0d1117);
+    --gh-bg-subtle:           light-dark(#f6f8fa, #151b23);
+    --gh-bg-inset:            light-dark(#f6f8fa, #010409);
+    --gh-bg-overlay:          light-dark(#ffffff, #151b23);
+    --gh-bg-neutral-muted:    light-dark(#818b981f, #656c7633);
+    --gh-bg-accent-muted:     light-dark(#ddf4ff, #388bfd1a);
+    --gh-bg-success-muted:    light-dark(#dafbe1, #2ea04326);
+    --gh-bg-attention-muted:  light-dark(#fff8c5, #bb800926);
+    --gh-bg-danger-muted:     light-dark(#ffebe9, #f8514926);
+
+    --gh-fg-default:          light-dark(#1f2328, #f0f6fc);
+    --gh-fg-muted:            light-dark(#59636e, #9198a1);
+    --gh-fg-on-emphasis:      #ffffff;
+    --gh-fg-accent:           light-dark(#0969da, #4493f8);
+    --gh-fg-success:          light-dark(#1a7f37, #3fb950);
+    --gh-fg-attention:        light-dark(#9a6700, #d29922);
+    --gh-fg-danger:           light-dark(#d1242f, #f85149);
+    --gh-fg-done:             light-dark(#8250df, #ab7df8);
+
+    --gh-success-emphasis:    light-dark(#1f883d, #238636);
+    --gh-done-emphasis:       light-dark(#8250df, #8957e5);
+    --gh-danger-emphasis:     light-dark(#cf222e, #da3633);
+    --gh-attention-emphasis:  light-dark(#9a6700, #9e6a03);
+    --gh-accent-emphasis:     light-dark(#0969da, #1f6feb);
+    --gh-neutral-emphasis:    light-dark(#59636e, #656c76);
+
+    --gh-border-default:      light-dark(#d1d9e0, #3d444d);
+    --gh-border-muted:        light-dark(#d1d9e0b3, #3d444db3);
+    --gh-border-active:       light-dark(#fd8c73, #f78166);
+
+    --gh-btn-bg:              light-dark(#f6f8fa, #212830);
+    --gh-btn-hover-bg:        light-dark(#eff2f5, #262c36);
+    --gh-btn-border:          light-dark(#d1d9e0, #3d444d);
+    --gh-btn-primary-bg:      light-dark(#1f883d, #238636);
+    --gh-btn-primary-hover-bg: light-dark(#1c8139, #29903b);
+    --gh-btn-primary-border:  light-dark(#1f232826, #ffffff1a);
+    --gh-btn-danger-hover-bg: light-dark(#cf222e, #b62324);
+
+    --gh-shadow-color:        light-dark(#25292e1f, #010409);
+    --gh-shadow-overlay:      0 0 0 1px var(--gh-border-default), 0 8px 24px 0 var(--gh-shadow-color);
+    --gh-shadow-resting:      0 1px 0 0 light-dark(#1f23280a, #00000000);
+    --gh-backdrop:            light-dark(#1f232866, #010409b3);
+}
+
+/* ------------------------------------------------------------------ */
+/* Map tokens onto Pico                                                */
+/* ------------------------------------------------------------------ */
+
+/* Pico declares its theme on selectors of specificity (0,2,0) or lower;
+   this selector matches every mode with (0,2,0) and comes later, so it wins. */
+:root[data-theme],
+:root:not([data-theme]) {
+    --pico-font-family-sans-serif: var(--gh-font-sans);
+    --pico-font-family-monospace: var(--gh-font-mono);
+    --pico-font-family: var(--pico-font-family-sans-serif);
+    --pico-line-height: 1.5;
+    --pico-border-radius: 6px;
+    --pico-border-width: 1px;
+    --pico-outline-width: 2px;
+    --pico-transition: 80ms cubic-bezier(0.33, 1, 0.68, 1);
+    --pico-typography-spacing-vertical: 1rem;
+    --pico-form-element-spacing-vertical: 0.3125rem;
+    --pico-form-element-spacing-horizontal: 0.75rem;
+    --pico-nav-breadcrumb-divider: "/";
+
+    --pico-background-color: var(--gh-bg-default);
+    --pico-color: var(--gh-fg-default);
+    --pico-h1-color: var(--gh-fg-default);
+    --pico-h2-color: var(--gh-fg-default);
+    --pico-h3-color: var(--gh-fg-default);
+    --pico-h4-color: var(--gh-fg-default);
+    --pico-h5-color: var(--gh-fg-default);
+    --pico-h6-color: var(--gh-fg-default);
+    --pico-muted-color: var(--gh-fg-muted);
+    --pico-muted-border-color: var(--gh-border-muted);
+    --pico-text-selection-color: var(--gh-bg-accent-muted);
+
+    /* Links and focus are blue; filled (primary) buttons are green. */
+    --pico-primary: var(--gh-fg-accent);
+    --pico-primary-hover: var(--gh-fg-accent);
+    --pico-primary-underline: transparent;
+    --pico-primary-hover-underline: var(--gh-fg-accent);
+    --pico-primary-focus: var(--gh-fg-accent);
+    --pico-primary-background: var(--gh-btn-primary-bg);
+    --pico-primary-border: var(--gh-btn-primary-border);
+    --pico-primary-hover-background: var(--gh-btn-primary-hover-bg);
+    --pico-primary-hover-border: var(--gh-btn-primary-border);
+    --pico-primary-inverse: var(--gh-fg-on-emphasis);
+
+    /* .secondary = GitHub default button; a.secondary = muted link. */
+    --pico-secondary: var(--gh-fg-muted);
+    --pico-secondary-hover: var(--gh-fg-accent);
+    --pico-secondary-underline: transparent;
+    --pico-secondary-hover-underline: var(--gh-fg-accent);
+    --pico-secondary-focus: var(--gh-fg-accent);
+    --pico-secondary-background: var(--gh-btn-bg);
+    --pico-secondary-border: var(--gh-btn-border);
+    --pico-secondary-hover-background: var(--gh-btn-hover-bg);
+    --pico-secondary-hover-border: var(--gh-btn-border);
+    --pico-secondary-inverse: var(--gh-fg-default);
+
+    --pico-contrast: var(--gh-fg-default);
+    --pico-contrast-hover: var(--gh-fg-accent);
+    --pico-contrast-underline: transparent;
+    --pico-contrast-hover-underline: var(--gh-fg-accent);
+    --pico-contrast-focus: var(--gh-fg-accent);
+    --pico-contrast-background: var(--gh-btn-bg);
+    --pico-contrast-border: var(--gh-btn-border);
+    --pico-contrast-hover-background: var(--gh-btn-hover-bg);
+    --pico-contrast-hover-border: var(--gh-btn-border);
+    --pico-contrast-inverse: var(--gh-fg-default);
+
+    --pico-box-shadow: var(--gh-shadow-overlay);
+    --pico-button-box-shadow: var(--gh-shadow-resting);
+    --pico-button-hover-box-shadow: var(--gh-shadow-resting);
+
+    --pico-card-background-color: var(--gh-bg-default);
+    --pico-card-border-color: var(--gh-border-default);
+    --pico-card-box-shadow: 0 0 0 1px var(--gh-border-default);
+    --pico-card-sectioning-background-color: var(--gh-bg-subtle);
+
+    --pico-dropdown-background-color: var(--gh-bg-overlay);
+    --pico-dropdown-border-color: var(--gh-border-default);
+    --pico-dropdown-box-shadow: var(--gh-shadow-overlay);
+    --pico-dropdown-color: var(--gh-fg-default);
+    --pico-dropdown-hover-background-color: var(--gh-bg-neutral-muted);
+
+    --pico-modal-overlay-background-color: var(--gh-backdrop);
+    --pico-modal-overlay-backdrop-filter: none;
+
+    --pico-form-element-background-color: var(--gh-bg-default);
+    --pico-form-element-selected-background-color: var(--gh-bg-subtle);
+    --pico-form-element-border-color: var(--gh-border-default);
+    --pico-form-element-color: var(--gh-fg-default);
+    --pico-form-element-placeholder-color: var(--gh-fg-muted);
+    --pico-form-element-active-background-color: var(--gh-bg-default);
+    --pico-form-element-active-border-color: var(--gh-fg-accent);
+    --pico-form-element-focus-color: var(--gh-fg-accent);
+    --pico-form-element-invalid-border-color: var(--gh-fg-danger);
+    --pico-form-element-invalid-active-border-color: var(--gh-fg-danger);
+    --pico-form-element-invalid-focus-color: var(--gh-fg-danger);
+    --pico-form-element-valid-border-color: var(--gh-fg-success);
+    --pico-form-element-valid-active-border-color: var(--gh-fg-success);
+    --pico-form-element-valid-focus-color: var(--gh-fg-success);
+
+    --pico-table-border-color: var(--gh-border-muted);
+    --pico-table-row-stripped-background-color: transparent;
+
+    --pico-code-background-color: var(--gh-bg-neutral-muted);
+    --pico-code-color: var(--gh-fg-default);
+
+    --pico-accordion-border-color: var(--gh-border-default);
+    --pico-accordion-active-summary-color: var(--gh-fg-default);
+    --pico-accordion-close-summary-color: var(--gh-fg-default);
+    --pico-accordion-open-summary-color: var(--gh-fg-default);
+
+    --pico-ins-color: var(--gh-fg-success);
+    --pico-del-color: var(--gh-fg-danger);
+}
+
+/* ------------------------------------------------------------------ */
+/* Base                                                                */
+/* ------------------------------------------------------------------ */
+
+.container {
+    max-width: 1280px;
+    padding-inline: 1rem;
+}
+
+@media (min-width: 768px) {
+    .container { padding-inline: 2rem; }
+}
+
+h1 { --pico-font-size: 2rem;    --pico-font-weight: 400; --pico-line-height: 1.25; }
+h2 { --pico-font-size: 1.5rem;  --pico-font-weight: 600; --pico-line-height: 1.25; }
+h3 { --pico-font-size: 1.25rem; --pico-font-weight: 600; --pico-line-height: 1.25; }
+h4 { --pico-font-size: 1rem;    --pico-font-weight: 600; --pico-line-height: 1.5; }
+h1 .muted { font-weight: 300; }
+
+small, .small { font-size: 0.857rem; }
+.muted { color: var(--gh-fg-muted); }
+.error { color: var(--gh-fg-danger); }
+.text-success { color: var(--gh-fg-success); }
+.text-danger { color: var(--gh-fg-danger); }
+
+/* Text for screen readers only. */
+.visually-hidden {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+}
+
+/* Inline code: branches, SHAs, fingerprints, URLs. */
+code {
+    padding: 0.2em 0.4em;
+    border-radius: 6px;
+    font-size: 0.857rem;
+}
+
+pre {
+    border: 1px solid var(--gh-border-default);
+    border-radius: 6px;
+    background-color: var(--gh-bg-inset);
+}
+pre > code { padding: 1rem; background: none; }
+
+/* Page title row: title on the left, actions on the right. */
+.page-header {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem 1rem;
+    margin-bottom: 1rem;
+}
+.page-header > h1 { margin-bottom: 0; }
+.page-header + p.muted { margin-top: -0.5rem; }
+
+/* ------------------------------------------------------------------ */
+/* App header                                                          */
+/* ------------------------------------------------------------------ */
+
+body > header.app-header {
+    padding-block: 0;
+}
+
+/* Two rows like a GitHub repository header: brand + account on top, section tabs below. */
+.app-header {
     margin-bottom: 1.5rem;
+    border-bottom: 1px solid var(--gh-border-default);
+    background-color: var(--gh-bg-inset);
 }
 
-.navbar-container nav {
+.app-header nav {
     --pico-nav-element-spacing-vertical: 0;
-    --pico-nav-link-spacing-vertical: 0.25rem;
-    padding-top: 0;
-    padding-bottom: 0;
+    --pico-nav-link-spacing-vertical: 0.375rem;
+    --pico-nav-link-spacing-horizontal: 0.5rem;
 }
 
-.navbar-container nav > ul > li > a,
-.navbar-container nav > ul > li > strong > a,
-.navbar-container nav details.dropdown > summary:not([role]) {
-    color: #fff;
+.app-header-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    min-height: 3.5rem;
+    padding-top: 0.5rem;
+}
+
+.app-brand {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    color: var(--gh-fg-default);
+    font-size: 1.143rem;
+    font-weight: 600;
     text-decoration: none;
 }
 
-.navbar-container nav > ul > li > a:hover,
-.navbar-container nav > ul > li > strong > a:hover {
-    color: #e0f7fa;
+.app-brand:hover { color: var(--gh-fg-default); }
+
+.app-logo {
+    flex: none;
+    width: 2rem;
+    height: 2rem;
 }
 
-.navbar-container nav > ul > li > strong > a {
-    font-weight: 700;
-    font-size: 1rem;
+/* Brand colours: the dark base turns light in the dark theme, the green accent stays. */
+.app-logo .logo-base { fill: light-dark(#13372c, #f0f6fc); }
+.app-logo .logo-accent { fill: #32f773; }
+
+.app-header nav a,
+.app-header details.dropdown > summary:not([role]) {
+    border-radius: 6px;
+    color: var(--gh-fg-default);
+    text-decoration: none;
 }
 
-/* Make the account dropdown summary look like the other nav entries. */
-.navbar-container nav details.dropdown > summary:not([role]) {
-    padding: 0;
+.app-header nav > ul > li > a:hover {
+    background-color: var(--gh-bg-neutral-muted);
+}
+
+/* Section tabs: GitHub "UnderlineNav", scrolls horizontally on small screens. */
+.app-tabs {
+    overflow-x: auto;
+    scrollbar-width: none;
+}
+
+.app-tabs ul { gap: 0.25rem; }
+
+.app-tabs li {
+    position: relative;
+    padding: 0 0 0.5rem;
+}
+
+.app-tabs a {
+    margin: 0;
+    white-space: nowrap;
+}
+
+.app-tabs a[aria-current="page"] {
+    font-weight: 600;
+}
+
+.app-tabs li:has(> a[aria-current="page"])::after {
+    content: "";
+    position: absolute;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    height: 2px;
+    border-radius: 6px;
+    background-color: var(--gh-border-active);
+}
+
+/* Make the account dropdown summary look like a nav link. */
+.app-header details.dropdown {
+    margin-bottom: 0;
+}
+
+.app-header details.dropdown > summary:not([role]) {
     height: auto;
-    background-color: transparent;
+    padding: var(--pico-nav-link-spacing-vertical) var(--pico-nav-link-spacing-horizontal);
     border: none;
+    background-color: transparent;
     box-shadow: none;
 }
 
-.navbar-container nav details.dropdown > summary:not([role])::after {
-    display: block;
-    float: right;
-    margin-inline-start: 0.25rem;
-    background-position: right center;
-    filter: brightness(0) invert(1);
-    transform: rotate(-90deg);
+.app-header details.dropdown > summary:not([role]):hover {
+    background-color: var(--gh-bg-neutral-muted);
 }
 
-.navbar-container nav details.dropdown[open] > summary:not([role])::after {
-    transform: rotate(0);
+/* ------------------------------------------------------------------ */
+/* Dropdown                                                            */
+/* ------------------------------------------------------------------ */
+
+details.dropdown > summary + ul {
+    padding: 0.5rem;
+    border-radius: 12px;
 }
 
-.navbar-container .desktop-menu { display: flex; }
-.navbar-container .mobile-menu { display: none; }
-
-@media (max-width: 768px) {
-    .navbar-container .desktop-menu { display: none; }
-    .navbar-container .mobile-menu { display: inline-block; }
-    .navbar-container .mobile-menu > summary { color: #fff; }
-    .navbar-container .mobile-menu ul { background-color: var(--pico-card-background-color); }
+details.dropdown > summary + ul li a {
+    border-radius: 6px;
 }
+
+details.dropdown > summary + ul li:not(:has(a)) {
+    color: var(--gh-fg-muted);
+}
+
+/* ------------------------------------------------------------------ */
+/* Buttons                                                             */
+/* ------------------------------------------------------------------ */
 
 /* Pico stretches buttons to 100%; keep them at their natural size.
    Explicit types override Pico's [type=...] margin rule so buttons stay equally tall. */
@@ -73,38 +383,69 @@ button,
 [role="button"] {
     width: auto !important;
     margin: 0;
+    font-weight: 500;
 }
 
-/* Lightweight table row highlight on pointer devices. */
-@media (min-width: 769px) {
-    table.striped {
-        border: 1px solid var(--pico-muted-border-color);
-        border-radius: var(--pico-border-radius);
-        border-collapse: separate;
-        border-spacing: 0;
-        overflow: hidden;
-    }
-    table.striped tbody tr:last-child td { border-bottom: none; }
-    table.striped tbody tr:hover td {
-        background-color: rgba(128, 128, 128, 0.2);
-    }
+/* GitHub has no outline buttons: Pico's .outline renders as a default button.
+   Selectors mirror Pico's so they win on specificity. */
+:is(button, [type="submit"], [type="button"], [role="button"]).outline,
+:is(button, [type="submit"], [type="button"], [role="button"]).outline.secondary,
+:is(button, [type="submit"], [type="button"], [role="button"]).outline.contrast {
+    --pico-background-color: var(--gh-btn-bg);
+    --pico-border-color: var(--gh-btn-border);
+    --pico-color: var(--gh-fg-default);
 }
 
-/* Footer */
-body > footer { text-align: center; }
-
-/* Home page hero */
-.hero { text-align: center; }
-.hero footer {
-    display: flex;
-    justify-content: center;
-    gap: 1rem;
+:is(button, [type="submit"], [type="button"], [role="button"]).outline:is(:hover, :active, :focus),
+:is(button, [type="submit"], [type="button"], [role="button"]).outline.secondary:is(:hover, :active, :focus),
+:is(button, [type="submit"], [type="button"], [role="button"]).outline.contrast:is(:hover, :active, :focus) {
+    --pico-background-color: var(--gh-btn-hover-bg);
+    --pico-border-color: var(--gh-btn-border);
+    --pico-color: var(--gh-fg-default);
 }
 
-/* Modal dialogs */
-/* All dialog actions live in the footer: right-aligned, on one row,
-   sized to their label (Pico stretches buttons to 100% by default) and equally tall. */
-dialog article > footer {
+/* Destructive actions (Delete, Revoke). */
+:is(button, [type="submit"], [type="button"], [role="button"]).danger {
+    --pico-background-color: var(--gh-btn-bg);
+    --pico-border-color: var(--gh-btn-border);
+    --pico-color: var(--gh-fg-danger);
+}
+
+:is(button, [type="submit"], [type="button"], [role="button"]).danger:is(:hover, :active, :focus-visible) {
+    --pico-background-color: var(--gh-btn-danger-hover-bg);
+    --pico-border-color: var(--gh-btn-danger-hover-bg);
+    --pico-color: var(--gh-fg-on-emphasis);
+}
+
+/* Borderless text button (inline "Edit" in sidebars). */
+:is(button, [type="submit"], [type="button"], [role="button"]).invisible {
+    --pico-background-color: transparent;
+    --pico-border-color: transparent;
+    --pico-color: var(--gh-fg-accent);
+    --pico-box-shadow: none;
+    padding: 0 0.25rem;
+}
+
+:is(button, [type="submit"], [type="button"], [role="button"]).invisible:is(:hover, :active, :focus) {
+    --pico-background-color: var(--gh-bg-neutral-muted);
+    --pico-border-color: transparent;
+}
+
+button:disabled,
+[role="button"][aria-disabled="true"] {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+/* Checkboxes and radios are blue, not "primary" green. */
+[type="checkbox"]:is(:checked, :indeterminate),
+[type="radio"]:checked {
+    --pico-background-color: var(--gh-accent-emphasis);
+    --pico-border-color: var(--gh-accent-emphasis);
+}
+
+/* Right-aligned button row (filter panel, forms). */
+.actions {
     display: flex;
     flex-wrap: wrap;
     justify-content: flex-end;
@@ -112,103 +453,414 @@ dialog article > footer {
     gap: 0.5rem;
 }
 
+/* ------------------------------------------------------------------ */
+/* Forms                                                               */
+/* ------------------------------------------------------------------ */
+
+label,
+legend {
+    font-weight: 600;
+}
+
+/* Checkbox / radio labels are regular weight, like GitHub. */
+label:has(> [type="checkbox"], > [type="radio"]) {
+    font-weight: 400;
+}
+
+input:not([type="checkbox"], [type="radio"]) + small,
+select + small,
+textarea + small {
+    margin-top: calc(-0.75 * var(--pico-spacing));
+}
+
+/* ------------------------------------------------------------------ */
+/* Box / article                                                       */
+/* ------------------------------------------------------------------ */
+
+article {
+    padding: 1rem;
+}
+
+article > header,
+article > footer {
+    margin-right: -1rem;
+    margin-left: -1rem;
+    padding: 0.75rem 1rem;
+}
+
+article > header { margin-top: -1rem; margin-bottom: 1rem; }
+article > footer { margin-top: 1rem; margin-bottom: -1rem; }
+article > header > :is(h1, h2, h3, h4) { margin-bottom: 0; }
+article > header > p { margin: 0.25rem 0 0; color: var(--gh-fg-muted); }
+
+/* ------------------------------------------------------------------ */
+/* Data tables (GitHub issue/PR list look)                             */
+/* ------------------------------------------------------------------ */
+
+table.data-table {
+    border: 1px solid var(--gh-border-default);
+    border-radius: 6px;
+    border-collapse: separate;
+    border-spacing: 0;
+    overflow: hidden;
+}
+
+table.data-table :is(th, td) {
+    padding: 0.5rem 1rem;
+    border-bottom: 1px solid var(--gh-border-muted);
+    background-color: transparent;
+}
+
+table.data-table thead th {
+    border-bottom-color: var(--gh-border-default);
+    background-color: var(--gh-bg-subtle);
+    color: var(--gh-fg-muted);
+    font-weight: 600;
+}
+
+table.data-table thead th a {
+    color: var(--gh-fg-muted);
+    text-decoration: none;
+}
+
+table.data-table thead th a:hover { color: var(--gh-fg-accent); }
+
+table.data-table tbody tr:last-child td { border-bottom: none; }
+
+/* Identifiers (owner/repo#123) read as text and turn blue on hover. */
+table.data-table td a.id-link {
+    color: var(--gh-fg-default);
+    font-weight: 600;
+}
+table.data-table td a.id-link:hover { color: var(--gh-fg-accent); }
+
+@media (min-width: 769px) {
+    table.data-table tbody tr:hover td { background-color: var(--gh-bg-subtle); }
+}
+
+table.data-table tbody tr:has(input[type="checkbox"]:checked) td {
+    background-color: var(--gh-bg-accent-muted);
+}
+
+table.data-table td form,
+table.data-table td .grid { margin-bottom: 0; }
+table.data-table td input:not([type="checkbox"]) { margin-bottom: 0; }
+
+.checkbox-cell { width: 40px; text-align: center; }
+.checkbox-cell input { margin: 0; }
+
+/* Collapsible tables on small screens */
+@media (max-width: 768px) {
+    table.data-table {
+        border: none;
+        overflow: visible;
+    }
+    table.data-table thead { display: none; }
+    table.data-table tr {
+        display: block;
+        margin-bottom: 1rem;
+        padding: 0.25rem 0.5rem;
+        border: 1px solid var(--gh-border-default);
+        border-radius: 6px;
+        background-color: var(--gh-bg-default);
+    }
+    table.data-table td {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 0.5rem;
+        text-align: right;
+    }
+    table.data-table tbody tr td:last-child { border-bottom: none; }
+    table.data-table td::before {
+        content: attr(data-label);
+        margin-right: 1rem;
+        color: var(--gh-fg-muted);
+        font-weight: 600;
+        text-align: left;
+    }
+}
+
+/* ------------------------------------------------------------------ */
+/* State labels, review labels, counters                               */
+/* ------------------------------------------------------------------ */
+
+/* Filled pill for object state (PR, staging batch). Unknown states stay neutral. */
+.state {
+    display: inline-block;
+    padding: 0.25rem 0.75rem;
+    border-radius: 2em;
+    background-color: var(--gh-neutral-emphasis);
+    color: var(--gh-fg-on-emphasis);
+    font-weight: 500;
+    line-height: 1.25;
+    white-space: nowrap;
+}
+.state:is([data-state="open"], [data-state="in-progress/open"]) { background-color: var(--gh-success-emphasis); }
+.state:is([data-state="merged"], [data-state="merged/completed"]) { background-color: var(--gh-done-emphasis); }
+.state:is([data-state="closed"], [data-state="failed"]) { background-color: var(--gh-danger-emphasis); }
+.state[data-state="pending-release"] { background-color: var(--gh-attention-emphasis); }
+
+/* Compact variant for table cells. */
+.state.state-sm {
+    padding: 0 0.5rem;
+    font-size: 0.857rem;
+    line-height: 1.5;
+}
+
+/* Outlined pill for review state. */
+.label {
+    display: inline-block;
+    padding: 0 0.5rem;
+    border: 1px solid currentColor;
+    border-radius: 2em;
+    color: var(--gh-fg-muted);
+    font-size: 0.857rem;
+    font-weight: 500;
+    line-height: 1.5;
+    white-space: nowrap;
+}
+.label[data-state="accepted"] { color: var(--gh-fg-success); }
+.label[data-state="rejected"] { color: var(--gh-fg-danger); }
+.label[data-state="pending"]  { color: var(--gh-fg-attention); }
+.label[data-state="needinfo"] { color: var(--gh-fg-accent); }
+
+.counter {
+    display: inline-block;
+    min-width: 1.5em;
+    padding: 0 0.4rem;
+    border-radius: 2em;
+    background-color: var(--gh-bg-neutral-muted);
+    color: var(--gh-fg-default);
+    font-size: 0.857rem;
+    font-weight: 500;
+    line-height: 1.5;
+    text-align: center;
+    vertical-align: middle;
+}
+
+/* ------------------------------------------------------------------ */
+/* Flash (inline notice) and blank slate                               */
+/* ------------------------------------------------------------------ */
+
+.flash {
+    margin-bottom: 1rem;
+    padding: 1rem;
+    border: 1px solid color-mix(in srgb, var(--gh-fg-accent) 40%, transparent);
+    border-radius: 6px;
+    background-color: var(--gh-bg-accent-muted);
+    color: var(--gh-fg-default);
+}
+.flash > :last-child { margin-bottom: 0; }
+.flash > h3 { font-size: 1rem; margin-bottom: 0.5rem; }
+.flash-success { border-color: color-mix(in srgb, var(--gh-fg-success) 40%, transparent); background-color: var(--gh-bg-success-muted); }
+.flash-warning { border-color: color-mix(in srgb, var(--gh-fg-attention) 40%, transparent); background-color: var(--gh-bg-attention-muted); }
+.flash-danger  { border-color: color-mix(in srgb, var(--gh-fg-danger) 40%, transparent); background-color: var(--gh-bg-danger-muted); }
+
+.blankslate {
+    margin-bottom: 1rem;
+    padding: 2rem;
+    border: 1px solid var(--gh-border-default);
+    border-radius: 6px;
+    color: var(--gh-fg-muted);
+    text-align: center;
+}
+.blankslate > :last-child { margin-bottom: 0; }
+
+/* ------------------------------------------------------------------ */
+/* Filter panel                                                        */
+/* ------------------------------------------------------------------ */
+
+details.filter-panel {
+    margin-bottom: 1rem;
+    border: 1px solid var(--gh-border-default);
+    border-radius: 6px;
+    overflow: hidden;
+}
+
+details.filter-panel > summary {
+    margin-bottom: 0;
+    padding: 0.5rem 1rem;
+    background-color: var(--gh-bg-subtle);
+    font-weight: 600;
+}
+
+details.filter-panel[open] > summary {
+    margin-bottom: 0;
+    border-bottom: 1px solid var(--gh-border-default);
+}
+
+.filter-panel-body { padding: 1rem; }
+.filter-panel-body form { margin-bottom: 0; }
+.filter-panel-body fieldset { margin-bottom: 0.5rem; }
+
+/* ------------------------------------------------------------------ */
+/* Dialogs                                                             */
+/* ------------------------------------------------------------------ */
+
+dialog > article {
+    width: 100%;
+    max-width: 40rem;
+    border-radius: 12px;
+    background-color: var(--gh-bg-overlay);
+    box-shadow: var(--gh-shadow-overlay);
+}
+
+dialog > article > header {
+    border-bottom: 1px solid var(--gh-border-muted);
+    background-color: transparent;
+}
+
+dialog > article > header > h3 { font-size: 1rem; }
+
+/* All dialog actions live in the footer: right-aligned, on one row,
+   sized to their label (Pico stretches buttons to 100% by default) and equally tall. */
+dialog > article > footer {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    align-items: stretch;
+    gap: 0.5rem;
+    border-top: 1px solid var(--gh-border-muted);
+    background-color: transparent;
+}
+
+dialog > article > footer > :is(button, [role="button"]) { margin: 0; }
+
 /* The submit button only makes sense once the local login form is on the page;
    while the form is still collapsed behind "Use local account", hide it. */
 dialog article:has(#local-login-section) > footer .local-login-submit {
     display: none;
 }
 
-/* Filter panel */
-details.filter-panel {
-    border: 1px solid var(--pico-muted-border-color);
-    border-radius: var(--pico-border-radius);
-    margin-bottom: 1.5rem;
-    overflow: hidden;
-}
+/* ------------------------------------------------------------------ */
+/* Detail pages: main column + sidebar                                 */
+/* ------------------------------------------------------------------ */
 
-details.filter-panel > summary {
-    margin-bottom: 0;
-    padding: 0.5rem 0.75rem;
-}
-
-details.filter-panel[open] > summary {
-    border-bottom: 1px solid var(--pico-muted-border-color);
-}
-
-.filter-panel-body { padding: 1rem 0.75rem; }
-.filter-panel-body form { margin-bottom: 0; }
-
-/* Collapsible tables on small screens */
-@media (max-width: 768px) {
-    table.striped thead { display: none; }
-    table.striped tr {
-        display: block;
-        margin-bottom: 1rem;
-        border: 1px solid var(--pico-muted-border-color);
-        border-radius: var(--pico-border-radius);
-        padding: 0.5rem;
-        background-color: var(--pico-card-background-color);
-    }
-    table.striped td {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        padding: 0.5rem;
-        border-bottom: 1px solid var(--pico-muted-border-color);
-        text-align: right;
-    }
-    table.striped td:last-child { border-bottom: none; }
-    table.striped td::before {
-        content: attr(data-label);
-        font-weight: bold;
-        text-align: left;
-        color: var(--pico-muted-color);
-        margin-right: 1rem;
-    }
-}
-
-/* Two-column layout with sidebar */
 .layout-with-sidebar {
     display: grid;
-    grid-template-columns: 3fr 1fr;
+    grid-template-columns: minmax(0, 3fr) minmax(0, 1fr);
     gap: 1.5rem;
 }
 
 @media (max-width: 768px) {
-    .layout-with-sidebar { grid-template-columns: 1fr; }
+    .layout-with-sidebar { grid-template-columns: minmax(0, 1fr); }
 }
 
+.layout-with-sidebar section { margin-bottom: 1.5rem; }
+
 .sidebar-section {
-    border-bottom: 1px solid var(--pico-muted-border-color);
-    padding-bottom: 0.75rem;
-    margin-bottom: 0.75rem;
+    margin-bottom: 1rem;
+    padding-bottom: 1rem;
+    border-bottom: 1px solid var(--gh-border-muted);
 }
 
 .sidebar-section:last-child {
     border-bottom: none;
-    padding-bottom: 0;
-    margin-bottom: 0;
 }
 
 .sidebar-section h4 {
-    font-size: 0.8rem;
-    text-transform: uppercase;
-    color: var(--pico-muted-color);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
     margin-bottom: 0.25rem;
+    color: var(--gh-fg-muted);
+    font-size: 0.857rem;
+    font-weight: 600;
 }
 
-/* CSS-only "select mode" toggle. The checkbox is never visible and never
-   submitted (no name attribute); it only drives sibling styles. */
+.sidebar-section p { margin-bottom: 0; }
+.sidebar-section form { margin-bottom: 0; }
+.sidebar-section form input { margin-bottom: 0.5rem; }
+
+/* ------------------------------------------------------------------ */
+/* Breadcrumb and pagination                                           */
+/* ------------------------------------------------------------------ */
+
+nav[aria-label="breadcrumb"] {
+    margin-bottom: 0.5rem;
+    font-size: 0.857rem;
+}
+nav[aria-label="breadcrumb"] ul li:last-child { font-weight: 600; }
+nav[aria-label="breadcrumb"] a { color: var(--gh-fg-muted); }
+nav[aria-label="breadcrumb"] a:hover { color: var(--gh-fg-accent); }
+
+nav[aria-label="pagination"] {
+    justify-content: center;
+    margin-top: 1rem;
+}
+
+nav[aria-label="pagination"] ul { gap: 0.25rem; }
+nav[aria-label="pagination"] li { padding: 0; }
+
+nav[aria-label="pagination"] li > :is(a, span) {
+    display: inline-block;
+    margin: 0;
+    padding: 0.25rem 0.625rem;
+    border: 1px solid transparent;
+    border-radius: 6px;
+    text-decoration: none;
+}
+
+nav[aria-label="pagination"] li > a:hover {
+    border-color: var(--gh-border-default);
+}
+
+nav[aria-label="pagination"] li > span[aria-disabled="true"] {
+    color: var(--gh-fg-muted);
+    cursor: default;
+}
+
+nav[aria-label="pagination"] li > span[aria-current="page"] {
+    color: var(--gh-fg-default);
+}
+
+/* ------------------------------------------------------------------ */
+/* Footer                                                              */
+/* ------------------------------------------------------------------ */
+
+body > footer {
+    margin-top: 2.5rem;
+    padding-top: 2.5rem;
+    padding-bottom: 2.5rem;
+    border-top: 1px solid var(--gh-border-muted);
+    color: var(--gh-fg-muted);
+    font-size: 0.857rem;
+    text-align: center;
+}
+
+body > footer p { margin-bottom: 0.5rem; color: inherit; }
+
+/* ------------------------------------------------------------------ */
+/* Home page                                                           */
+/* ------------------------------------------------------------------ */
+
+.home-intro { margin-bottom: 2rem; }
+.home-intro p { color: var(--gh-fg-muted); font-size: 1.143rem; }
+.home-intro .actions { justify-content: flex-start; }
+
+/* ------------------------------------------------------------------ */
+/* PR list: CSS-only "select mode" toggle                              */
+/* ------------------------------------------------------------------ */
+
+/* The checkbox is never visible and never submitted (no name attribute);
+   it only drives sibling styles. */
 .select-mode-toggle { display: none; }
-.select-mode-label { width: auto; margin-bottom: 0; }
+.select-mode-label { margin-bottom: 0; }
 .select-mode-label .select-mode-off { display: none; }
 .select-mode-toggle:checked ~ form .select-mode-label .select-mode-on { display: none; }
 .select-mode-toggle:checked ~ form .select-mode-label .select-mode-off { display: inline; }
-.checkbox-cell { width: 40px; text-align: center; }
+
+.table-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-bottom: 0.5rem;
+}
 
 @media (max-width: 768px) {
-    .checkbox-cell { display: none; }
-    .select-mode-toggle:checked ~ form .checkbox-cell { display: flex; width: auto; }
+    table.data-table .checkbox-cell { display: none; }
+    .select-mode-toggle:checked ~ form table.data-table .checkbox-cell { display: flex; width: auto; }
     .mobile-only { display: inline-block; }
 }
 
@@ -216,28 +868,36 @@ details.filter-panel[open] > summary {
     .mobile-only { display: none; }
 }
 
-/* Toasts */
+/* ------------------------------------------------------------------ */
+/* Toasts                                                              */
+/* ------------------------------------------------------------------ */
+
 #toast-container {
     position: fixed;
-    bottom: 20px;
-    right: 20px;
+    right: 1.5rem;
+    bottom: 1.5rem;
     z-index: 1000;
     display: flex;
     flex-direction: column;
-    gap: 10px;
+    gap: 0.5rem;
 }
 
 .toast {
-    background-color: #2e3440;
-    color: #eceff4;
-    padding: 12px 24px;
-    border-radius: 4px;
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.15);
-    font-size: 0.9rem;
+    padding: 0.75rem 1rem;
+    border: 1px solid var(--gh-border-default);
+    border-left: 4px solid var(--gh-fg-accent);
+    border-radius: 6px;
+    background-color: var(--gh-bg-overlay);
+    box-shadow: var(--gh-shadow-overlay);
+    color: var(--gh-fg-default);
     opacity: 0;
     transform: translateY(20px);
     animation: toast-in 0.3s ease forwards, toast-out 0.3s ease 5s forwards;
 }
+
+.toast-success { border-left-color: var(--gh-fg-success); }
+.toast-warning { border-left-color: var(--gh-fg-attention); }
+.toast-error { border-left-color: var(--gh-fg-danger); }
 
 @keyframes toast-in {
     to { opacity: 1; transform: translateY(0); }
@@ -248,9 +908,29 @@ details.filter-panel[open] > summary {
     to { opacity: 0; transform: translateY(20px); visibility: hidden; }
 }
 
-@media (prefers-reduced-motion: reduce) {
-    .toast { animation: none; opacity: 1; transform: none; }
+/* ------------------------------------------------------------------ */
+/* htmx                                                                */
+/* ------------------------------------------------------------------ */
+
+form.htmx-request [type="submit"],
+button.htmx-request {
+    opacity: 0.5;
+    pointer-events: none;
+    cursor: progress;
 }
 
-.toast-success { border-left: 4px solid #a3be8c; }
-.toast-error { border-left: 4px solid #bf616a; }
+.htmx-indicator { opacity: 0; transition: opacity 150ms ease; }
+.htmx-request .htmx-indicator,
+.htmx-request.htmx-indicator { opacity: 1; }
+
+/* ------------------------------------------------------------------ */
+/* Reduced motion                                                      */
+/* ------------------------------------------------------------------ */
+
+@media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+        transition: none !important;
+        animation: none !important;
+    }
+    .toast { opacity: 1; transform: none; }
+}

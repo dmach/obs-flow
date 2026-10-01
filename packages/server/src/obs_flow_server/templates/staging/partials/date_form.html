@@ -2,8 +2,10 @@
     <h4>{% if date_type == "embargo" %}Embargo Date{% else %}Release Date{% endif %}</h4>
     <form hx-post="{% url 'staging_edit_date' batch.id date_type %}" hx-target="#{{ date_type }}-date-container" hx-swap="outerHTML">
         {% csrf_token %}
-        <input type="datetime-local" name="date_value" value="{{ current_val }}">
-        <button type="submit">Save</button>
-        <button type="button" hx-get="{% url 'staging_date_display' batch.id date_type %}" hx-target="#{{ date_type }}-date-container" hx-swap="outerHTML" class="secondary outline">Cancel</button>
+        <input type="datetime-local" name="date_value" value="{{ current_val }}" aria-label="{% if date_type == 'embargo' %}Embargo date{% else %}Release date{% endif %}">
+        <div class="actions">
+            <button type="button" hx-get="{% url 'staging_date_display' batch.id date_type %}" hx-target="#{{ date_type }}-date-container" hx-swap="outerHTML" class="secondary">Cancel</button>
+            <button type="submit">Save</button>
+        </div>
     </form>
 </div>

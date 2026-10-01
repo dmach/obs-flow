@@ -11,14 +11,18 @@
     </ul>
 </nav>
 
-<h2>{{ batch.title|default:"Staging Batch" }} <span class="muted">#{{ batch.id }}</span></h2>
+<h1>{{ batch.title|default:"Staging Batch" }} <span class="muted">#{{ batch.id }}</span></h1>
+<p>
+    <span class="state" data-state="{{ batch.state }}">{{ batch.get_state_display }}</span>
+    <span class="muted">Targeting <strong>{{ batch.project.name }}</strong>, created by <strong>{{ batch.author.username|default:"Automated" }}</strong></span>
+</p>
 
 <div class="layout-with-sidebar">
     <div>
         <section>
-            <h3>Included Pull Requests</h3>
+            <h2>Included Pull Requests</h2>
             {% if pull_requests_data %}
-                <table class="striped">
+                <table class="data-table">
                     <thead>
                         <tr>
                             <th>ID</th>
@@ -30,77 +34,28 @@
                     <tbody>
                         {% for item in pull_requests_data %}
                             <tr>
-                                <td data-label="ID"><a href="{% url 'pr_detail' item.pr.id %}">{{ item.pr.target.owner }}/{{ item.pr.target.repo }}#{{ item.pr.number }}</a></td>
+                                <td data-label="ID"><a href="{% url 'pr_detail' item.pr.id %}" class="id-link">{{ item.pr.target.owner }}/{{ item.pr.target.repo }}#{{ item.pr.number }}</a></td>
                                 <td data-label="Title">{{ item.pr.title }}</td>
-                                <td data-label="Reviews">{{ item.accepted_reviews }}/{{ item.total_reviews }}</td>
-                                <td data-label="State">{{ item.pr.state }}</td>
+                                <td data-label="Reviews"><span class="counter">{{ item.accepted_reviews }}/{{ item.total_reviews }}</span></td>
+                                <td data-label="State"><span class="state state-sm" data-state="{{ item.pr.state }}">{{ item.pr.get_state_display }}</span></td>
                             </tr>
                         {% endfor %}
                     </tbody>
                 </table>
             {% else %}
-                <p class="muted">No pull requests included in this batch.</p>
+                <div class="blankslate"><p>No pull requests included in this batch.</p></div>
             {% endif %}
         </section>
 
         <section>
-            <h3>Staging Reviews (Latest Revision)</h3>
-            {% if reviews %}
-                <table class="striped">
-                    <thead>
-                        <tr>
-                            <th>Reviewer</th>
-                            <th>Actor</th>
-                            <th>State</th>
-                            <th>Date</th>
-                            <th>Justification</th>
-                            <th>URL</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for review in reviews %}
-                            <tr>
-                                <td data-label="Reviewer">
-                                    {% if review.reviewer_user %}
-                                        {{ review.reviewer_user.username }}
-                                    {% elif review.reviewer_group %}
-                                        @{{ review.reviewer_group.name }}
-                                    {% else %}
-                                        role:{{ review.dynamic_role }}
-                                    {% endif %}
-                                </td>
-                                <td data-label="Actor">
-                                    {% if review.actor %}
-                                        {% if review.reviewer_group or review.dynamic_role or review.reviewer_user != review.actor %}
-                                            {{ review.actor.username }}
-                                        {% endif %}
-                                    {% else %}
-                                        -
-                                    {% endif %}
-                                </td>
-                                <td data-label="State">{{ review.state }}</td>
-                                <td data-label="Date">{{ review.updated_at|date:"Y-m-d H:i" }}</td>
-                                <td data-label="Justification">{{ review.justification|default:"-" }}</td>
-                                <td data-label="URL">
-                                    {% if review.external_review_url %}
-                                        <a href="{{ review.external_review_url }}" target="_blank">link</a>
-                                    {% else %}
-                                        -
-                                    {% endif %}
-                                </td>
-                            </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            {% else %}
-                <p class="muted">No reviews configured or pending.</p>
-            {% endif %}
+            <h2>Staging Reviews <small class="muted">(latest revision)</small></h2>
+            {% include "partials/review_table.html" %}
         </section>
 
         <section>
-            <h3>Revisions History</h3>
+            <h2>Revisions History</h2>
             {% if revisions %}
-                <table class="striped">
+                <table class="data-table">
                     <thead>
                         <tr>
                             <th>Rev</th>
@@ -119,38 +74,32 @@
                     </tbody>
                 </table>
             {% else %}
-                <p class="muted">No revisions found.</p>
+                <div class="blankslate"><p>No revisions found.</p></div>
             {% endif %}
         </section>
     </div>
 
     <aside>
-        <article>
-            <div class="sidebar-section">
-                <h4>State</h4>
-                <p>{{ batch.state }}</p>
-            </div>
-            {% if latest_revision %}
-            <div class="sidebar-section">
-                <h4>Latest Revision</h4>
-                <p>#{{ latest_revision.revision_number }}</p>
-            </div>
-            <div class="sidebar-section">
-                <h4>Fingerprint</h4>
-                <p><code>{{ latest_revision.fingerprint|slice:":12" }}</code></p>
-            </div>
-            {% endif %}
-            <div class="sidebar-section">
-                <h4>Target Project</h4>
-                <p>{{ batch.project.name }}</p>
-            </div>
-            <div class="sidebar-section">
-                <h4>Author</h4>
-                <p>{{ batch.author.username|default:"Automated" }}</p>
-            </div>
-            {% include "staging/partials/date_display.html" with date_type="embargo" %}
-            {% include "staging/partials/date_display.html" with date_type="release" %}
-        </article>
+        {% if latest_revision %}
+        <div class="sidebar-section">
+            <h4>Latest Revision</h4>
+            <p>#{{ latest_revision.revision_number }}</p>
+        </div>
+        <div class="sidebar-section">
+            <h4>Fingerprint</h4>
+            <p><code>{{ latest_revision.fingerprint|slice:":12" }}</code></p>
+        </div>
+        {% endif %}
+        <div class="sidebar-section">
+            <h4>Target Project</h4>
+            <p>{{ batch.project.name }}</p>
+        </div>
+        <div class="sidebar-section">
+            <h4>Author</h4>
+            <p>{{ batch.author.username|default:"Automated" }}</p>
+        </div>
+        {% include "staging/partials/date_display.html" with date_type="embargo" %}
+        {% include "staging/partials/date_display.html" with date_type="release" %}
     </aside>
 </div>
 {% endblock %}

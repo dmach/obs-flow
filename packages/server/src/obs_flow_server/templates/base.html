@@ -8,55 +8,51 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="color-scheme" content="light dark">
     <title>{% block title %}OBS Flow{% endblock %}</title>
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css">
+    <link rel="icon" type="image/svg+xml" href="{% static 'img/logo.svg' %}">
+    <link rel="stylesheet" href="{% static 'vendor/pico/pico.min.css' %}">
     <link rel="stylesheet" href="{% static 'css/flow.css' %}">
     <script src="{% static 'js/flow.js' %}"></script>
-    <script src="https://unpkg.com/htmx.org@4.0.0/dist/htmx.min.js"></script>
+    <script src="{% static 'vendor/htmx/htmx.min.js' %}"></script>
 </head>
 {# hx-headers:inherited is inherited by every htmx request on the page, so all non-GET #}
 {# requests carry the CSRF token without any JavaScript. Rendering the token #}
 {# here also makes Django set the csrftoken cookie on every page. #}
 <body hx-headers:inherited='{"X-CSRFToken": "{{ csrf_token }}"}'>
-    <header class="navbar-container">
-        <nav class="container">
-            <ul>
-                <li><strong><a href="{% url 'home' %}">OBS Flow</a></strong></li>
-            </ul>
-            <ul class="desktop-menu">
-                <li><a href="{% url 'git_mapping_list' %}">Git Mappings</a></li>
-                <li><a href="{% url 'pr_list' %}">Pull Requests</a></li>
-                <li><a href="{% url 'staging_list' %}">Staging Batches</a></li>
-                {% if user.is_authenticated %}
-                    <li>
-                        <details class="dropdown" dir="rtl">
-                            <summary dir="ltr"><strong>{{ user.username }}</strong></summary>
-                            <ul>
-                                <li><a href="{% url 'preferences' %}">Preferences</a></li>
-                                <li><a href="{% url 'token_list' %}">Tokens</a></li>
-                                <li><a href="#" hx-post="{% url 'logout' %}" hx-trigger="click">Logout</a></li>
-                            </ul>
-                        </details>
-                    </li>
-                {% else %}
-                    <li><a href="{% url 'login' %}?next={{ request.path|urlencode }}" hx-get="{% url 'login' %}?next={{ request.path|urlencode }}" hx-target="#modal-container" hx-swap="innerHTML">Log In</a></li>
-                {% endif %}
-            </ul>
-            <details class="mobile-menu dropdown">
-                <summary role="button" class="secondary outline">Menu</summary>
-                <ul dir="rtl">
-                    <li><a href="{% url 'git_mapping_list' %}">Git Mappings</a></li>
-                    <li><a href="{% url 'pr_list' %}">Pull Requests</a></li>
-                    <li><a href="{% url 'staging_list' %}">Staging Batches</a></li>
+    {% url 'git_mapping_list' as git_mapping_url %}
+    {% url 'pr_list' as pr_url %}
+    {% url 'staging_list' as staging_url %}
+    <header class="app-header">
+        <div class="container app-header-top">
+            <a href="{% url 'home' %}" class="app-brand">
+                {% include "partials/logo.svg" %}
+                <span>OBS Flow</span>
+            </a>
+            <nav aria-label="Account">
+                <ul>
                     {% if user.is_authenticated %}
-                        <li><a href="{% url 'preferences' %}">Preferences</a></li>
-                        <li><a href="{% url 'token_list' %}">Tokens</a></li>
-                        <li>Logged in as <strong>{{ user.username }}</strong></li>
-                        <li><a href="#" hx-post="{% url 'logout' %}" hx-trigger="click">Logout</a></li>
+                        <li>
+                            <details class="dropdown">
+                                <summary>{{ user.username }}</summary>
+                                <ul dir="rtl">
+                                    <li><a href="{% url 'preferences' %}">Preferences</a></li>
+                                    <li><a href="{% url 'token_list' %}">Tokens</a></li>
+                                    <li><a href="{% url 'bookmark_list' %}">Bookmarks</a></li>
+                                    <li><a href="#" hx-post="{% url 'logout' %}" hx-trigger="click">Logout</a></li>
+                                </ul>
+                            </details>
+                        </li>
                     {% else %}
                         <li><a href="{% url 'login' %}?next={{ request.path|urlencode }}" hx-get="{% url 'login' %}?next={{ request.path|urlencode }}" hx-target="#modal-container" hx-swap="innerHTML">Log In</a></li>
                     {% endif %}
                 </ul>
-            </details>
+            </nav>
+        </div>
+        <nav class="container app-tabs" aria-label="Main">
+            <ul>
+                <li><a href="{{ git_mapping_url }}"{% if git_mapping_url in request.path %} aria-current="page"{% endif %}>Git Mappings</a></li>
+                <li><a href="{{ pr_url }}"{% if pr_url in request.path %} aria-current="page"{% endif %}>Pull Requests</a></li>
+                <li><a href="{{ staging_url }}"{% if staging_url in request.path %} aria-current="page"{% endif %}>Staging Batches</a></li>
+            </ul>
         </nav>
     </header>
 
@@ -68,22 +64,22 @@
     {% include "partials/toasts.html" %}
 
     <footer class="container">
-        <small>
-            {% if request.user.is_authenticated %}
+        {% if request.user.is_authenticated %}
+        <p>
             <strong>Bookmarks:</strong>
             {% for bookmark in bookmarks %}
-                <a href="{{ bookmark.url }}" class="secondary">{{ bookmark.name }}</a> &bull;
+                <a href="{{ bookmark.url }}" class="secondary">{{ bookmark.name }}</a> &middot;
             {% endfor %}
-            <a href="#" hx-get="{% url 'bookmark_create' %}?url={{ request.get_full_path|urlencode }}" hx-target="#modal-container" class="secondary"><em>Save this page</em></a> &bull;
-            <a href="{% url 'bookmark_list' %}" class="secondary"><em>Manage Bookmarks</em></a>
-            </div>
-            <br>
-            {% endif %}
-            <a href="#" class="secondary">Documentation</a> &bull;
-            <a href="#" class="secondary">File a bug</a> &bull;
-            <a href="#" class="secondary">Support</a> &bull;
+            <a href="#" hx-get="{% url 'bookmark_create' %}?url={{ request.get_full_path|urlencode }}" hx-target="#modal-container" class="secondary">Save this page</a> &middot;
+            <a href="{% url 'bookmark_list' %}" class="secondary">Manage bookmarks</a>
+        </p>
+        {% endif %}
+        <p>
+            <a href="#" class="secondary">Documentation</a> &middot;
+            <a href="#" class="secondary">File a bug</a> &middot;
+            <a href="#" class="secondary">Support</a> &middot;
             <a href="#" class="secondary">Source Code</a>
-        </small>
+        </p>
     </footer>
 </body>
 </html>

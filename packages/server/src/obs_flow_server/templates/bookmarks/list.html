@@ -3,51 +3,40 @@
 {% block title %}Bookmarks - OBS Flow{% endblock %}
 
 {% block content %}
-<section>
-    <div class="page-header">
-        <h2>Bookmarks <span class="badge">{{ bookmarks|length }}</span></h2>
-        <div>
-            <button class="secondary outline"
-                    hx-post="{% url 'bookmark_delete_confirm' %}"
-                    hx-target="#modal-container"
-                    hx-include="[name='selected_bookmarks']">
-                Delete Selected
-            </button>
-        </div>
-    </div>
-    <p class="muted">Manage your saved relative URLs and filters.</p>
+<div class="page-header">
+    <h1>Bookmarks <span class="counter">{{ bookmarks|length }}</span></h1>
+    <button class="danger"
+            hx-post="{% url 'bookmark_delete_confirm' %}"
+            hx-target="#modal-container"
+            hx-include="[name='selected_bookmarks']">
+        Delete Selected
+    </button>
+</div>
+<p class="muted">Manage your saved relative URLs and filters.</p>
 
-    <form id="bulk-delete-form">
-        <table class="striped">
-            <thead>
+<form id="bulk-delete-form">
+    <table class="data-table">
+        <thead>
+            <tr>
+                <th class="checkbox-cell">
+                    <input type="checkbox" data-select-all="selected_bookmarks" aria-label="Select all bookmarks">
+                </th>
+                <th>Name</th>
+                <th>URL</th>
+                <th><span class="visually-hidden">Actions</span></th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for bookmark in bookmarks %}
+                {% include "bookmarks/partials/inline_row.html" %}
+            {% empty %}
                 <tr>
-                    <th class="checkbox-cell">
-                        <input type="checkbox" id="select-all-bookmarks" onclick="toggleAllBookmarks(this)">
-                    </th>
-                    <th>Name</th>
-                    <th>URL</th>
-                    <th>Actions</th>
+                    <td colspan="4" class="muted">
+                        No bookmarks saved yet.
+                    </td>
                 </tr>
-            </thead>
-            <tbody>
-                {% for bookmark in bookmarks %}
-                    {% include "bookmarks/partials/inline_row.html" %}
-                {% empty %}
-                    <tr>
-                        <td colspan="4" class="muted">
-                            No bookmarks saved yet.
-                        </td>
-                    </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-    </form>
-</section>
-
-<script>
-function toggleAllBookmarks(master) {
-    const checkboxes = document.querySelectorAll('input[name="selected_bookmarks"]');
-    checkboxes.forEach(cb => cb.checked = master.checked);
-}
-</script>
+            {% endfor %}
+        </tbody>
+    </table>
+</form>
 {% endblock %}

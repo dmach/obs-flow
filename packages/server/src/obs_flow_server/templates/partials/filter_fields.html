@@ -1,0 +1,10 @@
+{# One row of filter fields; each field may come with an "exact match" checkbox. #}
+<div class="grid">
+    {% for field, exact_field in fields %}
+    <div>
+        {{ field.label_tag }}
+        {{ field }}
+        {% if exact_field %}<label>{{ exact_field }} {{ exact_field.label }}</label>{% endif %}
+    </div>
+    {% endfor %}
+</div>

@@ -3,7 +3,9 @@
 {% block title %}Staging Batches - OBS Flow{% endblock %}
 
 {% block content %}
-<h2>Staging Batches <small>{{ total_count }}</small></h2>
+<div class="page-header">
+    <h1>Staging Batches <span class="counter">{{ total_count }}</span></h1>
+</div>
 
 <details class="filter-panel" {% if base_query %}open{% endif %}>
     <summary>Search &amp; Filters</summary>
@@ -11,64 +13,34 @@
         <form method="GET" action="" data-clean-url="true">
             <fieldset>
                 <legend>Target Filter</legend>
-                <div class="grid">
-                    {% for field, exact_field in form.target_fields %}
-                    <div>
-                        {{ field.label_tag }}
-                        {{ field }}
-                        {% if exact_field %}<label>{{ exact_field }} {{ exact_field.label }}</label>{% endif %}
-                    </div>
-                    {% endfor %}
-                </div>
+                {% include "partials/filter_fields.html" with fields=form.target_fields %}
             </fieldset>
 
             <fieldset>
                 <legend>PR Filter</legend>
-                <div class="grid">
-                    {% for field, exact_field in form.pr_fields %}
-                    <div>
-                        {{ field.label_tag }}
-                        {{ field }}
-                        {% if exact_field %}<label>{{ exact_field }} {{ exact_field.label }}</label>{% endif %}
-                    </div>
-                    {% endfor %}
-                </div>
+                {% include "partials/filter_fields.html" with fields=form.pr_fields %}
             </fieldset>
 
             <fieldset>
                 <legend>PR Source Filter</legend>
-                <div class="grid">
-                    {% for field, exact_field in form.pr_source_fields %}
-                    <div>
-                        {{ field.label_tag }}
-                        {{ field }}
-                        {% if exact_field %}<label>{{ exact_field }} {{ exact_field.label }}</label>{% endif %}
-                    </div>
-                    {% endfor %}
-                </div>
+                {% include "partials/filter_fields.html" with fields=form.pr_source_fields %}
             </fieldset>
 
             <fieldset>
                 <legend>PR Target Filter</legend>
-                <div class="grid">
-                    {% for field, exact_field in form.pr_target_fields %}
-                    <div>
-                        {{ field.label_tag }}
-                        {{ field }}
-                        {% if exact_field %}<label>{{ exact_field }} {{ exact_field.label }}</label>{% endif %}
-                    </div>
-                    {% endfor %}
-                </div>
+                {% include "partials/filter_fields.html" with fields=form.pr_target_fields %}
             </fieldset>
 
-            <a href="?" role="button" class="secondary outline">Reset</a>
-            <button type="submit">Apply Filter</button>
+            <div class="actions">
+                <a href="?" role="button" class="secondary">Reset</a>
+                <button type="submit">Apply Filter</button>
+            </div>
         </form>
     </div>
 </details>
 
 {% if page_obj %}
-    <table class="striped">
+    <table class="data-table">
         <thead>
             <tr>
                 <th>
@@ -106,40 +78,21 @@
         <tbody>
             {% for batch in page_obj %}
                 <tr>
-                    <td data-label="ID"><a href="{% url 'staging_detail' batch.id %}">#{{ batch.id }}</a></td>
+                    <td data-label="ID"><a href="{% url 'staging_detail' batch.id %}" class="id-link">#{{ batch.id }}</a></td>
                     <td data-label="Title">{{ batch.title|default:"(No Title)" }}</td>
                     <td data-label="Project">{{ batch.project.name }}</td>
                     <td data-label="Author">{{ batch.author.username|default:"(Automated)" }}</td>
-                    <td data-label="State">{{ batch.state }}</td>
+                    <td data-label="State"><span class="state state-sm" data-state="{{ batch.state }}">{{ batch.get_state_display }}</span></td>
                 </tr>
             {% endfor %}
         </tbody>
     </table>
 
-    {% if page_obj.has_other_pages %}
-    <nav aria-label="pagination">
-        <ul>
-            {% if page_obj.has_previous %}
-            <li><a href="?page=1{{ filter_query }}">First</a></li>
-            <li><a href="?page={{ page_obj.previous_page_number }}{{ filter_query }}">Previous</a></li>
-            {% else %}
-            <li><span aria-disabled="true">First</span></li>
-            <li><span aria-disabled="true">Previous</span></li>
-            {% endif %}
-
-            <li>Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</li>
-
-            {% if page_obj.has_next %}
-            <li><a href="?page={{ page_obj.next_page_number }}{{ filter_query }}">Next</a></li>
-            <li><a href="?page={{ page_obj.paginator.num_pages }}{{ filter_query }}">Last</a></li>
-            {% else %}
-            <li><span aria-disabled="true">Next</span></li>
-            <li><span aria-disabled="true">Last</span></li>
-            {% endif %}
-        </ul>
-    </nav>
-    {% endif %}
+    {% include "partials/pagination.html" %}
 {% else %}
-    <p class="muted">No staging batches found.</p>
+    <div class="blankslate">
+        <h3>No staging batches found</h3>
+        {% if base_query %}<p>Try changing or <a href="?">resetting the filters</a>.</p>{% endif %}
+    </div>
 {% endif %}
 {% endblock %}

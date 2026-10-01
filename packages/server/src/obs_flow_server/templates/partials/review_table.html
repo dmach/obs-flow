@@ -1,0 +1,52 @@
+{% if reviews %}
+    <table class="data-table">
+        <thead>
+            <tr>
+                <th>Reviewer</th>
+                <th>Actor</th>
+                <th>State</th>
+                <th>Date</th>
+                <th>Justification</th>
+                <th>URL</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for review in reviews %}
+                <tr>
+                    <td data-label="Reviewer">
+                        {% if review.reviewer_user %}
+                            {{ review.reviewer_user.username }}
+                        {% elif review.reviewer_group %}
+                            @{{ review.reviewer_group.name }}
+                        {% else %}
+                            role:{{ review.dynamic_role }}
+                        {% endif %}
+                    </td>
+                    <td data-label="Actor">
+                        {% if review.actor %}
+                            {% if review.reviewer_group or review.dynamic_role or review.reviewer_user != review.actor %}
+                                {{ review.actor.username }}
+                            {% endif %}
+                        {% else %}
+                            <span class="muted">-</span>
+                        {% endif %}
+                    </td>
+                    <td data-label="State"><span class="label" data-state="{{ review.state }}">{{ review.get_state_display }}</span></td>
+                    <td data-label="Date">{{ review.updated_at|date:"Y-m-d H:i" }}</td>
+                    <td data-label="Justification">{{ review.justification|default:"-" }}</td>
+                    <td data-label="URL">
+                        {% if review.external_review_url %}
+                            <a href="{{ review.external_review_url }}" target="_blank" rel="noopener">link</a>
+                        {% else %}
+                            <span class="muted">-</span>
+                        {% endif %}
+                    </td>
+                </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+{% else %}
+    <div class="blankslate">
+        <p>No reviews configured or pending.</p>
+    </div>
+{% endif %}

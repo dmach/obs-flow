@@ -5,7 +5,7 @@
     {% if form.errors %}
         {% for field, errors in form.errors.items %}
             {% for error in errors %}
-                <p class="muted">{{ error }}</p>
+                <p class="error">{{ error }}</p>
             {% endfor %}
         {% endfor %}
     {% endif %}
