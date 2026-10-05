@@ -63,4 +63,5 @@
 - packages should be located under packages/<prefix>/<name>
 - reconsider using submodules - forking a project frequently leads to broken submodule paths (they're relative; ../../owner/repo usually works, ../repo does not)
 - glossary
+- package maintainers are frequently creating TODO lists with a matrix of what needs to be done across several projects/packages to fix a bug; some built-in tool might be nice
 
