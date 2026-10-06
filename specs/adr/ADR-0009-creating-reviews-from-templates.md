@@ -21,8 +21,9 @@ the system must determine which reviews are required and instantiate concrete re
 ## Decision
 We use declarative templates to instantiate review records on each revision:
 
-1. **Review Templates:** Defined at the project level, templates specify context (`project`, `package`, or `staging`)
-   and assign reviewer targets (users, groups, or dynamic roles like maintainers).
+1. **Review Templates:** Review configuration stored in a dabatabase, mapped to projects.
+   They specify type (`project`, `package`, or `staging`) that determine if the reviews apply to project PRs, package PRs or staging
+   and assign reviewers (users, groups, or dynamic roles like maintainers).
 2. **Per-Revision Instantiation:** When a revision is created, matching templates are cloned into discrete review records
    bound to that specific revision with an initial `PENDING` state. Reviews are strictly revision-scoped and never shared across revisions.
 3. **Actor Tracking:** Templates define policy (who *should* review), while review records capture execution (who *actually* reviewed).
