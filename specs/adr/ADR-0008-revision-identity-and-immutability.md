@@ -21,8 +21,14 @@ We model pull request and staging batch revisions as immutable, uniquely identif
 1. **PR Revision Fingerprint:** A deterministic SHA-256 fingerprint computed from:
    - Head commit SHA (source tree).
    - Base commit SHA (merge base).
-   - Canonical digest of review-critical metadata (e.g., target branch, bug/CVE links, justifications).
-2. **Staging Batch Revision Fingerprint:** A deterministic fingerprint computed from the sorted list of included PR revision fingerprints and any batch-level metadata.
+   - Canonical digest of review-critical metadata (e.g., target branch, justifications).
+2. **Staging Batch Revision Fingerprint:** A deterministic SHA-256 fingerprinte computed from:
+   - Sorted list of included PR revision fingerprints
+   - Canonical digest of review-critical metadata (e.g. justifications).
+3. **Revision Fingerprint Backwards Compatibility:** Revision Fingerprints MUST remain stable even if new fields are added to the hashed data.
+   - **Format:** UTF-8 encoded, minified JSON (no whitespace outside string values, no newlines).
+   - **Ordering:** All JSON object keys and list values MUST be sorted lexicographically.
+   - **Default Omission:** Any new fields added to the schema in the future MUST be optional. When serializing for hashing, all fields with `null` or default values MUST be strictly omitted. This guarantees that older revisions lacking the new fields serialize to the exact same string and maintain an identical hash.
 3. **Immutability:** Revisions are strictly immutable. Any change to the fingerprint inputs spawns a new revision; past revisions are never altered or deleted.
 4. **Strict Binding:** Reviews, test runs, and batch memberships attach exclusively to a specific revision, never to the mutable pull request itself.
 5. **Git-Hook Merge Guard:** A server-side pre-receive hook verifies that:
