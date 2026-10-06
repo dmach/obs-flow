@@ -3,10 +3,12 @@
     "model": "accounts.user",
     "pk": 1,
     "fields": {
-      "username": "darix",
-      "username_lower": "darix",
-      "full_name": "Marcus Rueckert",
-      "email": "mrueckert@suse.com",
+      "username": "admin",
+      "username_lower": "admin",
+      "password": "pbkdf2_sha256$1500000$SyGlv7I8b1rWsrzEOk8KYt$zfAS8cd1jAJS1GUirZw8gUEmKtuHBkA9VRWwV1OgbH0=",
+      "is_local_account": true,
+      "full_name": "Administrator",
+      "email": "admin@opensuse.org",
       "account_type": "human",
       "is_active": true
     }
@@ -15,22 +17,40 @@
     "model": "accounts.user",
     "pk": 2,
     "fields": {
-      "username": "factory-auto",
-      "username_lower": "factory-auto",
-      "account_type": "bot",
-      "is_active": true
+      "username": "darix",
+      "username_lower": "darix",
+      "full_name": "Marcus Rueckert",
+      "email": "mrueckert@suse.com",
+      "account_type": "human",
+      "is_active": true,
+      "password": "pbkdf2_sha256$1500000$SyGlv7I8b1rWsrzEOk8KYt$zfAS8cd1jAJS1GUirZw8gUEmKtuHBkA9VRWwV1OgbH0=",
+      "is_local_account": true
     }
   },
   {
     "model": "accounts.user",
     "pk": 3,
     "fields": {
+      "username": "factory-auto",
+      "username_lower": "factory-auto",
+      "account_type": "bot",
+      "is_active": true,
+      "password": "pbkdf2_sha256$1500000$SyGlv7I8b1rWsrzEOk8KYt$zfAS8cd1jAJS1GUirZw8gUEmKtuHBkA9VRWwV1OgbH0=",
+      "is_local_account": true
+    }
+  },
+  {
+    "model": "accounts.user",
+    "pk": 4,
+    "fields": {
       "username": "dimstar",
       "username_lower": "dimstar",
       "full_name": "Dominique Leuenberger",
       "email": "dimstar@opensuse.org",
       "account_type": "human",
-      "is_active": true
+      "is_active": true,
+      "password": "pbkdf2_sha256$1500000$SyGlv7I8b1rWsrzEOk8KYt$zfAS8cd1jAJS1GUirZw8gUEmKtuHBkA9VRWwV1OgbH0=",
+      "is_local_account": true
     }
   },
   {
@@ -53,7 +73,7 @@
     "model": "accounts.usergroup",
     "pk": 1,
     "fields": {
-      "user": 1,
+      "user": 2,
       "group": 1
     }
   },
@@ -61,7 +81,7 @@
     "model": "accounts.usergroup",
     "pk": 2,
     "fields": {
-      "user": 3,
+      "user": 4,
       "group": 1
     }
   },
@@ -69,7 +89,7 @@
     "model": "accounts.usergroup",
     "pk": 3,
     "fields": {
-      "user": 3,
+      "user": 4,
       "group": 2
     }
   },
@@ -92,12 +112,182 @@
     }
   },
   {
+    "model": "core.project",
+    "pk": 2,
+    "fields": {
+      "name": "openSUSE:Leap:16.1"
+    }
+  },
+  {
+    "model": "core.project",
+    "pk": 3,
+    "fields": {
+      "name": "openSUSE:Leap:16.0"
+    }
+  },
+  {
+    "model": "core.package",
+    "pk": 1,
+    "fields": {
+      "project": 2,
+      "name": "osc"
+    }
+  },
+  {
+    "model": "core.package",
+    "pk": 2,
+    "fields": {
+      "project": 3,
+      "name": "osc"
+    }
+  },
+  {
+    "model": "core.gitmapping",
+    "pk": 2,
+    "fields": {
+      "owner": "openSUSE",
+      "repo": "Leap",
+      "branch": "leap-16.1",
+      "project": 2,
+      "package": null
+    }
+  },
+  {
+    "model": "core.gitmapping",
+    "pk": 3,
+    "fields": {
+      "owner": "pool",
+      "repo": "osc",
+      "branch": "leap-16.1",
+      "project": null,
+      "package": 1
+    }
+  },
+  {
+    "model": "core.gitmapping",
+    "pk": 4,
+    "fields": {
+      "owner": "openSUSE",
+      "repo": "Leap",
+      "branch": "leap-16.0",
+      "project": 3,
+      "package": null
+    }
+  },
+  {
+    "model": "core.gitmapping",
+    "pk": 5,
+    "fields": {
+      "owner": "pool",
+      "repo": "osc",
+      "branch": "leap-16.0",
+      "project": null,
+      "package": 2
+    }
+  },
+  {
+    "model": "reviews.reviewconfig",
+    "pk": 1,
+    "fields": {
+      "project": 2,
+      "type": "package",
+      "reviewer_user": 3,
+      "reviewer_group": null,
+      "dynamic_role": null,
+      "depends_on": []
+    }
+  },
+  {
+    "model": "reviews.reviewconfig",
+    "pk": 2,
+    "fields": {
+      "project": 2,
+      "type": "package",
+      "reviewer_user": null,
+      "reviewer_group": 1,
+      "dynamic_role": null,
+      "depends_on": []
+    }
+  },
+  {
+    "model": "reviews.reviewconfig",
+    "pk": 3,
+    "fields": {
+      "project": 2,
+      "type": "package",
+      "reviewer_user": 2,
+      "reviewer_group": null,
+      "dynamic_role": null,
+      "depends_on": []
+    }
+  },
+  {
+    "model": "reviews.reviewconfig",
+    "pk": 4,
+    "fields": {
+      "project": 2,
+      "type": "package",
+      "reviewer_user": null,
+      "reviewer_group": null,
+      "dynamic_role": "maintainer",
+      "depends_on": []
+    }
+  },
+  {
+    "model": "reviews.reviewconfig",
+    "pk": 5,
+    "fields": {
+      "project": 3,
+      "type": "package",
+      "reviewer_user": 3,
+      "reviewer_group": null,
+      "dynamic_role": null,
+      "depends_on": []
+    }
+  },
+  {
+    "model": "reviews.reviewconfig",
+    "pk": 6,
+    "fields": {
+      "project": 3,
+      "type": "package",
+      "reviewer_user": null,
+      "reviewer_group": 1,
+      "dynamic_role": null,
+      "depends_on": []
+    }
+  },
+  {
+    "model": "reviews.reviewconfig",
+    "pk": 7,
+    "fields": {
+      "project": 3,
+      "type": "package",
+      "reviewer_user": 2,
+      "reviewer_group": null,
+      "dynamic_role": null,
+      "depends_on": []
+    }
+  },
+  {
+    "model": "reviews.reviewconfig",
+    "pk": 8,
+    "fields": {
+      "project": 3,
+      "type": "package",
+      "reviewer_user": null,
+      "reviewer_group": null,
+      "dynamic_role": "maintainer",
+      "depends_on": []
+    }
+  },
+  {
     "model": "pull_requests.pullrequest",
     "pk": 1,
     "fields": {
       "target": 1,
       "number": 1234,
-      "author": 2,
+      "author": 3,
       "title": "Pull Request #1234 for openSUSE/osc",
       "source_owner": "openSUSE",
       "source_repo": "osc",
@@ -121,7 +311,7 @@
     "pk": 1,
     "fields": {
       "revision": 1,
-      "reviewer_user": 2,
+      "reviewer_user": 3,
       "reviewer_group": null,
       "dynamic_role": null,
       "depends_on": [],
@@ -143,7 +333,7 @@
       "reviewer_group": 1,
       "dynamic_role": null,
       "depends_on": [],
-      "actor": 1,
+      "actor": 2,
       "state": "rejected",
       "justification": "Missing changelog entry. Please update the .changes file.",
       "external_review_url": "https://github.com/openSUSE/osc/pull/1234#pullrequestreview-123456",
@@ -161,7 +351,7 @@
       "reviewer_group": 2,
       "dynamic_role": null,
       "depends_on": [],
-      "actor": 3,
+      "actor": 4,
       "state": "accepted",
       "justification": "Looks good to me.",
       "external_review_url": null,
@@ -176,7 +366,7 @@
     "fields": {
       "project": 1,
       "title": "Staging Batch #1",
-      "author": 1,
+      "author": 2,
       "state": "collecting",
       "created_at": "2026-08-12T12:00:00Z",
       "updated_at": "2026-08-12T12:00:00Z"
@@ -197,7 +387,7 @@
     "pk": 1,
     "fields": {
       "revision": 1,
-      "reviewer_user": 1,
+      "reviewer_user": 2,
       "reviewer_group": null,
       "dynamic_role": null,
       "depends_on": [],
@@ -208,6 +398,54 @@
       "locked_by": null,
       "locked_until": null,
       "updated_at": "2026-08-12T12:00:00Z"
+    }
+  },
+  {
+    "model": "accounts.token",
+    "pk": 1,
+    "fields": {
+      "user": 1,
+      "last_eight": "ow-admin",
+      "token_hash": "8026947a75f3c7751485961a4455483cf481d4d5dc4f909050d74ee374cb1b9e",
+      "description": "Default test token",
+      "created_at": "2026-08-12T12:00:00Z",
+      "last_used_at": null
+    }
+  },
+  {
+    "model": "accounts.token",
+    "pk": 2,
+    "fields": {
+      "user": 2,
+      "last_eight": "ow-darix",
+      "token_hash": "a7985a1d0c07abf0415c8ab81c3b40639c16d994c16060dc9656fd6af0552b0b",
+      "description": "Default test token",
+      "created_at": "2026-08-12T12:00:00Z",
+      "last_used_at": null
+    }
+  },
+  {
+    "model": "accounts.token",
+    "pk": 3,
+    "fields": {
+      "user": 3,
+      "last_eight": "ory-auto",
+      "token_hash": "7a5baca6afd0f8c0164897c5ed7e002ff4ee406e4f67e9875764d307a4bd6112",
+      "description": "Default test token",
+      "created_at": "2026-08-12T12:00:00Z",
+      "last_used_at": null
+    }
+  },
+  {
+    "model": "accounts.token",
+    "pk": 4,
+    "fields": {
+      "user": 4,
+      "last_eight": "-dimstar",
+      "token_hash": "6fe3101d444f0a4d2312376933aea7a8cd81cdfe8c35787889d913339751a2a1",
+      "description": "Default test token",
+      "created_at": "2026-08-12T12:00:00Z",
+      "last_used_at": null
     }
   }
 ]
