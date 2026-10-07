@@ -65,4 +65,5 @@
 - glossary
 - package maintainers are frequently creating TODO lists with a matrix of what needs to be done across several projects/packages to fix a bug; some built-in tool might be nice
 - consider if we should be able to override git username and email on server; we want people to use their official identity, but in general they can set arbitrary values locally and push a commit
+- alternative to `osc mr -m ... prj pac1 pac2 pac3 ... release-project` that will automatically group the related pull requests; maybe some form of staging that groups PRs from a devel project automatically?
 
