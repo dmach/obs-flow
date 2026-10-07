@@ -32,7 +32,7 @@
                     {% if user.is_authenticated %}
                         <li>
                             <details class="dropdown">
-                                <summary>{{ user.username }}</summary>
+                                <summary><img src="{% static 'img/icons/person-16.svg' %}" /> {{ user.username }}</summary>
                                 <ul dir="rtl">
                                     <li><a href="{% url 'preferences' %}">Preferences</a></li>
                                     <li><a href="{% url 'token_list' %}">Tokens</a></li>
@@ -49,9 +49,11 @@
         </div>
         <nav class="container app-tabs" aria-label="Main">
             <ul>
-                <li><a href="{{ git_mapping_url }}"{% if git_mapping_url in request.path %} aria-current="page"{% endif %}>Git Mappings</a></li>
-                <li><a href="{{ pr_url }}"{% if pr_url in request.path %} aria-current="page"{% endif %}>Pull Requests</a></li>
-                <li><a href="{{ staging_url }}"{% if staging_url in request.path %} aria-current="page"{% endif %}>Staging Batches</a></li>
+                <li><a href="{{ git_mapping_url }}"{% if git_mapping_url in request.path %} aria-current="page"{% endif %}><img src="{% static 'img/icons/git-branch-16.svg' %}" />Git Mappings</a></li>
+                <li><a href="#"><img src="{% static 'img/icons/project-16.svg' %}" />Projects</a></li>
+                <li><a href="#"><img src="{% static 'img/icons/package-16.svg' %}" />Packages</a></li>
+                <li><a href="{{ pr_url }}"{% if pr_url in request.path %} aria-current="page"{% endif %}><img src="{% static 'img/icons/git-pull-request-16.svg' %}" /> Pull Requests</a></li>
+                <li><a href="{{ staging_url }}"{% if staging_url in request.path %} aria-current="page"{% endif %}><img src="{% static 'img/icons/iterations-16.svg' %}" />Staging Batches</a></li>
             </ul>
         </nav>
     </header>

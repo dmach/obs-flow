@@ -317,8 +317,15 @@ body > header.app-header {
 }
 
 .app-tabs a {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.286rem;
     margin: 0;
     white-space: nowrap;
+}
+
+.app-tabs a img {
+    flex: none;
 }
 
 .app-tabs a[aria-current="page"] {
