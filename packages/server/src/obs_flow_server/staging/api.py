@@ -41,18 +41,22 @@ def pr_to_id(pr: PullRequest) -> str:
     return f"{pr.target.owner}/{pr.target.repo}#{pr.number}"
 
 
-def compute_staging_fingerprint(pr_revisions) -> str:
+def compute_staging_fingerprint(batch: StagingBatch, pr_revisions) -> str:
     """
-    Computes a SHA-256 fingerprint of the sorted list of PR revisions.
-    Each PR revision is formatted as "owner/repo#number.revision_number".
+    Computes a deterministic SHA-256 fingerprint of the staging batch.
     """
-    formatted_revs = []
+    from staging.fingerprint import StagingBatchPayload
+
+    pr_fingerprints = []
     for pr_rev in pr_revisions:
-        pr = pr_rev.pull_request
-        formatted_revs.append(f"{pr.target.owner}/{pr.target.repo}#{pr.number}.{pr_rev.revision_number}")
-    formatted_revs.sort()
-    content = "\n".join(formatted_revs)
-    return hashlib.sha256(content.encode("utf-8")).hexdigest()
+        if not pr_rev.fingerprint:
+            raise ValueError(f"PullRequestRevision {pr_rev.id} is missing a fingerprint.")
+        pr_fingerprints.append(pr_rev.fingerprint)
+
+    payload = StagingBatchPayload(
+        pr_revisions=pr_fingerprints,
+    )
+    return payload.compute_fingerprint()
 
 
 def create_staging_revision(batch: StagingBatch, pr_revisions) -> StagingBatchRevision:
@@ -62,7 +66,7 @@ def create_staging_revision(batch: StagingBatch, pr_revisions) -> StagingBatchRe
     Otherwise, it increments the revision number, creates the new revision, links the PR revisions,
     and re-creates pending StagingReviews based on ReviewConfig.
     """
-    fingerprint = compute_staging_fingerprint(pr_revisions)
+    fingerprint = compute_staging_fingerprint(batch, pr_revisions)
     latest_rev = batch.revisions.order_by("-revision_number").first()
 
     if latest_rev and latest_rev.fingerprint == fingerprint:
