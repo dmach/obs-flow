@@ -319,3 +319,55 @@ class FingerprintTests(TestCase):
         # Verify defaults/None omitted
         payload2 = DummyPayload(items=["a"], name=None)
         self.assertEqual(payload2._to_canonical_json(), b'{"items":["a"]}')
+
+
+class TestProjectAPI(TransactionTestCase):
+    def setUp(self):
+        self.proj_factory = Project.objects.create(name="openSUSE:Factory", workflow_type=Project.WorkflowType.STAGING)
+        self.proj_leap = Project.objects.create(name="openSUSE:Leap:16.0", workflow_type=Project.WorkflowType.DIRECT)
+
+    def test_list_projects(self):
+        with TestClient(api) as client:
+            response = client.post("/api/v1/project/list", content="{}")
+        self.assertEqual(response.status_code, 200)
+        res_data = response.json()
+        projects = res_data["projects"]
+        self.assertEqual(len(projects), 2)
+        self.assertEqual(projects[0]["name"], "openSUSE:Factory")
+        self.assertEqual(projects[0]["workflow_type"], "staging")
+        self.assertEqual(projects[1]["name"], "openSUSE:Leap:16.0")
+        self.assertEqual(projects[1]["workflow_type"], "direct")
+
+    def test_update_project_workflow_type(self):
+        payload = {
+            "name": "openSUSE:Leap:16.0",
+            "workflow_type": "staging",
+        }
+        with TestClient(api) as client:
+            response = client.post("/api/v1/project/update", content=json.dumps(payload))
+        self.assertEqual(response.status_code, 200)
+        res_data = response.json()
+        self.assertEqual(res_data["project"]["name"], "openSUSE:Leap:16.0")
+        self.assertEqual(res_data["project"]["workflow_type"], "staging")
+
+        # Verify DB
+        self.proj_leap.refresh_from_db()
+        self.assertEqual(self.proj_leap.workflow_type, Project.WorkflowType.STAGING)
+
+    def test_update_project_invalid_workflow_type(self):
+        payload = {
+            "name": "openSUSE:Leap:16.0",
+            "workflow_type": "invalid_type",
+        }
+        with TestClient(api) as client:
+            response = client.post("/api/v1/project/update", content=json.dumps(payload))
+        self.assertNotEqual(response.status_code, 200)
+
+    def test_update_nonexistent_project(self):
+        payload = {
+            "name": "nonexistent",
+            "workflow_type": "staging",
+        }
+        with TestClient(api) as client:
+            response = client.post("/api/v1/project/update", content=json.dumps(payload))
+        self.assertNotEqual(response.status_code, 200)

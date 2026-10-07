@@ -20,6 +20,11 @@ from obs_flow_common.messages.core import (
     GitMappingRemoveResponse,
     GitMappingEditRequest,
     GitMappingEditResponse,
+    ProjectDetail,
+    ProjectListRequest,
+    ProjectListResponse,
+    ProjectUpdateRequest,
+    ProjectUpdateResponse,
 )
 from obs_flow_common.messages.reviews import (
     ReviewConfigDTO,
@@ -90,6 +95,11 @@ __all__ = [
     "GitMappingRemoveResponse",
     "GitMappingEditRequest",
     "GitMappingEditResponse",
+    "ProjectDetail",
+    "ProjectListRequest",
+    "ProjectListResponse",
+    "ProjectUpdateRequest",
+    "ProjectUpdateResponse",
     "ReviewDetail",
     "ReviewConfigDTO",
     "ReviewConfigAddRequest",

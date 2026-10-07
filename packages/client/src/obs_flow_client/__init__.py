@@ -17,6 +17,10 @@ from obs_flow_client.git_mapping import (
     git_mapping_list,
     git_mapping_remove,
 )
+from obs_flow_client.project import (
+    project_list,
+    project_update,
+)
 from obs_flow_client.reviews import (
     pr_review_approve,
     pr_review_clear_needinfo,
@@ -56,6 +60,8 @@ __all__ = [
     "git_mapping_edit",
     "git_mapping_list",
     "git_mapping_remove",
+    "project_list",
+    "project_update",
     "pr_review_approve",
     "pr_review_clear_needinfo",
     "pr_review_decline",

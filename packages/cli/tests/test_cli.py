@@ -9,6 +9,9 @@ from obs_flow_common.messages import (
     GitMappingAddResponse,
     GitMappingRemoveResponse,
     GitMappingEditResponse,
+    ProjectDetail,
+    ProjectListResponse,
+    ProjectUpdateResponse,
 )
 
 
@@ -127,3 +130,71 @@ def test_cli_config_git_mapping_edit():
 
     assert result.exit_code == 0
     assert "Branch     : develop" in result.output
+
+
+def test_cli_project_list():
+    runner = CliRunner()
+    mock_projects = [
+        ProjectDetail(
+            id=1,
+            name="openSUSE:Factory",
+            workflow_type="staging",
+        ),
+        ProjectDetail(
+            id=2,
+            name="openSUSE:Leap:16.0",
+            workflow_type="direct",
+        ),
+    ]
+    with patch("obs_flow_client.project_list") as mock_list:
+        mock_list.return_value = ProjectListResponse(projects=mock_projects)
+        result = runner.invoke(main, ["project", "list"])
+
+    assert result.exit_code == 0
+    assert "ID            : 1" in result.output
+    assert "Name          : openSUSE:Factory" in result.output
+    assert "Workflow Type : staging" in result.output
+    assert "ID            : 2" in result.output
+    assert "Name          : openSUSE:Leap:16.0" in result.output
+    assert "Workflow Type : direct" in result.output
+
+
+def test_cli_project_update():
+    runner = CliRunner()
+    mock_project = ProjectDetail(
+        id=2,
+        name="openSUSE:Leap:16.0",
+        workflow_type="staging",
+    )
+    with patch("obs_flow_client.project_update") as mock_update:
+        mock_update.return_value = ProjectUpdateResponse(project=mock_project)
+        result = runner.invoke(
+            main,
+            [
+                "project",
+                "update",
+                "openSUSE:Leap:16.0",
+                "--workflow-type",
+                "staging",
+            ],
+        )
+
+    assert result.exit_code == 0
+    assert "ID            : 2" in result.output
+    assert "Name          : openSUSE:Leap:16.0" in result.output
+    assert "Workflow Type : staging" in result.output
+
+
+def test_cli_project_update_missing_name():
+    runner = CliRunner()
+    result = runner.invoke(
+        main,
+        [
+            "project",
+            "update",
+            "--workflow-type",
+            "staging",
+        ],
+    )
+    assert result.exit_code != 0
+    assert "Project name is required" in result.output
