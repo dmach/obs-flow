@@ -31,9 +31,9 @@
                 <ul>
                     {% if user.is_authenticated %}
                         <li>
-                            <details class="dropdown">
+                            <details class="dropdown dropdown-right">
                                 <summary><img src="{% static 'img/icons/person-16.svg' %}" /> {{ user.username }}</summary>
-                                <ul dir="rtl">
+                                <ul>
                                     <li><a href="{% url 'preferences' %}">Preferences</a></li>
                                     <li><a href="{% url 'token_list' %}">Tokens</a></li>
                                     <li><a href="{% url 'bookmark_list' %}">Bookmarks</a></li>
