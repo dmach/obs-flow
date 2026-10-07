@@ -3,21 +3,20 @@
 > GitHub product look and feel (Primer), built on stock Pico CSS v2, driven by htmx, light **and** dark.
 
 OBS Flow should feel like working on github.com: a quiet, neutral canvas, 14px system type, 6px corners,
-hairline borders instead of shadows, blue for links and focus, green only for the main action of a form
-or dialog, and colored pill labels for states (open / merged / closed).
+hairline borders instead of shadows, blue for links and focus, green only for the main action of a form or dialog,
+and colored pill labels for states (open / merged / closed).
 
-The reference is the GitHub *application* UI (pull request list, PR page, repository settings), not the
-github.com marketing homepage. No glass, glows, gradients or display typography.
+The reference is the GitHub *application* UI (pull request list, PR page, repository settings), not the github.com marketing homepage.
+No glass, glows, gradients or display typography.
 
 ## Constraints
 
 - **No Node.js.** No npm, no bundler, no PostCSS/Tailwind build. CSS and JS are hand-written static files.
-- **Pico CSS v2** provides the base styling. We only override Pico's `--pico-*` variables and add a few
-  components in `static/css/flow.css`.
-- **htmx** does all interactivity (server-rendered partials swapped into the page). JavaScript is the
-  exception (`static/js/flow.js`), never inline `onclick` or `<script>` blocks in templates.
-- **Third-party assets are vendored** into `static/vendor/` (Pico, htmx) with a pinned version, rather
-  than loaded from a CDN.
+- **Pico CSS v2** provides the base styling.
+  We only override Pico's `--pico-*` variables and add a few components in `static/css/flow.css`.
+- **htmx** does all interactivity (server-rendered partials swapped into the page).
+  JavaScript is the exception (`static/js/flow.js`), never inline `onclick` or `<script>` blocks in templates.
+- **Third-party assets are vendored** into `static/vendor/` (Pico, htmx) with a pinned version, rather than loaded from a CDN.
 - **No web fonts.** GitHub's product UI uses the system font stack; so do we.
 - **No hard-coded colors in templates.** No inline `style="..."`. Everything goes through tokens.
 
@@ -31,9 +30,10 @@ Three modes, matching the existing user preference (`auto` / `light` / `dark`):
 | light | `data-theme="light"` | Always light |
 | dark | `data-theme="dark"` | Always dark |
 
-Every color token is declared **once** with CSS `light-dark(<light>, <dark>)`. The browser chooses the
-value from the element's `color-scheme`, which we set from `data-theme`. No duplicated light/dark blocks,
-no JavaScript, no build step. (`light-dark()` is Baseline 2024: Firefox 120+, Chrome 123+, Safari 17.5+.)
+Every color token is declared **once** with CSS `light-dark(<light>, <dark>)`.
+The browser chooses the value from the element's `color-scheme`, which we set from `data-theme`.
+No duplicated light/dark blocks, no JavaScript, no build step.
+(`light-dark()` is Baseline 2024: Firefox 120+, Chrome 123+, Safari 17.5+.)
 
 ## Color tokens
 
@@ -99,8 +99,8 @@ Values follow GitHub Primer's "light default" and "dark default" themes.
 
 ### Shadows and backdrop
 
-Shadows only appear on things that float above the page (dialogs, dropdowns, toasts). Cards, tables
-and buttons get a border, not a shadow.
+Shadows only appear on things that float above the page (dialogs, dropdowns, toasts).
+Cards, tables and buttons get a border, not a shadow.
 
 | Token | Light | Dark |
 |---|---|---|
@@ -114,9 +114,9 @@ and buttons get a border, not a shadow.
 | `--gh-font-sans` | `-apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans", Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji"` |
 | `--gh-font-mono` | `ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace` |
 
-The base size is the user's font-size preference (12–20px, **default 14px**, like GitHub). It is
-applied as `--pico-font-size` on `<html>`, so every size below is in `rem`. That way the whole UI,
-controls included, scales with the preference.
+The base size is the user's font-size preference (12–20px, **default 14px**, like GitHub).
+It is applied as `--pico-font-size` on `<html>`, so every size below is in `rem`.
+That way the whole UI, controls included, scales with the preference.
 
 | Role | Element | Size | Weight | Line height |
 |---|---|---|---|---|
@@ -136,10 +136,8 @@ The page title is followed by a muted identifier, GitHub-style:
 
 ## Spacing, shape, layout
 
-- **Spacing base:** 4px. Use 4 / 8 / 12 / 16 / 24 / 32 / 40px (in rem at 14px base: 0.286 / 0.571 /
-  0.857 / 1.143 / 1.714 / 2.286 / 2.857). Pico's `--pico-spacing` stays `1rem`.
-- **Radius:** `6px` for buttons, inputs, boxes, tables, cards, code, flashes, toasts. `12px` for
-  dialogs. `2em` (pill) for state labels, review labels and counters. Nothing else.
+- **Spacing base:** 4px. Use 4 / 8 / 12 / 16 / 24 / 32 / 40px (in rem at 14px base: 0.286 / 0.571 / 0.857 / 1.143 / 1.714 / 2.286 / 2.857). Pico's `--pico-spacing` stays `1rem`.
+- **Radius:** `6px` for buttons, inputs, boxes, tables, cards, code, flashes, toasts. `12px` for dialogs. `2em` (pill) for state labels, review labels and counters. Nothing else.
 - **Borders:** always 1px.
 - **Container:** fluid, max-width `1280px`, horizontal padding `1rem`.
 - **Detail pages:** main column + sidebar, `3fr 1fr`, gap `1.5rem`. A single column below `768px`.
@@ -149,40 +147,36 @@ The page title is followed by a muted identifier, GitHub-style:
 
 ### App header
 
-Two rows, like a GitHub repository header, on a `--gh-bg-inset` background with a 1px
-`--gh-border-default` bottom border. No SUSE green, and no vertical padding on the header itself.
+Two rows, like a GitHub repository header, on a `--gh-bg-inset` background with a 1px `--gh-border-default` bottom border.
+No SUSE green, and no vertical padding on the header itself.
 
-- **Top row (`.app-header-top`):** min height 3.5rem. On the left, the brand (`.app-brand`): the logo
-  (2rem) plus "OBS Flow" at 1.143rem/600 `--gh-fg-default`. On the right, the account nav: the user
-  dropdown (Preferences, Tokens, Bookmarks, Logout), or "Log In".
+- **Top row (`.app-header-top`):** min height 3.5rem.
+  On the left, the brand (`.app-brand`): the logo (2rem) plus "OBS Flow" at 1.143rem/600 `--gh-fg-default`.
+  On the right, the account nav: the user dropdown (Preferences, Tokens, Bookmarks, Logout), or "Log In".
 - **Tab row (`nav.app-tabs`):** the section links Git Mappings, Pull Requests, Staging Batches.
-  1rem/400 `--gh-fg-default`, padding `0.375rem 0.5rem`, radius 6px, hover background
-  `--gh-bg-neutral-muted`.
-- **Current tab:** `aria-current="page"`, weight 600, with a 2px `--gh-border-active` bar along the
-  header's bottom edge (GitHub "UnderlineNav").
+  1rem/400 `--gh-fg-default`, padding `0.375rem 0.5rem`, radius 6px, hover background `--gh-bg-neutral-muted`.
+- **Current tab:** `aria-current="page"`, weight 600, with a 2px `--gh-border-active` bar along the header's bottom edge (GitHub "UnderlineNav").
 - **Small screens:** the same layout. The tab row scrolls horizontally if it doesn't fit.
 
 ### Logo
 
-An isometric cube (a built package) wrapped by a green flow band that leaves it as an upward arrow
-(the workflow toward release). It was made in Recraft and has two colours:
+An isometric cube (a built package) wrapped by a green flow band that leaves it as an upward arrow (the workflow toward release).
+It was made in Recraft and has two colours:
 
 | Part | Light | Dark |
 |---|---|---|
 | Base (`.logo-base`) | `#13372c` | `#f0f6fc` |
 | Accent (`.logo-accent`) | `#32f773` | `#32f773` |
 
-- **In the page:** inline from `templates/partials/logo.svg`. Colours come from `.app-logo` rules in
-  `flow.css` (`light-dark()`), so it follows an explicit light/dark preference too. Path order
-  matters: the accent paths must stay after the first base path.
-- **Favicon:** `static/img/logo.svg`, the same paths with the colours embedded and switched by
-  `prefers-color-scheme`.
+- **In the page:** inline from `templates/partials/logo.svg`.
+  Colours come from `.app-logo` rules in `flow.css` (`light-dark()`), so it follows an explicit light/dark preference too.
+  Path order matters: the accent paths must stay after the first base path.
+- **Favicon:** `static/img/logo.svg`, the same paths with the colours embedded and switched by `prefers-color-scheme`.
 - Don't recolour it, add effects, or put it on a filled background. The minimum size is 16px.
 
 ### Buttons
 
-Height ≈ 32px (`--pico-form-element-spacing-vertical: 0.3125rem`, horizontal `0.75rem`), 1rem/500,
-radius 6px, 1px border, sized to their label (never full width).
+Height ≈ 32px (`--pico-form-element-spacing-vertical: 0.3125rem`, horizontal `0.75rem`), 1rem/500, radius 6px, 1px border, sized to their label (never full width).
 
 | Variant | Markup | Rest | Hover |
 |---|---|---|---|
@@ -192,8 +186,7 @@ radius 6px, 1px border, sized to their label (never full width).
 | Invisible | `class="invisible"` | Transparent, no border, text `--gh-fg-accent` | `--gh-bg-neutral-muted` |
 
 Rules:
-- At most **one primary** button per form, dialog or toolbar. It is the action that moves things
-  forward (Save, Stage, Next, Log In).
+- At most **one primary** button per form, dialog or toolbar. It is the action that moves things forward (Save, Stage, Next, Log In).
 - **Destructive** actions (Delete, Revoke) use `danger`, never primary.
 - **Cancel** is a default button.
 - In dialogs and forms the buttons are right-aligned, with the primary one last.
@@ -202,8 +195,7 @@ Rules:
 ### Links
 
 - **Normal links:** `--gh-fg-accent`, no underline, underline on hover.
-- **Muted links:** `a.secondary` (footer, breadcrumbs, table metadata) use `--gh-fg-muted`, turning
-  accent on hover.
+- **Muted links:** `a.secondary` (footer, breadcrumbs, table metadata) use `--gh-fg-muted`, turning accent on hover.
 - **Identifiers:** `owner/repo#123` and SHAs are links in default text color, accent on hover.
 
 ### Box and data tables
@@ -211,18 +203,16 @@ Rules:
 The main building block: `<table class="data-table">`. It looks like a GitHub issue/PR list:
 
 - **Outline:** 1px `--gh-border-default`, radius 6px, `overflow: hidden`.
-- **`thead`:** `--gh-bg-subtle` background, 1rem/600 `--gh-fg-muted` text. Sort links are muted, accent
-  on hover. The current direction shows as `▲` / `▼`.
-- **Rows:** no zebra striping. 1px `--gh-border-muted` dividers, cell padding `0.5rem 1rem`, hover
-  `--gh-bg-subtle`.
+- **`thead`:** `--gh-bg-subtle` background, 1rem/600 `--gh-fg-muted` text. Sort links are muted, accent on hover.
+  The current direction shows as `▲` / `▼`.
+- **Rows:** no zebra striping. 1px `--gh-border-muted` dividers, cell padding `0.5rem 1rem`, hover `--gh-bg-subtle`.
 - **Checked rows:** `tr:has(input[type=checkbox]:checked)` gets `--gh-bg-accent-muted`.
 - **Narrow columns:** checkbox column 40px, centered.
-- **Small screens (< 768px):** rows become stacked cards (current behavior). Each `td` shows its
-  `data-label` as a muted bold prefix.
+- **Small screens (< 768px):** rows become stacked cards (current behavior). Each `td` shows its `data-label` as a muted bold prefix.
 - **Empty table:** show a blank slate instead (see below).
 
-`article` (Pico card) is a Box too: a 1px border (drawn as `box-shadow: 0 0 0 1px`), radius 6px, no
-drop shadow, and `--gh-bg-subtle` for its `header` and `footer`.
+`article` (Pico card) is a Box too: a 1px border (drawn as `box-shadow: 0 0 0 1px`), radius 6px,
+no drop shadow, and `--gh-bg-subtle` for its `header` and `footer`.
 
 ### State labels (filled pill)
 
@@ -242,15 +232,14 @@ drop shadow, and `--gh-bg-subtle` for its `header` and `footer`.
 | StagingBatch | `merged/completed` | `--gh-done-emphasis` |
 | StagingBatch | `failed` | `--gh-danger-emphasis` |
 
-Use the `data-state` attribute, not a generated class name. State values contain `/`, and attribute
-selectors (`[data-state="in-progress/open"]`) handle that cleanly.
+Use the `data-state` attribute, not a generated class name.
+State values contain `/`, and attribute selectors (`[data-state="in-progress/open"]`) handle that cleanly.
 
 ### Review labels (outlined pill)
 
 `<span class="label" data-state="{{ review.state }}">{{ review.get_state_display }}</span>`
 
-0.857rem/500, line height 1.5, padding `0 0.5rem`, radius 2em, 1px border in the text color,
-transparent background:
+0.857rem/500, line height 1.5, padding `0 0.5rem`, radius 2em, 1px border in the text color, transparent background:
 
 | State | Color |
 |---|---|
@@ -260,8 +249,7 @@ transparent background:
 | `needinfo` | `--gh-fg-accent` |
 | `waiting`, `overridden` | `--gh-fg-muted` |
 
-**Mergeable** shows as text, not a label: "yes" in `--gh-fg-success`, "no" in `--gh-fg-danger`,
-"unknown" in `--gh-fg-muted`.
+**Mergeable** shows as text, not a label: "yes" in `--gh-fg-success`, "no" in `--gh-fg-danger`, "unknown" in `--gh-fg-muted`.
 
 Color never carries meaning alone. The label text is always present.
 
@@ -269,25 +257,26 @@ Color never carries meaning alone. The label text is always present.
 
 `<span class="counter">{{ total_count }}</span>` next to page titles, tabs and box headings.
 
-0.857rem/500, min-width 1.5em, padding `0 0.4rem`, radius 2em, `--gh-bg-neutral-muted` background,
-`--gh-fg-default` text, centered. (Replaces `<small>` and `.badge` after headings.)
+0.857rem/500, min-width 1.5em, padding `0 0.4rem`, radius 2em, `--gh-bg-neutral-muted` background, `--gh-fg-default` text, centered.
+(Replaces `<small>` and `.badge` after headings.)
 
 ### Forms
 
 - **Labels:** 1rem/600 `--gh-fg-default`, `0.25rem` gap below. `legend` looks the same.
-- **Inputs, selects:** `--gh-bg-default`, 1px `--gh-border-default`, radius 6px, same height as
-  buttons. Focus: border `--gh-fg-accent` plus a 2px accent ring.
+- **Inputs, selects:** `--gh-bg-default`, 1px `--gh-border-default`, radius 6px, same height as buttons.
+  Focus: border `--gh-fg-accent` plus a 2px accent ring.
 - **Placeholder:** `--gh-fg-muted`.
 - **Help text:** `<small>` below the field, 0.857rem muted.
-- **Errors:** `aria-invalid="true"` on the input (red border via Pico), then
-  `<small class="error">message</small>` in `--gh-fg-danger`. No inline styles.
+- **Errors:** `aria-invalid="true"` on the input (red border via Pico), then `<small class="error">message</small>` in `--gh-fg-danger`.
+  No inline styles.
 - **Grouped input + button:** Pico `fieldset[role=group]` (e.g. "Generate token").
 
 ### Filter panel
 
-A Box built from `<details class="filter-panel">`. The `summary` is a `--gh-bg-subtle` header row,
-1rem/600, with a bottom border when open. Body padding `1rem`. Actions are right-aligned: "Reset"
-(default) and "Apply Filter" (primary). It is open by default when a filter is active.
+A Box built from `<details class="filter-panel">`.
+The `summary` is a `--gh-bg-subtle` header row, 1rem/600, with a bottom border when open. Body padding `1rem`.
+Actions are right-aligned: "Reset" (default) and "Apply Filter" (primary).
+It is open by default when a filter is active.
 
 ### Dialog
 
@@ -296,22 +285,19 @@ Pico `<dialog open>` with an `article` inside, inserted into `#modal-container` 
 - **Panel:** `--gh-bg-overlay`, radius 12px, overlay shadow, max-width 40rem.
 - **Backdrop:** `--gh-backdrop`, **no blur**.
 - **Header:** `--gh-bg-default`, title `h3` at 1rem/600, bottom border `--gh-border-muted`.
-- **Footer:** top border `--gh-border-muted`, buttons right-aligned with `0.5rem` gap, primary or danger
-  last.
+- **Footer:** top border `--gh-border-muted`, buttons right-aligned with `0.5rem` gap, primary or danger last.
 - **Close:** with Escape and Cancel (the existing `method="dialog"` + htmx pattern).
 
 ### Dropdown
 
 Pico `details.dropdown`.
 
-- **Menu:** `--gh-bg-overlay`, 1px `--gh-border-default`, radius 12px, overlay shadow, `0.5rem`
-  padding.
+- **Menu:** `--gh-bg-overlay`, 1px `--gh-border-default`, radius 12px, overlay shadow, `0.5rem` padding.
 - **Items:** 1rem/400, padding `0.375rem 0.5rem`, radius 6px, hover `--gh-bg-neutral-muted`.
 
 ### Flash (inline notice)
 
-`<div class="flash flash-success|flash-warning|flash-danger|flash-info">…</div>`, for page-level
-messages such as "Token generated, copy it now".
+`<div class="flash flash-success|flash-warning|flash-danger|flash-info">...</div>`, for page-level messages such as "Token generated, copy it now".
 
 1px border, radius 6px, padding `1rem`, text `--gh-fg-default`. Colors per variant:
 
@@ -326,87 +312,80 @@ messages such as "Token generated, copy it now".
 
 Server-rendered from Django messages, shown bottom-right, auto-hidden by CSS animation.
 
-`--gh-bg-overlay`, 1px `--gh-border-default`, radius 6px, overlay shadow, padding `0.75rem 1rem`, 1rem
-text. There is a 4px left border in `--gh-fg-success` / `--gh-fg-danger` / `--gh-fg-attention`.
+`--gh-bg-overlay`, 1px `--gh-border-default`, radius 6px, overlay shadow, padding `0.75rem 1rem`, 1rem text.
+There is a 4px left border in `--gh-fg-success` / `--gh-fg-danger` / `--gh-fg-attention`.
 
 ### Blank slate (empty states)
 
-Replaces `<p class="muted">No … found.</p>`.
+Replaces `<p class="muted">No ... found.</p>`.
 
-A Box with centered content and `2rem` padding. Heading 1.25rem/600, description `--gh-fg-muted`, and
-an optional single action button.
+A Box with centered content and `2rem` padding.
+Heading 1.25rem/600, description `--gh-fg-muted`, and an optional single action button.
 
 ### Sidebar (detail pages)
 
 Plain column, **no card around it**, matching the GitHub PR sidebar.
 
-- **Sections:** each `.sidebar-section` ends with a 1px `--gh-border-muted` bottom border and
-  `0.75rem` padding.
+- **Sections:** each `.sidebar-section` ends with a 1px `--gh-border-muted` bottom border and `0.75rem` padding.
 - **Headings:** 0.857rem/600 muted.
 - **Values:** 1rem.
 - **Inline editing:** an `Edit` invisible button next to the heading swaps in a small form via htmx.
 
 ### Breadcrumb
 
-Pico `nav[aria-label=breadcrumb]` with `/` as divider (`--pico-nav-breadcrumb-divider`). Links are
-muted; the current item is `--gh-fg-default`, weight 600.
+Pico `nav[aria-label=breadcrumb]` with `/` as divider (`--pico-nav-breadcrumb-divider`).
+Links are muted; the current item is `--gh-fg-default`, weight 600.
 
 ### Pagination
 
-Shared partial `partials/pagination.html` (include it with the `page_obj` in context). It renders a
-centered row: First / Previous, "Page X of Y", Next / Last. Items have padding `0.25rem 0.625rem` and
-radius 6px. Links show a `--gh-border-default` border on hover.
+Shared partial `partials/pagination.html` (include it with the `page_obj` in context).
+It renders a centered row: First / Previous, "Page X of Y", Next / Last.
+Items have padding `0.25rem 0.625rem` and radius 6px.
+Links show a `--gh-border-default` border on hover.
 
-- **Current page:** the plain text `<span aria-current="page">Page X of Y</span>` in
-  `--gh-fg-default`. There are no numbered page links.
+- **Current page:** the plain text `<span aria-current="page">Page X of Y</span>` in `--gh-fg-default`. There are no numbered page links.
 - **Disabled First/Previous/Next/Last:** `<span aria-disabled="true">` in `--gh-fg-muted`, no hover.
 
 ### Code, SHAs, branches
 
-- **Inline `code`:** `--gh-font-mono` 0.857rem, `--gh-bg-neutral-muted` background, padding
-  `0.2em 0.4em`, radius 6px.
+- **Inline `code`:** `--gh-font-mono` 0.857rem, `--gh-bg-neutral-muted` background, padding `0.2em 0.4em`, radius 6px.
 - **SHAs:** 8 characters, fingerprints 12.
 - **`pre`:** `--gh-bg-inset`, 1px border, radius 6px, padding `1rem`, horizontal scroll.
 
 ### Footer
 
-Top border `--gh-border-muted`, padding `2.5rem 0`, centered, 0.857rem `--gh-fg-muted`. Links are muted
-and turn accent on hover. Items are separated by `·`.
+Top border `--gh-border-muted`, padding `2.5rem 0`, centered, 0.857rem `--gh-fg-muted`.
+Links are muted and turn accent on hover.
+Items are separated by `·`.
 
 ### Home page
 
-GitHub dashboard tone, not a marketing hero: page title, a one-line muted description, and two buttons
-("View Pull Requests" primary, "View Staging Batches" default). Below them, there can optionally be
-boxes with recent items. No gradients, illustrations or oversized type.
+GitHub dashboard tone, not a marketing hero: page title, a one-line muted description,
+and two buttons ("View Pull Requests" primary, "View Staging Batches" default).
+Below them, there can optionally be boxes with recent items.
+No gradients, illustrations or oversized type.
 
 ## htmx states
 
-- **Loading:** htmx adds `htmx-request` to the element issuing the request. Style it in CSS, with no
-  JavaScript:
-  - `form.htmx-request [type=submit]`, `button.htmx-request`: 50% opacity, `pointer-events: none`,
-    `cursor: progress`.
-  - `.htmx-indicator`: hidden (`opacity: 0`), shown when it or an ancestor has `.htmx-request`. Use
-    for small "Saving…" text or a spinner next to the trigger.
+- **Loading:** htmx adds `htmx-request` to the element issuing the request. Style it in CSS, with no JavaScript:
+  - `form.htmx-request [type=submit]`, `button.htmx-request`: 50% opacity, `pointer-events: none`, `cursor: progress`.
+  - `.htmx-indicator`: hidden (`opacity: 0`), shown when it or an ancestor has `.htmx-request`.
+    Use for small "Saving..." text or a spinner next to the trigger.
 - **Swapped content:** fades in with `opacity` over 150ms. No layout-shifting animations.
-- **Errors:** come back as server-rendered partials (error dialog or `.flash-danger`), never as
-  `alert()`.
+- **Errors:** come back as server-rendered partials (error dialog or `.flash-danger`), never as `alert()`.
 - **CSRF:** sent via `hx-headers:inherited` on `<body>` (already in place).
 
 ## Motion
 
-- **Timing:** `--pico-transition: 80ms cubic-bezier(0.33, 1, 0.68, 1)` for hover/focus. 150–300ms for
-  dialogs, toasts and swaps.
-- **What to animate:** only `opacity` and `transform`. Color/background changes on hover are instant or
-  use the 80ms transition.
+- **Timing:** `--pico-transition: 80ms cubic-bezier(0.33, 1, 0.68, 1)` for hover/focus. 150–300ms for dialogs, toasts and swaps.
+- **What to animate:** only `opacity` and `transform`. Color/background changes on hover are instant or use the 80ms transition.
 - **Reduced motion:** `prefers-reduced-motion: reduce` disables every animation.
 
 ## Accessibility
 
-- **Contrast:** all text/background pairs above meet WCAG AA in both themes (Primer values). Don't
-  invent new color pairs.
+- **Contrast:** all text/background pairs above meet WCAG AA in both themes (Primer values). Don't invent new color pairs.
 - **Focus:** always visible, a 2px `--gh-fg-accent` ring. Never `outline: none` without a replacement.
-- **Color:** state is never shown by color alone. Labels carry text, and table cells repeat
-  `data-label` on mobile.
+- **Color:** state is never shown by color alone. Labels carry text, and table cells repeat `data-label` on mobile.
 - **Dialogs:** have a heading, close with Escape, and the primary action is reachable by keyboard.
 - **Current page:** the active navigation item has `aria-current="page"`.
 
@@ -497,8 +476,8 @@ Load order: `vendor/pico/pico.min.css`, then `css/flow.css`. Everything below is
 ### 3. Map tokens onto Pico
 
 Pico declares its colors on `:root:not([data-theme=dark])`, `[data-theme=light]` and
-`:root:not([data-theme])`, all with specificity (0,2,0) or lower. The selector below has (0,2,0), comes
-later, and so wins in every mode.
+`:root:not([data-theme])`, all with specificity (0,2,0) or lower.
+The selector below has (0,2,0), comes later, and so wins in every mode.
 
 ```css
 :root[data-theme],
