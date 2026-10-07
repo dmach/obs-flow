@@ -11,6 +11,18 @@
 [data-theme="light"]    { color-scheme: light; }
 [data-theme="dark"]     { color-scheme: dark; }
 
+:root {
+    --icon-filter: none;
+}
+@media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+        --icon-filter: invert(1);
+    }
+}
+[data-theme="dark"] {
+    --icon-filter: invert(1);
+}
+
 /* ------------------------------------------------------------------ */
 /* Tokens (one block, both themes)                                     */
 /* ------------------------------------------------------------------ */
@@ -326,6 +338,10 @@ body > header.app-header {
 
 .app-tabs a img {
     flex: none;
+}
+
+.app-header img {
+    filter: var(--icon-filter);
 }
 
 .app-tabs a[aria-current="page"] {
