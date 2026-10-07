@@ -293,14 +293,24 @@ def _do_sync_pull_request(req: PRSyncRequest) -> PRSyncResponse:
         pr.save()
 
     # Check revisions
+    from pull_requests.fingerprint import PRRevisionPayload
+
+    pr_payload = PRRevisionPayload(
+        head_sha=head_sha,
+        base_sha=base_sha,
+        target_branch=pr.target.branch,
+    )
+    fingerprint = pr_payload.compute_fingerprint()
+
     latest_revision = pr.revisions.order_by("-revision_number").first()
-    if not latest_revision or latest_revision.head_sha != head_sha:
+    if not latest_revision or latest_revision.fingerprint != fingerprint:
         rev_number = (latest_revision.revision_number + 1) if latest_revision else 1
         latest_revision = PullRequestRevision.objects.create(
             pull_request=pr,
             revision_number=rev_number,
             head_sha=head_sha,
-            base_sha=base_sha
+            base_sha=base_sha,
+            fingerprint=fingerprint,
         )
 
         from reviews.models import ReviewConfig

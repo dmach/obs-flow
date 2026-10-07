@@ -35,13 +35,14 @@ class PullRequestRevision(models.Model):
     revision_number = models.IntegerField()
     head_sha = models.CharField(max_length=64)  # Designed for SHA-1, SHA-256, etc.
     base_sha = models.CharField(max_length=64)
+    fingerprint = models.CharField(max_length=64)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
         unique_together = ("pull_request", "revision_number")
 
     def __str__(self):
-        return f"{self.pull_request} - Rev {self.revision_number} ({self.head_sha[:8]})"
+        return f"{self.pull_request} - Rev {self.revision_number} ({self.fingerprint[:8]})"
 
 
 class PullRequestRevisionIssue(models.Model):

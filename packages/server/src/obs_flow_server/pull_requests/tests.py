@@ -1,6 +1,6 @@
 import json
 from unittest.mock import MagicMock, patch
-from django.test import TransactionTestCase, override_settings
+from django.test import TestCase, TransactionTestCase, override_settings
 from django_bolt.testing import TestClient
 
 from accounts.models import User
@@ -202,6 +202,14 @@ class TestPRSyncEndpoint(TransactionTestCase):
 
         # Verify review was created for the new revision
         latest_revision = pr.revisions.get(revision_number=2)
+        from pull_requests.fingerprint import PRRevisionPayload
+        expected_fp = PRRevisionPayload(
+            head_sha="2222222222222222222222222222222222222222",
+            base_sha="0000000000000000000000000000000000000000",
+            target_branch="main"
+        ).compute_fingerprint()
+        self.assertEqual(latest_revision.fingerprint, expected_fp)
+
         self.assertEqual(latest_revision.reviews.count(), 1)
         review = latest_revision.reviews.first()
         self.assertEqual(review.reviewer_user, reviewer_user)
@@ -296,6 +304,88 @@ class TestPRSyncEndpoint(TransactionTestCase):
         from pull_requests.models import PullRequestReview
         self.assertEqual(review.state, PullRequestReview.State.PENDING)
 
+    @override_settings(GITEA_URL="https://gitea.example.com", GITEA_TOKEN="secret-token")
+    @patch("urllib.request.urlopen")
+    def test_sync_rebase_creates_new_revision(self, mock_urlopen):
+        """Verify that rebasing (head SHA unchanged, but base SHA changed) creates a new revision."""
+        project = Project.objects.create(name="suse:rebase-test")
+        git_mapping = GitMapping.objects.create(owner="suse", repo="rebase-repo", branch="main", project=project)
+        author = User.objects.create(username="rebase_user", username_lower="rebase_user", account_type=User.AccountType.HUMAN)
+        pr = PullRequest.objects.create(
+            target=git_mapping,
+            number=999,
+            author=author,
+            title="Rebase PR",
+            is_draft=False,
+            is_mergeable=True,
+            state=PullRequest.State.OPEN,
+            source_owner="rebase_user",
+            source_repo="rebase-repo",
+            source_branch="feat"
+        )
+        from pull_requests.fingerprint import PRRevisionPayload
+        fp1 = PRRevisionPayload(
+            head_sha="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            base_sha="1111111111111111111111111111111111111111",
+            target_branch="main"
+        ).compute_fingerprint()
+        PullRequestRevision.objects.create(
+            pull_request=pr,
+            revision_number=1,
+            head_sha="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            base_sha="1111111111111111111111111111111111111111",
+            fingerprint=fp1
+        )
+
+        # Mock Gitea response where head is still "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", but base changed to "2222222222222222222222222222222222222222"
+        mock_response = MagicMock()
+        gitea_data = {
+            "title": "Rebase PR",
+            "draft": False,
+            "mergeable": True,
+            "state": "open",
+            "user": {"login": "rebase_user"},
+            "head": {
+                "sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                "ref": "feat",
+                "repo": {
+                    "owner": {"login": "rebase_user"},
+                    "name": "rebase-repo"
+                }
+            },
+            "base": {
+                "sha": "2222222222222222222222222222222222222222",
+                "ref": "main"
+            }
+        }
+        mock_response.read.return_value = json.dumps(gitea_data).encode("utf-8")
+        mock_urlopen.return_value.__enter__.return_value = mock_response
+
+        payload = {
+            "owner": "suse",
+            "repo": "rebase-repo",
+            "number": 999
+        }
+        with TestClient(api) as client:
+            response = client.post(
+                "/api/v1/pr/sync",
+                content=json.dumps(payload),
+            )
+        self.assertEqual(response.status_code, 200)
+
+        # Verify a new revision was created despite head SHA being identical!
+        self.assertEqual(pr.revisions.count(), 2)
+        rev2 = pr.revisions.get(revision_number=2)
+        self.assertEqual(rev2.head_sha, "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
+        self.assertEqual(rev2.base_sha, "2222222222222222222222222222222222222222")
+        fp2 = PRRevisionPayload(
+            head_sha="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            base_sha="2222222222222222222222222222222222222222",
+            target_branch="main"
+        ).compute_fingerprint()
+        self.assertEqual(rev2.fingerprint, fp2)
+        self.assertNotEqual(rev2.fingerprint, fp1)
+
 
 class TestPRViews(TransactionTestCase):
     def test_pr_detail_view_with_package(self):
@@ -382,3 +472,17 @@ class TestPRViews(TransactionTestCase):
         self.assertNotContains(response, "PR 11")
 
 
+class TestPRRevisionPayload(TestCase):
+    def test_pr_revision_fingerprint(self):
+        from pull_requests.fingerprint import PRRevisionPayload
+        import hashlib
+
+        payload = PRRevisionPayload(
+            head_sha="head123",
+            base_sha="base456",
+            target_branch="main",
+        )
+        # Expected alphabetical JSON: {"base_sha":"base456","head_sha":"head123","target_branch":"main"}
+        expected_json = b'{"base_sha":"base456","head_sha":"head123","target_branch":"main"}'
+        self.assertEqual(payload._to_canonical_json(), expected_json)
+        self.assertEqual(payload.compute_fingerprint(), hashlib.sha256(expected_json).hexdigest())

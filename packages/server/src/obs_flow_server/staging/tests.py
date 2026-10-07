@@ -241,11 +241,15 @@ class TestStagingBatchRevision(TransactionTestCase):
         batch_id = res_data["id"]
 
         # Verify revision 1 is created (empty)
+        from staging.fingerprint import StagingBatchPayload
+        from pull_requests.fingerprint import PRRevisionPayload
+
         batch = StagingBatch.objects.get(id=batch_id)
         self.assertEqual(batch.revisions.count(), 1)
         rev1 = batch.revisions.get(revision_number=1)
         self.assertEqual(rev1.revision_pull_requests.count(), 0)
-        self.assertEqual(rev1.fingerprint, "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855")
+        expected_fingerprint_1 = StagingBatchPayload().compute_fingerprint()
+        self.assertEqual(rev1.fingerprint, expected_fingerprint_1)
 
         # 2. Add a PR to the staging batch
         add_payload = {
@@ -266,9 +270,11 @@ class TestStagingBatchRevision(TransactionTestCase):
         self.assertEqual(rev2.revision_pull_requests.count(), 1)
 
         # Verify fingerprint is computed correctly
-        expected_content = "openSUSE/osc#1234.1"
-        expected_fingerprint = hashlib.sha256(expected_content.encode("utf-8")).hexdigest()
-        self.assertEqual(rev2.fingerprint, expected_fingerprint)
+        pr_rev1 = PullRequestRevision.objects.get(pull_request__number=1234, revision_number=1)
+        expected_fingerprint_2 = StagingBatchPayload(
+            pr_revisions=[pr_rev1.fingerprint],
+        ).compute_fingerprint()
+        self.assertEqual(rev2.fingerprint, expected_fingerprint_2)
 
         # 3. Sync a new revision of the PR (PR code changes)
         # This should automatically trigger a new StagingBatchRevision (revision 3)
@@ -317,8 +323,10 @@ class TestStagingBatchRevision(TransactionTestCase):
         self.assertEqual(rev3.revision_pull_requests.count(), 1)
 
         # Verify fingerprint is computed correctly using PR revision 2
-        expected_content_3 = "openSUSE/osc#1234.2"
-        expected_fingerprint_3 = hashlib.sha256(expected_content_3.encode("utf-8")).hexdigest()
+        pr_rev2 = PullRequestRevision.objects.get(pull_request__number=1234, revision_number=2)
+        expected_fingerprint_3 = StagingBatchPayload(
+            pr_revisions=[pr_rev2.fingerprint],
+        ).compute_fingerprint()
         self.assertEqual(rev3.fingerprint, expected_fingerprint_3)
 
         # 4. Remove the PR from the staging batch
@@ -338,7 +346,7 @@ class TestStagingBatchRevision(TransactionTestCase):
         rev4 = batch.revisions.order_by("-revision_number").first()
         self.assertEqual(rev4.revision_number, 4)
         self.assertEqual(rev4.revision_pull_requests.count(), 0)
-        self.assertEqual(rev4.fingerprint, "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855")
+        self.assertEqual(rev4.fingerprint, expected_fingerprint_1)
 
 
 class TestStagingUIModalViews(TransactionTestCase):
@@ -508,3 +516,20 @@ class TestStagingUIModalCsrf(TransactionTestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Stage Selected Pull Requests")
 
+
+class TestStagingBatchPayload(TestCase):
+    def test_staging_batch_fingerprint_sorting_and_empty(self):
+        from staging.fingerprint import StagingBatchPayload
+        import hashlib
+
+        # Empty payload
+        payload_empty = StagingBatchPayload()
+        expected_empty_json = b'{}'
+        self.assertEqual(payload_empty._to_canonical_json(), expected_empty_json)
+        self.assertEqual(payload_empty.compute_fingerprint(), hashlib.sha256(expected_empty_json).hexdigest())
+
+        # Payload with unsorted pr_revisions
+        payload1 = StagingBatchPayload(pr_revisions=["rev2", "rev1"])
+        expected_json = b'{"pr_revisions":["rev1","rev2"]}'
+        self.assertEqual(payload1._to_canonical_json(), expected_json)
+        self.assertEqual(payload1.compute_fingerprint(), hashlib.sha256(expected_json).hexdigest())

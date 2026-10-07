@@ -1,5 +1,5 @@
 import json
-from django.test import TransactionTestCase
+from django.test import TestCase, TransactionTestCase
 from django_bolt.testing import TestClient
 
 from core.models import Project, Package, GitMapping
@@ -302,4 +302,20 @@ class TestGitMappingViews(TransactionTestCase):
         self.assertContains(response, "repo2")
 
 
+class FingerprintTests(TestCase):
+    def test_base_payload_sorting_and_omission(self):
+        import hashlib
+        from core.fingerprint import BasePayload
 
+        class DummyPayload(BasePayload):
+            items: list[str] = []
+            name: str | None = None
+
+        payload = DummyPayload(items=["b", "a"])
+        expected_json = b'{"items":["a","b"]}'
+        self.assertEqual(payload._to_canonical_json(), expected_json)
+        self.assertEqual(payload.compute_fingerprint(), hashlib.sha256(expected_json).hexdigest())
+
+        # Verify defaults/None omitted
+        payload2 = DummyPayload(items=["a"], name=None)
+        self.assertEqual(payload2._to_canonical_json(), b'{"items":["a"]}')
