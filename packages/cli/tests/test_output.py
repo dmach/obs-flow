@@ -296,3 +296,99 @@ def test_project_renderer():
         mock_echo.assert_any_call("ID            : \x1b[1m1\x1b[0m")
         mock_echo.assert_any_call("Name          : openSUSE:Factory")
         mock_echo.assert_any_call("Workflow Type : \x1b[36mstaging\x1b[0m")
+
+
+def test_renderer_id():
+    class Item:
+        def __init__(self, id, name, owner, repo):
+            self.id = id
+            self.name = name
+            self.owner = owner
+            self.repo = repo
+
+    items = [
+        Item(1, "proj1", "org", "repo1"),
+        Item(2, "proj2", "org", "repo2"),
+    ]
+
+    # Test default id_field ("id")
+    class DefaultRenderer(Renderer):
+        pass
+
+    with patch("click.echo") as mock_echo:
+        DefaultRenderer(items).render(fmt="id")
+        assert mock_echo.call_args_list == [
+            (( "1", ), {}),
+            (( "2", ), {}),
+        ]
+
+    # Test custom string id_field ("name")
+    class NameRenderer(Renderer):
+        id_field = "name"
+
+    with patch("click.echo") as mock_echo:
+        NameRenderer(items).render(fmt="id")
+        assert mock_echo.call_args_list == [
+            (( "proj1", ), {}),
+            (( "proj2", ), {}),
+        ]
+
+    # Test callable/composite id_field
+    class CompositeRenderer(Renderer):
+        id_field = lambda item: f"{item.owner}/{item.repo}"
+
+    with patch("click.echo") as mock_echo:
+        CompositeRenderer(items).render(fmt="id")
+        assert mock_echo.call_args_list == [
+            (( "org/repo1", ), {}),
+            (( "org/repo2", ), {}),
+        ]
+
+
+def test_get_reviewer_id():
+    from obs_flow_cli.output.formatters import get_reviewer_id
+    from obs_flow_common.messages import PersonReviewerDTO, GroupReviewerDTO, DynamicRoleReviewerDTO
+
+    person = PersonReviewerDTO(username="alice", full_name="Alice Smith", email="alice@example.com", is_active=True)
+    assert get_reviewer_id(person) == "alice"
+
+    group = GroupReviewerDTO(name="release-team", email=None)
+    assert get_reviewer_id(group) == "@release-team"
+
+    role = DynamicRoleReviewerDTO(role="maintainer")
+    assert get_reviewer_id(role) == "role:maintainer"
+
+
+def test_bookmark_renderer_id():
+    from obs_flow_cli.output.bookmark import BookmarkRenderer
+    from obs_flow_common.messages import BookmarkDTO
+
+    bookmark = BookmarkDTO(id=42, name="my-bookmark", url="https://example.com")
+    with patch("click.echo") as mock_echo:
+        BookmarkRenderer(bookmark).render(fmt="id")
+        assert mock_echo.call_args_list == [
+            (("my-bookmark",), {}),
+        ]
+
+
+def test_review_renderer_id():
+    from obs_flow_cli.output.review import ReviewRenderer
+    from obs_flow_common.messages import ReviewDetail, PersonReviewerDTO, GroupReviewerDTO
+
+    reviews = [
+        ReviewDetail(
+            reviewer=PersonReviewerDTO(username="alice", full_name="Alice", email=None, is_active=True),
+            state="accepted",
+        ),
+        ReviewDetail(
+            reviewer=GroupReviewerDTO(name="security", email=None),
+            state="pending",
+        ),
+    ]
+
+    with patch("click.echo") as mock_echo:
+        ReviewRenderer(reviews).render(fmt="id")
+        assert mock_echo.call_args_list == [
+            (("alice (ACCEPTED)",), {}),
+            (("@security (PENDING)",), {}),
+        ]

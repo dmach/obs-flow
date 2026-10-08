@@ -68,6 +68,7 @@ class Renderer:
     """
 
     _fields: dict[str, Field]
+    id_field: str | Callable[[Any], str] = "id"
 
     def __init_subclass__(cls, **kwargs):
         super().__init_subclass__(**kwargs)
@@ -83,8 +84,30 @@ class Renderer:
     ) -> None:
         if fmt == "json":
             self.render_json()
+        elif fmt == "id":
+            self.render_id()
         else:
             self.render_text(verbose=verbose)
+
+    def render_id(self) -> None:
+        """
+        Render just the ID field for scripting purposes.
+        """
+        if isinstance(self.data, list):
+            for item in self.data:
+                self._render_item_id(item)
+        elif self.data is not None:
+            self._render_item_id(self.data)
+
+    def _render_item_id(self, item: Any) -> None:
+        id_field = self.__class__.id_field
+        if callable(id_field):
+            val = id_field(item)
+        else:
+            val = getattr(item, str(id_field), None)
+
+        if val is not None:
+            click.echo(str(val))
 
     def render_text(self, verbose: bool = False) -> None:
         """

@@ -1,8 +1,10 @@
 from .common import Field, Renderer
-from .formatters import format_reviewer_dto, format_user_dto
+from .formatters import format_reviewer_dto, format_user_dto, get_reviewer_id
 
 
 class ReviewRenderer(Renderer):
+    id_field = lambda item: f"{get_reviewer_id(item.reviewer)} ({item.state.upper()})"
+
     reviewer = Field(
         label="Reviewer",
         style={"bold": True},
