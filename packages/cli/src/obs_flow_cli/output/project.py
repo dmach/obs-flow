@@ -2,6 +2,8 @@ from .common import Field, Renderer
 
 
 class ProjectRenderer(Renderer):
+    id_field = "name"
+
     id = Field(
         label="ID",
         style={"bold": True},

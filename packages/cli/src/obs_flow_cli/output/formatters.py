@@ -37,3 +37,13 @@ def format_reviewer_dto(reviewer: ReviewerDTO) -> str:
     elif isinstance(reviewer, DynamicRoleReviewerDTO):
         return format_dynamic_role_reviewer_dto(reviewer)
     return str(reviewer)
+
+
+def get_reviewer_id(reviewer: ReviewerDTO) -> str:
+    if isinstance(reviewer, PersonReviewerDTO):
+        return reviewer.username
+    elif isinstance(reviewer, GroupReviewerDTO):
+        return f"@{reviewer.name}"
+    elif isinstance(reviewer, DynamicRoleReviewerDTO):
+        return f"role:{reviewer.role}"
+    return str(reviewer)
