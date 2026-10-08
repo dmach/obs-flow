@@ -59,3 +59,26 @@ class GitMappingEditRequest(msgspec.Struct):
 
 class GitMappingEditResponse(msgspec.Struct):
     mapping: GitMappingDetail
+
+
+class ProjectDetail(msgspec.Struct):
+    id: int
+    name: str
+    workflow_type: str
+
+
+class ProjectListRequest(msgspec.Struct):
+    pass
+
+
+class ProjectListResponse(msgspec.Struct):
+    projects: list[ProjectDetail]
+
+
+class ProjectUpdateRequest(msgspec.Struct):
+    name: str
+    workflow_type: str | None = None
+
+
+class ProjectUpdateResponse(msgspec.Struct):
+    project: ProjectDetail

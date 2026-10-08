@@ -4,7 +4,16 @@ from django.db.models.functions import Lower
 
 
 class Project(models.Model):
+    class WorkflowType(models.TextChoices):
+        DIRECT = "direct", "Direct"
+        STAGING = "staging", "Staging"
+
     name = models.CharField(max_length=255, unique=True)
+    workflow_type = models.CharField(
+        max_length=20,
+        choices=WorkflowType.choices,
+        default=WorkflowType.DIRECT,
+    )
 
     def __str__(self):
         return self.name

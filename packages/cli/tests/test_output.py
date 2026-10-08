@@ -280,3 +280,19 @@ def test_git_mapping_renderer():
         mock_echo.assert_any_call("Project    : openSUSE:Factory")
         mock_echo.assert_any_call("Package    : osc")
 
+
+def test_project_renderer():
+    from obs_flow_cli.output.project import ProjectRenderer
+    from obs_flow_common.messages import ProjectDetail
+
+    detail = ProjectDetail(
+        id=1,
+        name="openSUSE:Factory",
+        workflow_type="staging",
+    )
+    renderer = ProjectRenderer(detail)
+    with patch("click.echo") as mock_echo:
+        renderer.render(fmt="text")
+        mock_echo.assert_any_call("ID            : \x1b[1m1\x1b[0m")
+        mock_echo.assert_any_call("Name          : openSUSE:Factory")
+        mock_echo.assert_any_call("Workflow Type : \x1b[36mstaging\x1b[0m")

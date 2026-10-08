@@ -13,6 +13,11 @@ from obs_flow_common.messages import (
     GitMappingRemoveResponse,
     GitMappingEditRequest,
     GitMappingEditResponse,
+    ProjectDetail,
+    ProjectListRequest,
+    ProjectListResponse,
+    ProjectUpdateRequest,
+    ProjectUpdateResponse,
 )
 from obs_flow_server.api import api
 from core.models import GitMapping, Project, Package
@@ -130,4 +135,40 @@ def edit_git_mapping(payload: GitMappingEditRequest):
 
     mapping.save()
     res = GitMappingEditResponse(mapping=mapping_to_detail(mapping))
+    return msgspec.structs.asdict(res)
+
+
+def project_to_detail(project: Project) -> ProjectDetail:
+    return ProjectDetail(
+        id=project.id,
+        name=project.name,
+        workflow_type=project.workflow_type,
+    )
+
+
+@api.post("/api/v1/project/list")
+@sync_to_async
+def list_projects(payload: ProjectListRequest):
+    projects = Project.objects.all().order_by("name")
+    details = [project_to_detail(p) for p in projects]
+    res = ProjectListResponse(projects=details)
+    return msgspec.structs.asdict(res)
+
+
+@api.post("/api/v1/project/update")
+@sync_to_async
+@transaction.atomic
+def update_project(payload: ProjectUpdateRequest):
+    try:
+        project = Project.objects.get(name=payload.name)
+    except Project.DoesNotExist:
+        raise ValueError(f"Project '{payload.name}' does not exist")
+
+    if payload.workflow_type is not None:
+        if payload.workflow_type not in Project.WorkflowType.values:
+            raise ValueError(f"Invalid workflow type: {payload.workflow_type}")
+        project.workflow_type = payload.workflow_type
+        project.save()
+
+    res = ProjectUpdateResponse(project=project_to_detail(project))
     return msgspec.structs.asdict(res)
