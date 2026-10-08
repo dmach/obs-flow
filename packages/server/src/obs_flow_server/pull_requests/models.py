@@ -2,7 +2,7 @@ from django.db import models
 from django.db.models import Q
 from django.conf import settings
 
-from core.models import GitMapping, Issue
+from core.models import GitMapping, Issue, Project
 from reviews.models import BaseReview
 
 
@@ -25,6 +25,10 @@ class PullRequest(models.Model):
 
     class Meta:
         unique_together = ("target", "number")
+
+    @property
+    def target_project(self) -> Project:
+        return self.target.target_project
 
     def __str__(self):
         return f"PR #{self.number} ({self.state}) on {self.target}"

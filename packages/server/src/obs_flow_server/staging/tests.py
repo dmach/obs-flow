@@ -348,6 +348,91 @@ class TestStagingBatchRevision(TransactionTestCase):
         self.assertEqual(rev4.revision_pull_requests.count(), 0)
         self.assertEqual(rev4.fingerprint, expected_fingerprint_1)
 
+    def test_staging_add_cross_project_pr_rejected(self):
+        """Verify that adding a PR targeting a different project to a staging batch is rejected with 400."""
+        import json
+        from django_bolt.testing import TestClient
+        from obs_flow_server.api import api
+
+        other_project = Project.objects.create(name="openSUSE:Testing")
+        other_mapping = GitMapping.objects.create(
+            owner="openSUSE", repo="leap-pkg", branch="main", project=other_project
+        )
+        author = User.objects.get(username="darix")
+        other_pr = PullRequest.objects.create(
+            target=other_mapping,
+            number=999,
+            author=author,
+            title="Leap PR",
+        )
+        PullRequestRevision.objects.create(
+            pull_request=other_pr,
+            revision_number=1,
+            head_sha="a" * 40,
+            base_sha="b" * 40,
+            fingerprint="c" * 64,
+        )
+
+        batch = StagingBatch.objects.get(id=1)
+        initial_rev_count = batch.revisions.count()
+
+        add_payload = {
+            "id": batch.id,
+            "pull_request_ids": ["openSUSE/leap-pkg#999"],
+        }
+        with TestClient(api) as client:
+            response = client.post(
+                "/api/v1/staging/add",
+                content=json.dumps(add_payload),
+            )
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("does not match staging batch project", response.text)
+        self.assertEqual(batch.revisions.count(), initial_rev_count)
+
+    def test_staging_add_package_target_pr_accepted(self):
+        """Verify that adding a PR targeting a package within the batch's project succeeds."""
+        import json
+        from django_bolt.testing import TestClient
+        from obs_flow_server.api import api
+        from core.models import Package
+
+        batch = StagingBatch.objects.get(id=1)
+        pkg = Package.objects.create(project=batch.project, name="subpackage")
+        pkg_mapping = GitMapping.objects.create(
+            owner="openSUSE", repo="subpkg-repo", branch="main", package=pkg
+        )
+        author = User.objects.get(username="darix")
+        pkg_pr = PullRequest.objects.create(
+            target=pkg_mapping,
+            number=555,
+            author=author,
+            title="Subpackage PR",
+        )
+        pr_rev = PullRequestRevision.objects.create(
+            pull_request=pkg_pr,
+            revision_number=1,
+            head_sha="d" * 40,
+            base_sha="e" * 40,
+            fingerprint="f" * 64,
+        )
+
+        initial_rev_count = batch.revisions.count()
+        add_payload = {
+            "id": batch.id,
+            "pull_request_ids": ["openSUSE/subpkg-repo#555"],
+        }
+        with TestClient(api) as client:
+            response = client.post(
+                "/api/v1/staging/add",
+                content=json.dumps(add_payload),
+            )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(batch.revisions.count(), initial_rev_count + 1)
+        latest_rev = batch.revisions.order_by("-revision_number").first()
+        self.assertTrue(
+            latest_rev.revision_pull_requests.filter(pull_request_revision=pr_rev).exists()
+        )
+
 
 class TestStagingUIModalViews(TransactionTestCase):
     fixtures = ["opensuse_data.json"]

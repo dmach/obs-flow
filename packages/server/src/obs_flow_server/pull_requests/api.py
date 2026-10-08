@@ -316,14 +316,12 @@ def _do_sync_pull_request(req: PRSyncRequest) -> PRSyncResponse:
         from reviews.models import ReviewConfig
 
         git_mapping = pr.target
+        project = git_mapping.target_project
         if git_mapping.project_id:
-            project = git_mapping.project
             config_type = ReviewConfig.ConfigType.PROJECT
         elif git_mapping.package_id:
-            project = git_mapping.package.project
             config_type = ReviewConfig.ConfigType.PACKAGE
         else:
-            project = None
             config_type = None
 
         if project and config_type:

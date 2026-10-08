@@ -224,6 +224,17 @@ def edit_staging_endpoint(payload: StagingEditRequest):
 def add_to_staging_endpoint(payload: StagingAddRequest):
     batch = StagingBatch.objects.get(id=payload.id)
 
+    # Validate that all requested PRs target the same project as the batch
+    resolved_prs = []
+    for pr_id in payload.pull_request_ids:
+        pr = get_pull_request(pr_id)
+        if pr.target_project != batch.project:
+            return HttpResponseBadRequest(
+                f"Pull request '{pr_id}' belongs to project '{pr.target_project.name}', "
+                f"which does not match staging batch project '{batch.project.name}'."
+            )
+        resolved_prs.append(pr)
+
     latest_rev = batch.revisions.order_by("-revision_number").first()
     current_prs = []
     if latest_rev:
@@ -232,8 +243,7 @@ def add_to_staging_endpoint(payload: StagingAddRequest):
             for bpr in latest_rev.revision_pull_requests.all()
         ]
 
-    for pr_id in payload.pull_request_ids:
-        pr = get_pull_request(pr_id)
+    for pr in resolved_prs:
         if pr not in current_prs:
             current_prs.append(pr)
 

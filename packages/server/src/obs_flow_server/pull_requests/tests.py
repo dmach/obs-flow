@@ -25,6 +25,11 @@ class TestPRSyncEndpoint(TransactionTestCase):
             )
         self.assertEqual(response.status_code, 200)
 
+    def test_pull_request_target_project_property(self):
+        pr = PullRequest.objects.get(number=1234)
+        project = Project.objects.get(name="openSUSE:Factory")
+        self.assertEqual(pr.target_project, project)
+
     @override_settings(GITEA_URL=None, GITEA_TOKEN=None)
     def test_sync_fails_without_settings(self):
         """Verify that the endpoint fails if GITEA_URL or GITEA_TOKEN is not set."""

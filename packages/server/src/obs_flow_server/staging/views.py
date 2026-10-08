@@ -232,11 +232,7 @@ def staging_ui_modal_select_batch(request):
     for pr_id in pr_ids:
         pr = get_object_or_404(PullRequest, id=pr_id)
         prs.append(pr)
-        git_mapping = pr.target
-        if git_mapping.project_id:
-            projects.add(git_mapping.project)
-        elif git_mapping.package_id:
-            projects.add(git_mapping.package.project)
+        projects.add(pr.target_project)
 
     if len(projects) > 1:
         return render(request, "staging/partials/modal_error.html", {

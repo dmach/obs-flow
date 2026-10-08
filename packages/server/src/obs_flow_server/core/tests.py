@@ -62,6 +62,17 @@ class TestGitMappingAPI(TransactionTestCase):
         # Verify DB
         self.assertTrue(GitMapping.objects.filter(owner="openSUSE", repo="osc", branch="master").exists())
 
+    def test_git_mapping_target_project_property(self):
+        mapping_proj = GitMapping.objects.create(
+            owner="openSUSE", repo="repo1", branch="main", project=self.project
+        )
+        self.assertEqual(mapping_proj.target_project, self.project)
+
+        mapping_pkg = GitMapping.objects.create(
+            owner="openSUSE", repo="repo2", branch="main", package=self.package
+        )
+        self.assertEqual(mapping_pkg.target_project, self.project)
+
     def test_add_git_mapping_package_missing_project(self):
         payload = {
             "owner": "openSUSE",
