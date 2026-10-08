@@ -59,6 +59,10 @@ class GitMapping(models.Model):
             ),
         ]
 
+    @property
+    def target_project(self) -> Project:
+        return self.project if self.project_id else self.package.project
+
     def __str__(self):
         target = self.project or self.package
         return f"{self.owner}/{self.repo}:{self.branch} -> {target}"
