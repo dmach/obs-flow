@@ -1,0 +1,31 @@
+<div id="pr-draft-section" class="sidebar-section">
+    <h4>Draft</h4>
+    <p>
+        {% if pr.is_draft %}
+            yes
+            {% if latest_revision and latest_revision.draft_expires_at %}
+                <span class="debounce-countdown"
+                      data-expires="{{ latest_revision.draft_expires_at|date:'c' }}"
+                      hx-get="{% url 'pr_draft_status' pr.id %}"
+                      hx-trigger="countdown-expired"
+                      hx-target="#pr-draft-section"
+                      hx-swap="outerHTML">
+                    (debouncing: <span class="countdown-timer">...</span>)
+                </span>
+            {% endif %}
+        {% else %}
+            no
+        {% endif %}
+    </p>
+    {% if pr.is_draft %}
+        <form method="post" action="{% url 'pr_ready_for_review' pr.id %}" hx-post="{% url 'pr_ready_for_review' pr.id %}" hx-target="#pr-draft-section" hx-swap="outerHTML">
+            {% csrf_token %}
+            <button type="submit" class="outline" style="margin-top: 0.5rem; width: 100%;">Ready for Review</button>
+        </form>
+    {% else %}
+        <form method="post" action="{% url 'pr_convert_to_draft' pr.id %}" hx-post="{% url 'pr_convert_to_draft' pr.id %}" hx-target="#pr-draft-section" hx-swap="outerHTML">
+            {% csrf_token %}
+            <button type="submit" class="outline secondary" style="margin-top: 0.5rem; width: 100%;">Convert to Draft</button>
+        </form>
+    {% endif %}
+</div>

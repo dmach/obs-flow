@@ -28,10 +28,12 @@ urlpatterns = [
     path("git-mappings/", core_views.git_mapping_list, name="git_mapping_list"),
     path("pull-requests/", pr_views.pr_list, name="pr_list"),
     path("pull-requests/<int:pr_id>/", pr_views.pr_detail, name="pr_detail"),
+    path("pull-requests/<int:pr_id>/draft-status/", pr_views.pr_draft_status, name="pr_draft_status"),
     path("pull-requests/<int:pr_id>/ready-for-review/", pr_views.pr_ready_for_review, name="pr_ready_for_review"),
     path("pull-requests/<int:pr_id>/convert-to-draft/", pr_views.pr_convert_to_draft, name="pr_convert_to_draft"),
     path("staging/", staging_views.staging_list, name="staging_list"),
     path("staging/<int:batch_id>/", staging_views.staging_detail, name="staging_detail"),
+    path("staging/<int:batch_id>/draft-status/", staging_views.staging_draft_status, name="staging_draft_status"),
     path("staging/<int:batch_id>/ready-for-review/", staging_views.staging_ready_for_review, name="staging_ready_for_review"),
     path("staging/<int:batch_id>/convert-to-draft/", staging_views.staging_convert_to_draft, name="staging_convert_to_draft"),
     path(

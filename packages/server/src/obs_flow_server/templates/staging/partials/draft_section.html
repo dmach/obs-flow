@@ -1,0 +1,31 @@
+<div id="staging-draft-section" class="sidebar-section">
+    <h4>Draft</h4>
+    <p>
+        {% if batch.is_draft %}
+            yes
+            {% if latest_revision and latest_revision.draft_expires_at %}
+                <span class="debounce-countdown"
+                      data-expires="{{ latest_revision.draft_expires_at|date:'c' }}"
+                      hx-get="{% url 'staging_draft_status' batch.id %}"
+                      hx-trigger="countdown-expired"
+                      hx-target="#staging-draft-section"
+                      hx-swap="outerHTML">
+                    (debouncing: <span class="countdown-timer">...</span>)
+                </span>
+            {% endif %}
+        {% else %}
+            no
+        {% endif %}
+    </p>
+    {% if batch.is_draft %}
+        <form method="post" action="{% url 'staging_ready_for_review' batch.id %}" hx-post="{% url 'staging_ready_for_review' batch.id %}" hx-target="#staging-draft-section" hx-swap="outerHTML">
+            {% csrf_token %}
+            <button type="submit" class="outline" style="margin-top: 0.5rem; width: 100%;">Ready for Review</button>
+        </form>
+    {% else %}
+        <form method="post" action="{% url 'staging_convert_to_draft' batch.id %}" hx-post="{% url 'staging_convert_to_draft' batch.id %}" hx-target="#staging-draft-section" hx-swap="outerHTML">
+            {% csrf_token %}
+            <button type="submit" class="outline secondary" style="margin-top: 0.5rem; width: 100%;">Convert to Draft</button>
+        </form>
+    {% endif %}
+</div>

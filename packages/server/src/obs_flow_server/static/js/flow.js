@@ -31,3 +31,45 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
 });
+
+function initDebounceCountdowns() {
+    document.querySelectorAll('.debounce-countdown').forEach(el => {
+        if (el._countdownInterval) return;
+
+        const expiresStr = el.getAttribute('data-expires');
+        if (!expiresStr) return;
+        const expires = new Date(expiresStr);
+        const timerEl = el.querySelector('.countdown-timer');
+
+        function tick() {
+            const now = new Date();
+            const diffMs = expires - now;
+            if (diffMs <= 0) {
+                if (timerEl) timerEl.textContent = '00m 00s';
+                clearInterval(el._countdownInterval);
+                el._countdownInterval = null;
+                if (window.htmx) {
+                    window.htmx.trigger(el, 'countdown-expired');
+                }
+            } else {
+                const totalSec = Math.floor(diffMs / 1000);
+                const days = Math.floor(totalSec / 86400);
+                const hours = Math.floor((totalSec % 86400) / 3600);
+                const minutes = Math.floor((totalSec % 3600) / 60);
+                const seconds = totalSec % 60;
+                let parts = [];
+                if (days > 0) parts.push(days + 'd');
+                if (hours > 0 || days > 0) parts.push(hours + 'h');
+                parts.push(String(minutes).padStart(2, '0') + 'm');
+                parts.push(String(seconds).padStart(2, '0') + 's');
+                if (timerEl) timerEl.textContent = parts.join(' ');
+            }
+        }
+
+        tick();
+        el._countdownInterval = setInterval(tick, 1000);
+    });
+}
+
+document.addEventListener('DOMContentLoaded', initDebounceCountdowns);
+document.addEventListener('htmx:afterSwap', initDebounceCountdowns);

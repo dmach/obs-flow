@@ -858,3 +858,26 @@ class TestPRDraftWebViews(TestCase):
         self.assertIsNone(self.rev.draft_expires_at)
         # Reviews remain intact
         self.assertEqual(self.rev.reviews.count(), 1)
+
+    def test_pr_htmx_actions_and_draft_status_expiration(self):
+        from django.test import Client
+        client = Client()
+
+        # HTMX ready for review returns partial directly
+        res = client.post(f"/pull-requests/{self.pr.id}/ready-for-review/", HTTP_HX_REQUEST="true")
+        self.assertEqual(res.status_code, 200)
+        self.assertContains(res, 'id="pr-draft-section"')
+        self.assertContains(res, "Convert to Draft")
+
+        # Set expired draft timer
+        self.rev.is_draft = True
+        self.rev.draft_expires_at = timezone.now() - timezone.timedelta(seconds=1)
+        self.rev.save()
+
+        # GET /draft-status/ auto-publishes expired draft and returns partial with Convert to Draft
+        res = client.get(f"/pull-requests/{self.pr.id}/draft-status/")
+        self.assertEqual(res.status_code, 200)
+        self.assertContains(res, "Convert to Draft")
+        self.assertNotContains(res, "debouncing:")
+        self.rev.refresh_from_db()
+        self.assertFalse(self.rev.is_draft)
