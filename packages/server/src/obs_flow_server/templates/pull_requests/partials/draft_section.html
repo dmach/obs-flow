@@ -37,3 +37,10 @@
         </form>
     {% endif %}
 </div>
+
+{% if request.headers.HX_Request %}
+<section id="pr-reviews-section" hx-swap-oob="true">
+    <h3>Reviews (Latest Revision)</h3>
+    {% include "pull_requests/partials/reviews_table.html" %}
+</section>
+{% endif %}

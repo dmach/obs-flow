@@ -342,6 +342,19 @@ def staging_ui_modal_confirm_add(request):
     return _close_modal_and_refresh()
 
 
+def _render_staging_draft_section(request, batch, latest_revision):
+    reviews = latest_revision.reviews.all() if latest_revision else []
+    return render(
+        request,
+        "staging/partials/draft_section.html",
+        {
+            "batch": batch,
+            "latest_revision": latest_revision,
+            "reviews": reviews,
+        },
+    )
+
+
 def staging_draft_status(request, batch_id):
     batch = get_object_or_404(StagingBatch, id=batch_id)
     latest_revision = batch.revisions.order_by("-revision_number").first()
@@ -350,14 +363,7 @@ def staging_draft_status(request, batch_id):
         mark_staging_ready_for_review(latest_revision)
         batch.refresh_from_db()
         latest_revision.refresh_from_db()
-    return render(
-        request,
-        "staging/partials/draft_section.html",
-        {
-            "batch": batch,
-            "latest_revision": latest_revision,
-        },
-    )
+    return _render_staging_draft_section(request, batch, latest_revision)
 
 
 @require_POST
@@ -372,14 +378,7 @@ def staging_ready_for_review(request, batch_id):
         latest_revision.refresh_from_db()
 
     if request.headers.get("HX-Request"):
-        return render(
-            request,
-            "staging/partials/draft_section.html",
-            {
-                "batch": batch,
-                "latest_revision": latest_revision,
-            },
-        )
+        return _render_staging_draft_section(request, batch, latest_revision)
     return redirect("staging_detail", batch_id=batch.id)
 
 
@@ -395,14 +394,7 @@ def staging_cancel_timeout(request, batch_id):
         latest_revision.refresh_from_db()
 
     if request.headers.get("HX-Request"):
-        return render(
-            request,
-            "staging/partials/draft_section.html",
-            {
-                "batch": batch,
-                "latest_revision": latest_revision,
-            },
-        )
+        return _render_staging_draft_section(request, batch, latest_revision)
     return redirect("staging_detail", batch_id=batch.id)
 
 
@@ -418,12 +410,5 @@ def staging_convert_to_draft(request, batch_id):
         latest_revision.refresh_from_db()
 
     if request.headers.get("HX-Request"):
-        return render(
-            request,
-            "staging/partials/draft_section.html",
-            {
-                "batch": batch,
-                "latest_revision": latest_revision,
-            },
-        )
+        return _render_staging_draft_section(request, batch, latest_revision)
     return redirect("staging_detail", batch_id=batch.id)

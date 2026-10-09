@@ -144,6 +144,19 @@ def pr_detail(request, pr_id):
     )
 
 
+def _render_pr_draft_section(request, pr, latest_revision):
+    reviews = latest_revision.reviews.all() if latest_revision else []
+    return render(
+        request,
+        "pull_requests/partials/draft_section.html",
+        {
+            "pr": pr,
+            "latest_revision": latest_revision,
+            "reviews": reviews,
+        },
+    )
+
+
 def pr_draft_status(request, pr_id):
     pr = get_object_or_404(PullRequest, id=pr_id)
     latest_revision = pr.revisions.order_by("-revision_number").first()
@@ -152,14 +165,7 @@ def pr_draft_status(request, pr_id):
         mark_ready_for_review(latest_revision)
         pr.refresh_from_db()
         latest_revision.refresh_from_db()
-    return render(
-        request,
-        "pull_requests/partials/draft_section.html",
-        {
-            "pr": pr,
-            "latest_revision": latest_revision,
-        },
-    )
+    return _render_pr_draft_section(request, pr, latest_revision)
 
 
 @require_POST
@@ -174,14 +180,7 @@ def pr_ready_for_review(request, pr_id):
         latest_revision.refresh_from_db()
 
     if request.headers.get("HX-Request"):
-        return render(
-            request,
-            "pull_requests/partials/draft_section.html",
-            {
-                "pr": pr,
-                "latest_revision": latest_revision,
-            },
-        )
+        return _render_pr_draft_section(request, pr, latest_revision)
     return redirect("pr_detail", pr_id=pr.id)
 
 
@@ -197,14 +196,7 @@ def pr_cancel_timeout(request, pr_id):
         latest_revision.refresh_from_db()
 
     if request.headers.get("HX-Request"):
-        return render(
-            request,
-            "pull_requests/partials/draft_section.html",
-            {
-                "pr": pr,
-                "latest_revision": latest_revision,
-            },
-        )
+        return _render_pr_draft_section(request, pr, latest_revision)
     return redirect("pr_detail", pr_id=pr.id)
 
 
@@ -220,12 +212,5 @@ def pr_convert_to_draft(request, pr_id):
         latest_revision.refresh_from_db()
 
     if request.headers.get("HX-Request"):
-        return render(
-            request,
-            "pull_requests/partials/draft_section.html",
-            {
-                "pr": pr,
-                "latest_revision": latest_revision,
-            },
-        )
+        return _render_pr_draft_section(request, pr, latest_revision)
     return redirect("pr_detail", pr_id=pr.id)

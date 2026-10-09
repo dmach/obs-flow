@@ -863,22 +863,28 @@ class TestPRDraftWebViews(TestCase):
         from django.test import Client
         client = Client()
 
-        # HTMX ready for review returns partial directly
+        # HTMX ready for review returns partial directly with OOB reviews section containing reviewer
         res = client.post(f"/pull-requests/{self.pr.id}/ready-for-review/", HTTP_HX_REQUEST="true")
         self.assertEqual(res.status_code, 200)
         self.assertContains(res, 'id="pr-draft-section"')
         self.assertContains(res, "Convert to Draft")
+        self.assertContains(res, 'id="pr-reviews-section"')
+        self.assertContains(res, 'hx-swap-oob="true"')
+        self.assertContains(res, "rev")
 
         # Set expired draft timer
         self.rev.is_draft = True
         self.rev.draft_expires_at = timezone.now() - timezone.timedelta(seconds=1)
         self.rev.save()
 
-        # GET /draft-status/ auto-publishes expired draft and returns partial with Convert to Draft
-        res = client.get(f"/pull-requests/{self.pr.id}/draft-status/")
+        # GET /draft-status/ auto-publishes expired draft and returns partial with Convert to Draft and updated reviews
+        res = client.get(f"/pull-requests/{self.pr.id}/draft-status/", HTTP_HX_REQUEST="true")
         self.assertEqual(res.status_code, 200)
         self.assertContains(res, "Convert to Draft")
         self.assertNotContains(res, "debouncing:")
+        self.assertContains(res, 'id="pr-reviews-section"')
+        self.assertContains(res, 'hx-swap-oob="true"')
+        self.assertContains(res, "rev")
         self.rev.refresh_from_db()
         self.assertFalse(self.rev.is_draft)
 
