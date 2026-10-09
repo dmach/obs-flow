@@ -98,7 +98,7 @@ class TestPRSyncEndpoint(TransactionTestCase):
         self.assertEqual(pr_detail["id"], "suse/obs-flow#123")
         self.assertEqual(pr_detail["title"], "Fix some bugs")
         self.assertEqual(pr_detail["state"], "open")
-        self.assertEqual(pr_detail["is_draft"], False)
+        self.assertEqual(pr_detail["is_draft"], True)
         self.assertEqual(pr_detail["is_mergeable"], True)
         self.assertEqual(pr_detail["author"], {
             "username": "john_doe",
@@ -113,6 +113,12 @@ class TestPRSyncEndpoint(TransactionTestCase):
         self.assertTrue(User.objects.filter(username="john_doe").exists())
         self.assertTrue(Project.objects.filter(name="suse:obs-flow").exists())
         self.assertTrue(GitMapping.objects.filter(owner="suse", repo="obs-flow").exists())
+        pr = PullRequest.objects.get(number=123)
+        self.assertTrue(pr.is_draft)
+        latest_rev = pr.revisions.first()
+        self.assertTrue(latest_rev.is_draft)
+        self.assertIsNotNone(latest_rev.draft_expires_at)
+        self.assertEqual(latest_rev.reviews.count(), 0)
         self.assertTrue(PullRequest.objects.filter(number=123).exists())
         self.assertTrue(PullRequestRevision.objects.filter(revision_number=1).exists())
 
@@ -192,7 +198,7 @@ class TestPRSyncEndpoint(TransactionTestCase):
         res_data = response.json()
         pr_detail = res_data["pull_request"]
         self.assertEqual(pr_detail["title"], "New Title")
-        self.assertEqual(pr_detail["is_draft"], False)
+        self.assertEqual(pr_detail["is_draft"], True)
         self.assertEqual(pr_detail["is_mergeable"], True)
         self.assertEqual(pr_detail["latest_revision"], 2)
         self.assertEqual(pr_detail["head_sha"], "2222222222222222222222222222222222222222")
@@ -200,13 +206,13 @@ class TestPRSyncEndpoint(TransactionTestCase):
         # Verify DB state
         pr.refresh_from_db()
         self.assertEqual(pr.title, "New Title")
-        self.assertEqual(pr.is_draft, False)
+        self.assertEqual(pr.is_draft, True)
         self.assertEqual(pr.is_mergeable, True)
 
         # Verify both revisions exist
         self.assertEqual(pr.revisions.count(), 2)
 
-        # Verify review was created for the new revision
+        # Verify review is NOT created initially while in debounce draft mode
         latest_revision = pr.revisions.get(revision_number=2)
         from pull_requests.fingerprint import PRRevisionPayload
         expected_fp = PRRevisionPayload(
@@ -215,7 +221,15 @@ class TestPRSyncEndpoint(TransactionTestCase):
             target_branch="main"
         ).compute_fingerprint()
         self.assertEqual(latest_revision.fingerprint, expected_fp)
+        self.assertTrue(latest_revision.is_draft)
+        self.assertIsNotNone(latest_revision.draft_expires_at)
+        self.assertEqual(latest_revision.reviews.count(), 0)
 
+        # Transition out of draft mode and verify reviews are now created
+        from pull_requests.api import mark_ready_for_review
+        mark_ready_for_review(latest_revision)
+        pr.refresh_from_db()
+        self.assertFalse(pr.is_draft)
         self.assertEqual(latest_revision.reviews.count(), 1)
         review = latest_revision.reviews.first()
         self.assertEqual(review.reviewer_user, reviewer_user)
@@ -302,8 +316,14 @@ class TestPRSyncEndpoint(TransactionTestCase):
             )
         self.assertEqual(response.status_code, 200)
 
-        # Verify review was created for the new revision and it is the package config, not project config
+        # Verify revision was created in draft mode and no reviews yet
         latest_revision = pr.revisions.get(revision_number=2)
+        self.assertTrue(latest_revision.is_draft)
+        self.assertEqual(latest_revision.reviews.count(), 0)
+
+        # Transition out of draft mode and verify review was created for the new revision and it is the package config, not project config
+        from pull_requests.api import mark_ready_for_review
+        mark_ready_for_review(latest_revision)
         self.assertEqual(latest_revision.reviews.count(), 1)
         review = latest_revision.reviews.first()
         self.assertEqual(review.reviewer_user, reviewer_user)
@@ -577,4 +597,118 @@ class TestPullRequestReviewProvisioning(TestCase):
 
         # Subsequent call does not duplicate reviews
         mark_ready_for_review(rev)
+        self.assertEqual(rev.reviews.count(), 1)
+
+
+class TestPRSyncDebounceLifecycle(TransactionTestCase):
+    @override_settings(GITEA_URL="https://gitea.example.com", GITEA_TOKEN="secret-token", DEBOUNCE_TIMEOUT_MINUTES=15)
+    @patch("urllib.request.urlopen")
+    def test_sync_manual_draft_pr_sets_no_expiry(self, mock_urlopen):
+        project = Project.objects.create(name="suse:obs-flow")
+        GitMapping.objects.create(owner="suse", repo="obs-flow", branch="main", project=project)
+
+        mock_response = MagicMock()
+        mock_response.read.return_value = json.dumps({
+            "title": "Manual Draft PR",
+            "draft": True,
+            "mergeable": True,
+            "state": "open",
+            "user": {"login": "dev"},
+            "head": {"sha": "1111", "ref": "feat", "repo": {"owner": {"login": "dev"}, "name": "obs-flow"}},
+            "base": {"sha": "0000", "ref": "main"},
+        }).encode("utf-8")
+        mock_urlopen.return_value.__enter__.return_value = mock_response
+
+        with TestClient(api) as client:
+            res = client.post("/api/v1/pr/sync", content=json.dumps({"owner": "suse", "repo": "obs-flow", "number": 1}))
+        self.assertEqual(res.status_code, 200)
+
+        pr = PullRequest.objects.get(number=1)
+        rev = pr.revisions.first()
+        self.assertTrue(rev.is_draft)
+        self.assertIsNone(rev.draft_expires_at)
+        self.assertEqual(rev.reviews.count(), 0)
+
+    @override_settings(GITEA_URL="https://gitea.example.com", GITEA_TOKEN="secret-token", DEBOUNCE_TIMEOUT_MINUTES=15)
+    @patch("urllib.request.urlopen")
+    def test_sync_transition_manual_draft_to_published_without_new_push(self, mock_urlopen):
+        project = Project.objects.create(name="suse:obs-flow")
+        git_mapping = GitMapping.objects.create(owner="suse", repo="obs-flow", branch="main", project=project)
+        author = User.objects.create(username="dev", username_lower="dev", account_type=User.AccountType.HUMAN)
+        reviewer = User.objects.create(username="rev", username_lower="rev", account_type=User.AccountType.HUMAN)
+        from reviews.models import ReviewConfig
+        ReviewConfig.objects.create(project=project, type=ReviewConfig.ConfigType.PROJECT, reviewer_user=reviewer)
+
+        pr = PullRequest.objects.create(
+            target=git_mapping,
+            number=1,
+            author=author,
+            source_owner="dev",
+            source_repo="obs-flow",
+            source_branch="feat",
+        )
+        from pull_requests.fingerprint import PRRevisionPayload
+        fp = PRRevisionPayload(head_sha="1111", base_sha="0000", target_branch="main").compute_fingerprint()
+        rev = PullRequestRevision.objects.create(
+            pull_request=pr,
+            revision_number=1,
+            head_sha="1111",
+            base_sha="0000",
+            fingerprint=fp,
+            is_draft=True,
+            draft_expires_at=None,
+        )
+
+        # Now mock Gitea returning draft: False with the exact same head & base sha
+        mock_response = MagicMock()
+        mock_response.read.return_value = json.dumps({
+            "title": "Published PR",
+            "draft": False,
+            "mergeable": True,
+            "state": "open",
+            "user": {"login": "dev"},
+            "head": {"sha": "1111", "ref": "feat", "repo": {"owner": {"login": "dev"}, "name": "obs-flow"}},
+            "base": {"sha": "0000", "ref": "main"},
+        }).encode("utf-8")
+        mock_urlopen.return_value.__enter__.return_value = mock_response
+
+        with TestClient(api) as client:
+            res = client.post("/api/v1/pr/sync", content=json.dumps({"owner": "suse", "repo": "obs-flow", "number": 1}))
+        self.assertEqual(res.status_code, 200)
+
+        rev.refresh_from_db()
+        self.assertFalse(rev.is_draft)
+        self.assertIsNone(rev.draft_expires_at)
+        self.assertEqual(rev.reviews.count(), 1)
+
+    @override_settings(GITEA_URL="https://gitea.example.com", GITEA_TOKEN="secret-token", REVIEW_DEBOUNCE_MINUTES=0)
+    @patch("urllib.request.urlopen")
+    def test_sync_zero_debounce_publishes_immediately(self, mock_urlopen):
+        project = Project.objects.create(name="suse:obs-flow")
+        git_mapping = GitMapping.objects.create(owner="suse", repo="obs-flow", branch="main", project=project)
+        reviewer = User.objects.create(username="rev", username_lower="rev", account_type=User.AccountType.HUMAN)
+        from reviews.models import ReviewConfig
+        ReviewConfig.objects.create(project=project, type=ReviewConfig.ConfigType.PROJECT, reviewer_user=reviewer)
+
+        mock_response = MagicMock()
+        mock_response.read.return_value = json.dumps({
+            "title": "Zero Debounce PR",
+            "draft": False,
+            "mergeable": True,
+            "state": "open",
+            "user": {"login": "dev"},
+            "head": {"sha": "1111", "ref": "feat", "repo": {"owner": {"login": "dev"}, "name": "obs-flow"}},
+            "base": {"sha": "0000", "ref": "main"},
+        }).encode("utf-8")
+        mock_urlopen.return_value.__enter__.return_value = mock_response
+
+        with TestClient(api) as client:
+            res = client.post("/api/v1/pr/sync", content=json.dumps({"owner": "suse", "repo": "obs-flow", "number": 1}))
+        self.assertEqual(res.status_code, 200)
+
+        pr = PullRequest.objects.get(number=1)
+        rev = pr.revisions.first()
+        self.assertFalse(rev.is_draft)
+        self.assertIsNone(rev.draft_expires_at)
+        self.assertFalse(pr.is_draft)
         self.assertEqual(rev.reviews.count(), 1)

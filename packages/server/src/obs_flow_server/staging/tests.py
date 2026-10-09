@@ -137,6 +137,15 @@ class TestStagingCreationWithReviewConfig(TransactionTestCase):
         batch = StagingBatch.objects.get(id=batch_id)
         self.assertEqual(batch.project, project)
 
+        # Reviews are deferred while in draft
+        self.assertTrue(batch.is_draft)
+        self.assertEqual(StagingReview.objects.filter(revision__staging_batch=batch).count(), 0)
+
+        # Transition out of draft mode and verify reviews are now created
+        from staging.api import mark_staging_ready_for_review
+        mark_staging_ready_for_review(batch.revisions.first())
+        self.assertFalse(batch.is_draft)
+
         reviews = StagingReview.objects.filter(revision__staging_batch=batch)
         self.assertEqual(reviews.count(), 3)
 
@@ -684,4 +693,24 @@ class TestStagingReviewProvisioning(TestCase):
 
         # Subsequent call does not duplicate reviews
         mark_staging_ready_for_review(rev)
+        self.assertEqual(rev.reviews.count(), 1)
+
+    def test_staging_zero_debounce_publishes_immediately(self):
+        from reviews.models import ReviewConfig
+        from staging.api import create_staging_revision
+
+        project = Project.objects.create(name="test:project-zero", review_debounce_minutes=0)
+        reviewer = User.objects.create(username="reviewer_zero", username_lower="reviewer_zero", account_type=User.AccountType.HUMAN)
+        ReviewConfig.objects.create(
+            project=project,
+            type="staging",
+            reviewer_user=reviewer,
+        )
+
+        batch = StagingBatch.objects.create(project=project)
+        rev = create_staging_revision(batch, [])
+
+        self.assertFalse(rev.is_draft)
+        self.assertIsNone(rev.draft_expires_at)
+        self.assertFalse(batch.is_draft)
         self.assertEqual(rev.reviews.count(), 1)

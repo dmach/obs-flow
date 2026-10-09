@@ -1,3 +1,4 @@
+from datetime import timedelta
 import re
 
 import msgspec
@@ -220,9 +221,12 @@ from django.http import HttpResponseServerError
 def provision_reviews_for_revision(revision: PullRequestRevision) -> list[PullRequestReview]:
     """
     Provisions reviews for a PullRequestRevision based on ReviewConfig if no reviews exist.
+    While a revision is in draft mode, no review records are created.
     Existing reviews are never re-provisioned.
     """
     rev = PullRequestRevision.objects.select_for_update().get(pk=revision.pk)
+    if rev.is_draft:
+        return []
     if rev.reviews.exists():
         return list(rev.reviews.all())
 
@@ -355,19 +359,34 @@ def _do_sync_pull_request(req: PRSyncRequest) -> PRSyncResponse:
     )
     fingerprint = pr_payload.compute_fingerprint()
 
+    target_project = pr.target.target_project
+    timeout_minutes = target_project.effective_review_debounce_minutes if target_project else settings.REVIEW_DEBOUNCE_MINUTES
     latest_revision = pr.revisions.order_by("-revision_number").first()
     if not latest_revision or latest_revision.fingerprint != fingerprint:
         rev_number = (latest_revision.revision_number + 1) if latest_revision else 1
+
+        if draft:
+            rev_is_draft = True
+            rev_draft_expires_at = None
+        elif timeout_minutes == 0:
+            rev_is_draft = False
+            rev_draft_expires_at = None
+        else:
+            rev_is_draft = True
+            rev_draft_expires_at = timezone.now() + timedelta(minutes=timeout_minutes)
+
         latest_revision = PullRequestRevision.objects.create(
             pull_request=pr,
             revision_number=rev_number,
             head_sha=head_sha,
             base_sha=base_sha,
             fingerprint=fingerprint,
-            is_draft=draft,
+            is_draft=rev_is_draft,
+            draft_expires_at=rev_draft_expires_at,
         )
 
-        provision_reviews_for_revision(latest_revision)
+        if not rev_is_draft:
+            provision_reviews_for_revision(latest_revision)
 
         # Update any StagingBatches containing this PR to use the new PullRequestRevision
         from staging.models import StagingBatch
@@ -393,6 +412,16 @@ def _do_sync_pull_request(req: PRSyncRequest) -> PRSyncResponse:
                         else:
                             updated_pr_revs.append(r)
                     create_staging_revision(batch, updated_pr_revs)
+    else:
+        # Same fingerprint (no new push). Check if upstream draft state changed.
+        if not draft and latest_revision.is_draft and latest_revision.draft_expires_at is None:
+            # Transitioned from manual draft to ready in upstream forge
+            mark_ready_for_review(latest_revision)
+        elif draft and not latest_revision.is_draft:
+            # Upstream toggled back to draft
+            latest_revision.is_draft = True
+            latest_revision.draft_expires_at = None
+            latest_revision.save(update_fields=["is_draft", "draft_expires_at"])
 
     return PRSyncResponse(
         pull_request=PRDetail(

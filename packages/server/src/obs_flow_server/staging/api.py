@@ -1,5 +1,7 @@
+from datetime import timedelta
 import msgspec
 from asgiref.sync import sync_to_async
+from django.conf import settings
 from django.db import transaction
 from django.utils import timezone
 from django.http import HttpResponseBadRequest
@@ -64,8 +66,8 @@ def create_staging_revision(batch: StagingBatch, pr_revisions) -> StagingBatchRe
     """
     Creates a new StagingBatchRevision for the given StagingBatch and list of PullRequestRevisions.
     If the latest revision has the exact same fingerprint, it returns the existing one.
-    Otherwise, it increments the revision number, creates the new revision, links the PR revisions,
-    and re-creates pending StagingReviews based on ReviewConfig.
+    Otherwise, it increments the revision number, creates the new revision in draft mode with debounce timer,
+    and links the PR revisions. Reviews are not provisioned while in draft.
     """
     fingerprint = compute_staging_fingerprint(batch, pr_revisions)
     latest_rev = batch.revisions.order_by("-revision_number").first()
@@ -73,11 +75,22 @@ def create_staging_revision(batch: StagingBatch, pr_revisions) -> StagingBatchRe
     if latest_rev and latest_rev.fingerprint == fingerprint:
         return latest_rev
 
+    timeout_minutes = batch.project.effective_review_debounce_minutes
     rev_number = (latest_rev.revision_number + 1) if latest_rev else 1
+
+    if timeout_minutes == 0:
+        rev_is_draft = False
+        rev_draft_expires_at = None
+    else:
+        rev_is_draft = True
+        rev_draft_expires_at = timezone.now() + timedelta(minutes=timeout_minutes)
+
     new_rev = StagingBatchRevision.objects.create(
         staging_batch=batch,
         revision_number=rev_number,
         fingerprint=fingerprint,
+        is_draft=rev_is_draft,
+        draft_expires_at=rev_draft_expires_at,
     )
 
     for pr_rev in pr_revisions:
@@ -86,7 +99,8 @@ def create_staging_revision(batch: StagingBatch, pr_revisions) -> StagingBatchRe
             pull_request_revision=pr_rev,
         )
 
-    provision_reviews_for_staging_revision(new_rev)
+    if not rev_is_draft:
+        provision_reviews_for_staging_revision(new_rev)
 
     return new_rev
 
@@ -95,9 +109,12 @@ def create_staging_revision(batch: StagingBatch, pr_revisions) -> StagingBatchRe
 def provision_reviews_for_staging_revision(revision: StagingBatchRevision) -> list[StagingReview]:
     """
     Provisions reviews for a StagingBatchRevision based on ReviewConfig if no reviews exist.
+    While a revision is in draft mode, no review records are created.
     Existing reviews are never re-provisioned.
     """
     rev = StagingBatchRevision.objects.select_for_update().get(pk=revision.pk)
+    if rev.is_draft:
+        return []
     if rev.reviews.exists():
         return list(rev.reviews.all())
 

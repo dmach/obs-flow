@@ -14,6 +14,14 @@ class Project(models.Model):
         choices=WorkflowType.choices,
         default=WorkflowType.DIRECT,
     )
+    review_debounce_minutes = models.PositiveIntegerField(null=True, blank=True)
+
+    @property
+    def effective_review_debounce_minutes(self) -> int:
+        if self.review_debounce_minutes is not None:
+            return self.review_debounce_minutes
+        from django.conf import settings
+        return settings.REVIEW_DEBOUNCE_MINUTES
 
     def __str__(self):
         return self.name
