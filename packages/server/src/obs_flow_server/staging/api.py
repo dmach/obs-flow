@@ -161,6 +161,22 @@ def mark_staging_ready_for_review(revision: StagingBatchRevision) -> None:
     provision_reviews_for_staging_revision(rev)
 
 
+@transaction.atomic
+def mark_staging_draft(revision: StagingBatchRevision) -> None:
+    """
+    Transitions a StagingBatchRevision into manual draft mode without debounce timer.
+    Existing reviews are not modified or removed.
+    """
+    rev = StagingBatchRevision.objects.select_for_update().get(pk=revision.pk)
+    if rev.is_draft and rev.draft_expires_at is None:
+        return
+    rev.is_draft = True
+    rev.draft_expires_at = None
+    rev.save(update_fields=["is_draft", "draft_expires_at"])
+    revision.is_draft = True
+    revision.draft_expires_at = None
+
+
 def batch_to_detail(batch: StagingBatch) -> StagingDetail:
     latest_rev = batch.revisions.order_by("-revision_number").first()
     if latest_rev:

@@ -1,10 +1,12 @@
 import datetime
 import urllib.parse
+from django.contrib import messages
 from django.core.paginator import Paginator
 from django.db.models import Q
-from django.shortcuts import render, get_object_or_404
+from django.shortcuts import render, get_object_or_404, redirect
 from django.utils import timezone
 from django.views.decorators.csrf import ensure_csrf_cookie
+from django.views.decorators.http import require_POST
 
 from pull_requests.models import PullRequest
 from pull_requests.forms import PullRequestFilterForm
@@ -140,3 +142,25 @@ def pr_detail(request, pr_id):
             "reviews": reviews,
         },
     )
+
+
+@require_POST
+def pr_ready_for_review(request, pr_id):
+    pr = get_object_or_404(PullRequest, id=pr_id)
+    latest_revision = pr.revisions.order_by("-revision_number").first()
+    if latest_revision:
+        from pull_requests.api import mark_ready_for_review
+        mark_ready_for_review(latest_revision)
+        messages.success(request, f"Pull request #{pr.number} is now ready for review.")
+    return redirect("pr_detail", pr_id=pr.id)
+
+
+@require_POST
+def pr_convert_to_draft(request, pr_id):
+    pr = get_object_or_404(PullRequest, id=pr_id)
+    latest_revision = pr.revisions.order_by("-revision_number").first()
+    if latest_revision:
+        from pull_requests.api import mark_draft
+        mark_draft(latest_revision)
+        messages.success(request, f"Pull request #{pr.number} converted to draft.")
+    return redirect("pr_detail", pr_id=pr.id)

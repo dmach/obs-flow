@@ -130,6 +130,32 @@
                 <h4>State</h4>
                 <p>{{ batch.state }}</p>
             </div>
+            <div class="sidebar-section">
+                <h4>Draft</h4>
+                <p>
+                    {% if batch.is_draft %}
+                        yes
+                        {% if latest_revision and latest_revision.draft_expires_at %}
+                            <span class="debounce-countdown" data-expires="{{ latest_revision.draft_expires_at|date:'c' }}">
+                                (debouncing: <span class="countdown-timer">...</span>)
+                            </span>
+                        {% endif %}
+                    {% else %}
+                        no
+                    {% endif %}
+                </p>
+                {% if batch.is_draft %}
+                    <form method="post" action="{% url 'staging_ready_for_review' batch.id %}">
+                        {% csrf_token %}
+                        <button type="submit" class="outline" style="margin-top: 0.5rem; width: 100%;">Ready for Review</button>
+                    </form>
+                {% else %}
+                    <form method="post" action="{% url 'staging_convert_to_draft' batch.id %}">
+                        {% csrf_token %}
+                        <button type="submit" class="outline secondary" style="margin-top: 0.5rem; width: 100%;">Convert to Draft</button>
+                    </form>
+                {% endif %}
+            </div>
             {% if latest_revision %}
             <div class="sidebar-section">
                 <h4>Latest Revision</h4>

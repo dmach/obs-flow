@@ -85,5 +85,36 @@
             <a href="#" class="secondary">Source Code</a>
         </small>
     </footer>
+
+    <script>
+        function updateDebounceCountdowns() {
+            document.querySelectorAll(".debounce-countdown").forEach(function(el) {
+                const expiresStr = el.getAttribute("data-expires");
+                if (!expiresStr) return;
+                const expires = new Date(expiresStr);
+                const now = new Date();
+                const diffMs = expires - now;
+                const timerEl = el.querySelector(".countdown-timer");
+                if (!timerEl) return;
+                if (diffMs <= 0) {
+                    timerEl.textContent = "expiring soon";
+                } else {
+                    const totalSec = Math.floor(diffMs / 1000);
+                    const days = Math.floor(totalSec / 86400);
+                    const hours = Math.floor((totalSec % 86400) / 3600);
+                    const minutes = Math.floor((totalSec % 3600) / 60);
+                    const seconds = totalSec % 60;
+                    let parts = [];
+                    if (days > 0) parts.push(days + "d");
+                    if (hours > 0 || days > 0) parts.push(hours + "h");
+                    parts.push(String(minutes).padStart(2, "0") + "m");
+                    parts.push(String(seconds).padStart(2, "0") + "s");
+                    timerEl.textContent = parts.join(" ");
+                }
+            });
+        }
+        document.addEventListener("DOMContentLoaded", updateDebounceCountdowns);
+        setInterval(updateDebounceCountdowns, 1000);
+    </script>
 </body>
 </html>

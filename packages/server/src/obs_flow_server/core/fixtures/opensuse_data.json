@@ -308,6 +308,34 @@
     }
   },
   {
+    "model": "pull_requests.pullrequest",
+    "pk": 2,
+    "fields": {
+      "target": 1,
+      "number": 5678,
+      "author": 2,
+      "title": "Debounced Draft PR #5678 for openSUSE/osc",
+      "source_owner": "openSUSE",
+      "source_repo": "osc",
+      "source_branch": "draft-feature",
+      "state": "open"
+    }
+  },
+  {
+    "model": "pull_requests.pullrequestrevision",
+    "pk": 2,
+    "fields": {
+      "pull_request": 2,
+      "revision_number": 1,
+      "head_sha": "5678567856785678567856785678567856785678",
+      "base_sha": "abcdef0123456789abcdef0123456789abcdef01",
+      "fingerprint": "5678567856785678567856785678567856785678567856785678567856785678",
+      "created_at": "2026-08-12T12:00:00Z",
+      "is_draft": true,
+      "draft_expires_at": "2100-01-01T00:00:00Z"
+    }
+  },
+  {
     "model": "pull_requests.pullrequestreview",
     "pk": 1,
     "fields": {
@@ -381,6 +409,30 @@
       "revision_number": 1,
       "fingerprint": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
       "created_at": "2026-08-12T12:00:00Z"
+    }
+  },
+  {
+    "model": "staging.stagingbatch",
+    "pk": 2,
+    "fields": {
+      "project": 1,
+      "title": "Debounced Draft Staging Batch #2",
+      "author": 2,
+      "state": "collecting",
+      "created_at": "2026-08-12T12:00:00Z",
+      "updated_at": "2026-08-12T12:00:00Z"
+    }
+  },
+  {
+    "model": "staging.stagingbatchrevision",
+    "pk": 2,
+    "fields": {
+      "staging_batch": 2,
+      "revision_number": 1,
+      "fingerprint": "99996fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+      "created_at": "2026-08-12T12:00:00Z",
+      "is_draft": true,
+      "draft_expires_at": "2100-01-01T00:00:00Z"
     }
   },
   {

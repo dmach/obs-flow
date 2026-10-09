@@ -796,3 +796,65 @@ class TestPRReadyForReviewEndpoint(TestCase):
         with TestClient(api) as client:
             response = client.post("/api/v1/pr/ready-for-review", content=json.dumps({"pull_request_ids": ["suse/obs-flow#999"]}))
         self.assertEqual(response.status_code, 400)
+
+
+class TestPRDraftWebViews(TestCase):
+    def setUp(self):
+        self.project = Project.objects.create(name="test:project")
+        self.git_mapping = GitMapping.objects.create(owner="suse", repo="obs-flow", branch="main", project=self.project)
+        self.author = User.objects.create(username="dev", username_lower="dev", account_type=User.AccountType.HUMAN)
+        self.reviewer = User.objects.create(username="rev", username_lower="rev", account_type=User.AccountType.HUMAN)
+        from reviews.models import ReviewConfig
+        ReviewConfig.objects.create(project=self.project, type=ReviewConfig.ConfigType.PROJECT, reviewer_user=self.reviewer)
+
+        self.pr = PullRequest.objects.create(
+            target=self.git_mapping,
+            number=42,
+            author=self.author,
+            source_owner="dev",
+            source_repo="obs-flow",
+            source_branch="feat",
+        )
+        self.rev = PullRequestRevision.objects.create(
+            pull_request=self.pr,
+            revision_number=1,
+            head_sha="1111",
+            base_sha="0000",
+            fingerprint="fp1",
+            is_draft=True,
+            draft_expires_at=timezone.now() + timezone.timedelta(days=1),
+        )
+
+    def test_pr_detail_shows_countdown_and_ready_button(self):
+        from django.test import Client
+        client = Client()
+        res = client.get(f"/pull-requests/{self.pr.id}/")
+        self.assertEqual(res.status_code, 200)
+        self.assertContains(res, "debouncing:")
+        self.assertContains(res, "Ready for Review")
+
+    def test_pr_ready_and_convert_to_draft_actions(self):
+        from django.test import Client
+        client = Client()
+
+        # 1. Click Ready for Review
+        res = client.post(f"/pull-requests/{self.pr.id}/ready-for-review/")
+        self.assertRedirects(res, f"/pull-requests/{self.pr.id}/")
+        self.pr.refresh_from_db()
+        self.assertFalse(self.pr.is_draft)
+        self.assertEqual(self.rev.reviews.count(), 1)
+
+        # PR detail now shows Convert to Draft
+        res = client.get(f"/pull-requests/{self.pr.id}/")
+        self.assertContains(res, "Convert to Draft")
+        self.assertNotContains(res, "debouncing:")
+
+        # 2. Click Convert to Draft
+        res = client.post(f"/pull-requests/{self.pr.id}/convert-to-draft/")
+        self.assertRedirects(res, f"/pull-requests/{self.pr.id}/")
+        self.pr.refresh_from_db()
+        self.rev.refresh_from_db()
+        self.assertTrue(self.pr.is_draft)
+        self.assertIsNone(self.rev.draft_expires_at)
+        # Reviews remain intact
+        self.assertEqual(self.rev.reviews.count(), 1)

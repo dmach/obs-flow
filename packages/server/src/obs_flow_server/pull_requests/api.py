@@ -276,6 +276,22 @@ def mark_ready_for_review(revision: PullRequestRevision) -> None:
     provision_reviews_for_revision(rev)
 
 
+@transaction.atomic
+def mark_draft(revision: PullRequestRevision) -> None:
+    """
+    Transitions a PullRequestRevision into manual draft mode without debounce timer.
+    Existing reviews are not modified or removed.
+    """
+    rev = PullRequestRevision.objects.select_for_update().get(pk=revision.pk)
+    if rev.is_draft and rev.draft_expires_at is None:
+        return
+    rev.is_draft = True
+    rev.draft_expires_at = None
+    rev.save(update_fields=["is_draft", "draft_expires_at"])
+    revision.is_draft = True
+    revision.draft_expires_at = None
+
+
 def _do_sync_pull_request(req: PRSyncRequest) -> PRSyncResponse:
     # Fetch from Gitea
     url = f"{settings.GITEA_URL.rstrip('/')}/api/v1/repos/{req.owner}/{req.repo}/pulls/{req.number}"

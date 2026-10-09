@@ -72,6 +72,17 @@ class TestFixtureData(TestCase):
         batch = StagingBatch.objects.get(id=1)
         self.assertTrue(StagingReview.objects.filter(revision__staging_batch=batch, reviewer_user__username="darix").exists())
 
+        # Verify Debounced Draft PR from fixture
+        draft_pr = PullRequest.objects.get(number=5678)
+        self.assertTrue(draft_pr.is_draft)
+        self.assertEqual(draft_pr.revisions.first().draft_expires_at.year, 2100)
+
+        # Verify Debounced Draft StagingBatch from fixture
+        draft_batch = StagingBatch.objects.get(id=2)
+        self.assertTrue(draft_batch.is_draft)
+        self.assertEqual(draft_batch.revisions.first().draft_expires_at.year, 2100)
+
+
 
 class TestStagingCreationWithReviewConfig(TransactionTestCase):
     fixtures = ["opensuse_data.json"]
@@ -780,3 +791,54 @@ class TestStagingReadyForReviewEndpoint(TestCase):
         with TestClient(api) as client:
             response = client.post("/api/v1/staging/ready-for-review", content=json.dumps(payload))
         self.assertEqual(response.status_code, 400)
+
+
+class TestStagingDraftWebViews(TestCase):
+    def setUp(self):
+        self.project = Project.objects.create(name="test:project")
+        self.reviewer = User.objects.create(username="rev", username_lower="rev", account_type=User.AccountType.HUMAN)
+        from reviews.models import ReviewConfig
+        ReviewConfig.objects.create(project=self.project, type="staging", reviewer_user=self.reviewer)
+
+        self.batch = StagingBatch.objects.create(project=self.project)
+        self.rev = StagingBatchRevision.objects.create(
+            staging_batch=self.batch,
+            revision_number=1,
+            fingerprint="fp1",
+            is_draft=True,
+            draft_expires_at=timezone.now() + timezone.timedelta(days=1),
+        )
+
+    def test_staging_detail_shows_countdown_and_ready_button(self):
+        client = Client()
+        res = client.get(f"/staging/{self.batch.id}/")
+        self.assertEqual(res.status_code, 200)
+        self.assertContains(res, "debouncing:")
+        self.assertContains(res, "Ready for Review")
+
+    def test_staging_ready_and_convert_to_draft_actions(self):
+        client = Client()
+
+        # 1. Click Ready for Review
+        res = client.post(f"/staging/{self.batch.id}/ready-for-review/")
+        self.assertRedirects(res, f"/staging/{self.batch.id}/")
+        self.batch.refresh_from_db()
+        self.rev.refresh_from_db()
+        self.assertFalse(self.batch.is_draft)
+        self.assertFalse(self.rev.is_draft)
+        self.assertEqual(self.rev.reviews.count(), 1)
+
+        # Staging detail now shows Convert to Draft
+        res = client.get(f"/staging/{self.batch.id}/")
+        self.assertContains(res, "Convert to Draft")
+        self.assertNotContains(res, "debouncing:")
+
+        # 2. Click Convert to Draft
+        res = client.post(f"/staging/{self.batch.id}/convert-to-draft/")
+        self.assertRedirects(res, f"/staging/{self.batch.id}/")
+        self.batch.refresh_from_db()
+        self.rev.refresh_from_db()
+        self.assertTrue(self.batch.is_draft)
+        self.assertIsNone(self.rev.draft_expires_at)
+        # Reviews remain intact
+        self.assertEqual(self.rev.reviews.count(), 1)

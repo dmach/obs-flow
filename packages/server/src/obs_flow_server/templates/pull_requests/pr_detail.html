@@ -104,7 +104,29 @@
             </div>
             <div class="sidebar-section">
                 <h4>Draft</h4>
-                <p>{% if pr.is_draft %}yes{% else %}no{% endif %}</p>
+                <p>
+                    {% if pr.is_draft %}
+                        yes
+                        {% if latest_revision and latest_revision.draft_expires_at %}
+                            <span class="debounce-countdown" data-expires="{{ latest_revision.draft_expires_at|date:'c' }}">
+                                (debouncing: <span class="countdown-timer">...</span>)
+                            </span>
+                        {% endif %}
+                    {% else %}
+                        no
+                    {% endif %}
+                </p>
+                {% if pr.is_draft %}
+                    <form method="post" action="{% url 'pr_ready_for_review' pr.id %}">
+                        {% csrf_token %}
+                        <button type="submit" class="outline" style="margin-top: 0.5rem; width: 100%;">Ready for Review</button>
+                    </form>
+                {% else %}
+                    <form method="post" action="{% url 'pr_convert_to_draft' pr.id %}">
+                        {% csrf_token %}
+                        <button type="submit" class="outline secondary" style="margin-top: 0.5rem; width: 100%;">Convert to Draft</button>
+                    </form>
+                {% endif %}
             </div>
             <div class="sidebar-section">
                 <h4>Mergeable</h4>
