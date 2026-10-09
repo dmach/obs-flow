@@ -529,3 +529,52 @@ class TestPullRequestRevisionModel(TestCase):
         )
         self.assertTrue(rev2.is_draft)
         self.assertEqual(rev2.draft_expires_at, expiry)
+
+
+class TestPullRequestReviewProvisioning(TestCase):
+    def test_provision_reviews_and_mark_ready_for_review(self):
+        from reviews.models import ReviewConfig
+        from pull_requests.api import provision_reviews_for_revision, mark_ready_for_review
+
+        project = Project.objects.create(name="test:project")
+        git_mapping = GitMapping.objects.create(owner="test", repo="repo", branch="main", project=project)
+        author = User.objects.create(username="author1", username_lower="author1", account_type=User.AccountType.HUMAN)
+        reviewer = User.objects.create(username="reviewer1", username_lower="reviewer1", account_type=User.AccountType.HUMAN)
+        ReviewConfig.objects.create(
+            project=project,
+            type=ReviewConfig.ConfigType.PROJECT,
+            reviewer_user=reviewer,
+        )
+
+        pr = PullRequest.objects.create(
+            target=git_mapping,
+            number=1,
+            author=author,
+            source_owner="author1",
+            source_repo="repo",
+            source_branch="feat",
+        )
+        rev = PullRequestRevision.objects.create(
+            pull_request=pr,
+            revision_number=1,
+            head_sha="1111",
+            base_sha="0000",
+            fingerprint="fp1",
+            is_draft=True,
+            draft_expires_at=timezone.now(),
+        )
+
+        # Reviews should not exist initially
+        self.assertEqual(rev.reviews.count(), 0)
+
+        # Calling mark_ready_for_review clears draft and provisions reviews
+        mark_ready_for_review(rev)
+        rev.refresh_from_db()
+        self.assertFalse(rev.is_draft)
+        self.assertIsNone(rev.draft_expires_at)
+        self.assertEqual(rev.reviews.count(), 1)
+        self.assertEqual(rev.reviews.first().reviewer_user, reviewer)
+
+        # Subsequent call does not duplicate reviews
+        mark_ready_for_review(rev)
+        self.assertEqual(rev.reviews.count(), 1)

@@ -2,6 +2,7 @@ import re
 
 import msgspec
 from asgiref.sync import sync_to_async
+from django.db import transaction
 from django.utils import timezone
 from django_bolt import BoltAPI
 
@@ -215,6 +216,60 @@ from django.conf import settings
 from django.http import HttpResponseServerError
 
 
+@transaction.atomic
+def provision_reviews_for_revision(revision: PullRequestRevision) -> list[PullRequestReview]:
+    """
+    Provisions reviews for a PullRequestRevision based on ReviewConfig if no reviews exist.
+    Existing reviews are never re-provisioned.
+    """
+    rev = PullRequestRevision.objects.select_for_update().get(pk=revision.pk)
+    if rev.reviews.exists():
+        return list(rev.reviews.all())
+
+    from reviews.models import ReviewConfig
+
+    pr = rev.pull_request
+    git_mapping = pr.target
+    project = git_mapping.target_project
+    if git_mapping.project_id:
+        config_type = ReviewConfig.ConfigType.PROJECT
+    elif git_mapping.package_id:
+        config_type = ReviewConfig.ConfigType.PACKAGE
+    else:
+        config_type = None
+
+    created_reviews = []
+    if project and config_type:
+        configs = ReviewConfig.objects.filter(project=project, type=config_type)
+        for config in configs:
+            review = PullRequestReview.objects.create(
+                revision=rev,
+                reviewer_user=config.reviewer_user,
+                reviewer_group=config.reviewer_group,
+                dynamic_role=config.dynamic_role,
+                state=PullRequestReview.State.PENDING,
+            )
+            created_reviews.append(review)
+
+    return created_reviews
+
+
+@transaction.atomic
+def mark_ready_for_review(revision: PullRequestRevision) -> None:
+    """
+    Transitions a PullRequestRevision out of draft mode and provisions reviews.
+    """
+    rev = PullRequestRevision.objects.select_for_update().get(pk=revision.pk)
+    if not rev.is_draft and rev.draft_expires_at is None:
+        return
+    rev.is_draft = False
+    rev.draft_expires_at = None
+    rev.save(update_fields=["is_draft", "draft_expires_at"])
+    revision.is_draft = False
+    revision.draft_expires_at = None
+    provision_reviews_for_revision(rev)
+
+
 def _do_sync_pull_request(req: PRSyncRequest) -> PRSyncResponse:
     # Fetch from Gitea
     url = f"{settings.GITEA_URL.rstrip('/')}/api/v1/repos/{req.owner}/{req.repo}/pulls/{req.number}"
@@ -312,27 +367,7 @@ def _do_sync_pull_request(req: PRSyncRequest) -> PRSyncResponse:
             is_draft=draft,
         )
 
-        from reviews.models import ReviewConfig
-
-        git_mapping = pr.target
-        project = git_mapping.target_project
-        if git_mapping.project_id:
-            config_type = ReviewConfig.ConfigType.PROJECT
-        elif git_mapping.package_id:
-            config_type = ReviewConfig.ConfigType.PACKAGE
-        else:
-            config_type = None
-
-        if project and config_type:
-            configs = ReviewConfig.objects.filter(project=project, type=config_type)
-            for config in configs:
-                PullRequestReview.objects.create(
-                    revision=latest_revision,
-                    reviewer_user=config.reviewer_user,
-                    reviewer_group=config.reviewer_group,
-                    dynamic_role=config.dynamic_role,
-                    state=PullRequestReview.State.PENDING
-                )
+        provision_reviews_for_revision(latest_revision)
 
         # Update any StagingBatches containing this PR to use the new PullRequestRevision
         from staging.models import StagingBatch

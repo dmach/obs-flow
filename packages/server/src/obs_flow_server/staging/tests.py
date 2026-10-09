@@ -648,3 +648,40 @@ class TestStagingBatchRevisionModel(TestCase):
         self.assertEqual(rev2.draft_expires_at, expiry)
         self.assertTrue(batch.is_draft)
 
+
+class TestStagingReviewProvisioning(TestCase):
+    def test_provision_reviews_and_mark_staging_ready_for_review(self):
+        from reviews.models import ReviewConfig
+        from staging.api import provision_reviews_for_staging_revision, mark_staging_ready_for_review
+
+        project = Project.objects.create(name="test:project")
+        reviewer = User.objects.create(username="reviewer1", username_lower="reviewer1", account_type=User.AccountType.HUMAN)
+        ReviewConfig.objects.create(
+            project=project,
+            type="staging",
+            reviewer_user=reviewer,
+        )
+
+        batch = StagingBatch.objects.create(project=project)
+        rev = StagingBatchRevision.objects.create(
+            staging_batch=batch,
+            revision_number=1,
+            fingerprint="fp1",
+            is_draft=True,
+            draft_expires_at=timezone.now(),
+        )
+
+        # Reviews should not exist initially
+        self.assertEqual(rev.reviews.count(), 0)
+
+        # Calling mark_staging_ready_for_review clears draft and provisions reviews
+        mark_staging_ready_for_review(rev)
+        rev.refresh_from_db()
+        self.assertFalse(rev.is_draft)
+        self.assertIsNone(rev.draft_expires_at)
+        self.assertEqual(rev.reviews.count(), 1)
+        self.assertEqual(rev.reviews.first().reviewer_user, reviewer)
+
+        # Subsequent call does not duplicate reviews
+        mark_staging_ready_for_review(rev)
+        self.assertEqual(rev.reviews.count(), 1)

@@ -1,5 +1,6 @@
 import msgspec
 from asgiref.sync import sync_to_async
+from django.db import transaction
 from django.utils import timezone
 from django.http import HttpResponseBadRequest
 from django_bolt import BoltAPI
@@ -85,20 +86,36 @@ def create_staging_revision(batch: StagingBatch, pr_revisions) -> StagingBatchRe
             pull_request_revision=pr_rev,
         )
 
-    # Create reviews for the new revision based on ReviewConfig
+    provision_reviews_for_staging_revision(new_rev)
+
+    return new_rev
+
+
+@transaction.atomic
+def provision_reviews_for_staging_revision(revision: StagingBatchRevision) -> list[StagingReview]:
+    """
+    Provisions reviews for a StagingBatchRevision based on ReviewConfig if no reviews exist.
+    Existing reviews are never re-provisioned.
+    """
+    rev = StagingBatchRevision.objects.select_for_update().get(pk=revision.pk)
+    if rev.reviews.exists():
+        return list(rev.reviews.all())
+
     from reviews.models import ReviewConfig
-    configs = ReviewConfig.objects.filter(project=batch.project, type="staging")
+    configs = ReviewConfig.objects.filter(project=rev.staging_batch.project, type="staging")
+    created_reviews = []
     if configs.exists():
         config_to_review = {}
         for config in configs:
             review = StagingReview.objects.create(
-                revision=new_rev,
+                revision=rev,
                 reviewer_user=config.reviewer_user,
                 reviewer_group=config.reviewer_group,
                 dynamic_role=config.dynamic_role,
                 state=StagingReview.State.PENDING,
             )
             config_to_review[config] = review
+            created_reviews.append(review)
 
         # Set up dependencies between the created reviews
         for config, review in config_to_review.items():
@@ -106,7 +123,23 @@ def create_staging_revision(batch: StagingBatch, pr_revisions) -> StagingBatchRe
                 if dep_config in config_to_review:
                     review.depends_on.add(config_to_review[dep_config])
 
-    return new_rev
+    return created_reviews
+
+
+@transaction.atomic
+def mark_staging_ready_for_review(revision: StagingBatchRevision) -> None:
+    """
+    Transitions a StagingBatchRevision out of draft mode and provisions reviews.
+    """
+    rev = StagingBatchRevision.objects.select_for_update().get(pk=revision.pk)
+    if not rev.is_draft and rev.draft_expires_at is None:
+        return
+    rev.is_draft = False
+    rev.draft_expires_at = None
+    rev.save(update_fields=["is_draft", "draft_expires_at"])
+    revision.is_draft = False
+    revision.draft_expires_at = None
+    provision_reviews_for_staging_revision(rev)
 
 
 def batch_to_detail(batch: StagingBatch) -> StagingDetail:
