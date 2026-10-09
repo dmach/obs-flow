@@ -712,3 +712,87 @@ class TestPRSyncDebounceLifecycle(TransactionTestCase):
         self.assertIsNone(rev.draft_expires_at)
         self.assertFalse(pr.is_draft)
         self.assertEqual(rev.reviews.count(), 1)
+
+
+class TestPRReadyForReviewEndpoint(TestCase):
+    def setUp(self):
+        self.project = Project.objects.create(name="test:project")
+        self.git_mapping = GitMapping.objects.create(owner="suse", repo="obs-flow", branch="main", project=self.project)
+        self.author = User.objects.create(username="dev", username_lower="dev", account_type=User.AccountType.HUMAN)
+        self.reviewer = User.objects.create(username="rev", username_lower="rev", account_type=User.AccountType.HUMAN)
+        from reviews.models import ReviewConfig
+        ReviewConfig.objects.create(project=self.project, type=ReviewConfig.ConfigType.PROJECT, reviewer_user=self.reviewer)
+
+        self.pr1 = PullRequest.objects.create(
+            target=self.git_mapping,
+            number=42,
+            author=self.author,
+            source_owner="dev",
+            source_repo="obs-flow",
+            source_branch="feat-1",
+        )
+        self.rev1 = PullRequestRevision.objects.create(
+            pull_request=self.pr1,
+            revision_number=1,
+            head_sha="1111",
+            base_sha="0000",
+            fingerprint="fp1",
+            is_draft=True,
+            draft_expires_at=timezone.now(),
+        )
+
+        self.pr2 = PullRequest.objects.create(
+            target=self.git_mapping,
+            number=43,
+            author=self.author,
+            source_owner="dev",
+            source_repo="obs-flow",
+            source_branch="feat-2",
+        )
+        self.rev2 = PullRequestRevision.objects.create(
+            pull_request=self.pr2,
+            revision_number=1,
+            head_sha="2222",
+            base_sha="0000",
+            fingerprint="fp2",
+            is_draft=True,
+            draft_expires_at=timezone.now(),
+        )
+
+    def test_ready_for_review_bulk_success(self):
+        self.assertTrue(self.pr1.is_draft)
+        self.assertTrue(self.pr2.is_draft)
+        self.assertEqual(self.rev1.reviews.count(), 0)
+        self.assertEqual(self.rev2.reviews.count(), 0)
+
+        payload = {"pull_request_ids": ["suse/obs-flow#42", "suse/obs-flow#43"]}
+        with TestClient(api) as client:
+            response = client.post("/api/v1/pr/ready-for-review", content=json.dumps(payload))
+        self.assertEqual(response.status_code, 200)
+
+        res_data = response.json()
+        self.assertEqual(len(res_data["pull_requests"]), 2)
+        self.assertFalse(res_data["pull_requests"][0]["is_draft"])
+        self.assertFalse(res_data["pull_requests"][1]["is_draft"])
+
+        self.pr1.refresh_from_db()
+        self.rev1.refresh_from_db()
+        self.assertFalse(self.pr1.is_draft)
+        self.assertFalse(self.rev1.is_draft)
+        self.assertEqual(self.rev1.reviews.count(), 1)
+
+        self.pr2.refresh_from_db()
+        self.rev2.refresh_from_db()
+        self.assertFalse(self.pr2.is_draft)
+        self.assertFalse(self.rev2.is_draft)
+        self.assertEqual(self.rev2.reviews.count(), 1)
+
+    def test_ready_for_review_invalid_id(self):
+        with TestClient(api) as client:
+            response = client.post("/api/v1/pr/ready-for-review", content=json.dumps({"pull_request_ids": ["invalid"]}))
+        self.assertEqual(response.status_code, 400)
+
+    def test_ready_for_review_nonexistent_pr(self):
+        with TestClient(api) as client:
+            response = client.post("/api/v1/pr/ready-for-review", content=json.dumps({"pull_request_ids": ["suse/obs-flow#999"]}))
+        self.assertEqual(response.status_code, 400)

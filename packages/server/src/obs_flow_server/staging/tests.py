@@ -714,3 +714,69 @@ class TestStagingReviewProvisioning(TestCase):
         self.assertIsNone(rev.draft_expires_at)
         self.assertFalse(batch.is_draft)
         self.assertEqual(rev.reviews.count(), 1)
+
+
+class TestStagingReadyForReviewEndpoint(TestCase):
+    def setUp(self):
+        self.project = Project.objects.create(name="test:project")
+        self.reviewer = User.objects.create(username="rev", username_lower="rev", account_type=User.AccountType.HUMAN)
+        from reviews.models import ReviewConfig
+        ReviewConfig.objects.create(project=self.project, type="staging", reviewer_user=self.reviewer)
+
+        self.batch1 = StagingBatch.objects.create(project=self.project)
+        self.rev1 = StagingBatchRevision.objects.create(
+            staging_batch=self.batch1,
+            revision_number=1,
+            fingerprint="fp1",
+            is_draft=True,
+            draft_expires_at=timezone.now(),
+        )
+
+        self.batch2 = StagingBatch.objects.create(project=self.project)
+        self.rev2 = StagingBatchRevision.objects.create(
+            staging_batch=self.batch2,
+            revision_number=1,
+            fingerprint="fp2",
+            is_draft=True,
+            draft_expires_at=timezone.now(),
+        )
+
+    def test_staging_ready_for_review_bulk_success(self):
+        self.assertTrue(self.batch1.is_draft)
+        self.assertTrue(self.batch2.is_draft)
+        self.assertEqual(self.rev1.reviews.count(), 0)
+        self.assertEqual(self.rev2.reviews.count(), 0)
+
+        payload = {"staging_ids": [self.batch1.id, self.batch2.id]}
+        from django_bolt.testing import TestClient
+        from obs_flow_server.api import api
+        import json
+        with TestClient(api) as client:
+            response = client.post("/api/v1/staging/ready-for-review", content=json.dumps(payload))
+        self.assertEqual(response.status_code, 200)
+
+        res_data = response.json()
+        self.assertEqual(len(res_data["staging_batches"]), 2)
+        self.assertFalse(res_data["staging_batches"][0]["is_draft"])
+        self.assertFalse(res_data["staging_batches"][1]["is_draft"])
+
+        self.batch1.refresh_from_db()
+        self.rev1.refresh_from_db()
+        self.assertFalse(self.batch1.is_draft)
+        self.assertFalse(self.rev1.is_draft)
+        self.assertEqual(self.rev1.reviews.count(), 1)
+
+        self.batch2.refresh_from_db()
+        self.rev2.refresh_from_db()
+        self.assertFalse(self.batch2.is_draft)
+        self.assertFalse(self.rev2.is_draft)
+        self.assertEqual(self.rev2.reviews.count(), 1)
+
+    def test_staging_ready_for_review_nonexistent_batch(self):
+        payload = {"staging_ids": [9999]}
+        from django_bolt.testing import TestClient
+        from obs_flow_server.api import api
+        import json
+        with TestClient(api) as client:
+            response = client.post("/api/v1/staging/ready-for-review", content=json.dumps(payload))
+        self.assertEqual(response.status_code, 400)

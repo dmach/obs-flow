@@ -11,6 +11,8 @@ from obs_flow_common.messages import (
     PRDetail,
     PRSyncRequest,
     PRSyncResponse,
+    PRReadyForReviewRequest,
+    PRReadyForReviewResponse,
     PRReviewShowRequest,
     PRReviewShowResponse,
     PRReviewActionResponse,
@@ -214,7 +216,7 @@ import urllib.request
 import urllib.error
 import json
 from django.conf import settings
-from django.http import HttpResponseServerError
+from django.http import HttpResponseBadRequest, HttpResponseServerError
 
 
 @transaction.atomic
@@ -448,4 +450,39 @@ async def sync_pull_request_endpoint(payload: PRSyncRequest):
     except Exception as e:
         return HttpResponseServerError(str(e))
 
+    return msgspec.structs.asdict(res)
+
+
+@api.post("/api/v1/pr/ready-for-review")
+@sync_to_async
+def pr_ready_for_review_endpoint(payload: PRReadyForReviewRequest):
+    updated_prs = []
+    for pr_id in payload.pull_request_ids:
+        try:
+            pr = get_pull_request(pr_id)
+        except (PullRequest.DoesNotExist, ValueError) as e:
+            return HttpResponseBadRequest(str(e))
+
+        latest_revision = pr.revisions.order_by("-revision_number").first()
+        if not latest_revision:
+            return HttpResponseBadRequest(f"Pull request {pr_id} has no revisions.")
+
+        mark_ready_for_review(latest_revision)
+        pr.refresh_from_db()
+        latest_revision.refresh_from_db()
+        updated_prs.append(
+            PRDetail(
+                id=pr_id,
+                title=pr.title,
+                state=pr.state,
+                is_draft=pr.is_draft,
+                is_mergeable=pr.is_mergeable,
+                author=build_user_dto(pr.author),
+                latest_revision=latest_revision.revision_number,
+                head_sha=latest_revision.head_sha,
+                base_sha=latest_revision.base_sha,
+            )
+        )
+
+    res = PRReadyForReviewResponse(pull_requests=updated_prs)
     return msgspec.structs.asdict(res)

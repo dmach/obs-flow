@@ -13,6 +13,8 @@ from obs_flow_common.messages import (
     StagingCreateResponse,
     StagingEditRequest,
     StagingEditResponse,
+    StagingReadyForReviewRequest,
+    StagingReadyForReviewResponse,
     StagingAddRequest,
     StagingAddResponse,
     StagingRemoveRequest,
@@ -185,6 +187,7 @@ def batch_to_detail(batch: StagingBatch) -> StagingDetail:
         release_date=batch.release_date.isoformat() if batch.release_date else None,
         latest_revision=latest_rev_num,
         fingerprint=fingerprint,
+        is_draft=batch.is_draft,
     )
 
 
@@ -460,4 +463,26 @@ def reopen_staging_review_endpoint(payload: StagingReviewReopenRequest, request)
     review.save()
 
     res = StagingReviewActionResponse(staging_id=payload.staging_id, review=review_to_detail(review))
+    return msgspec.structs.asdict(res)
+
+
+@api.post("/api/v1/staging/ready-for-review")
+@sync_to_async
+def staging_ready_for_review_endpoint(payload: StagingReadyForReviewRequest):
+    updated_batches = []
+    for batch_id in payload.staging_ids:
+        try:
+            batch = StagingBatch.objects.get(id=batch_id)
+        except StagingBatch.DoesNotExist:
+            return HttpResponseBadRequest(f"Staging batch #{batch_id} does not exist.")
+
+        latest_rev = batch.revisions.order_by("-revision_number").first()
+        if not latest_rev:
+            return HttpResponseBadRequest(f"Staging batch #{batch_id} has no revisions.")
+
+        mark_staging_ready_for_review(latest_rev)
+        batch.refresh_from_db()
+        updated_batches.append(batch_to_detail(batch))
+
+    res = StagingReadyForReviewResponse(staging_batches=updated_batches)
     return msgspec.structs.asdict(res)
