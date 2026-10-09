@@ -1,6 +1,7 @@
 import json
 from unittest.mock import MagicMock, patch
 from django.test import TestCase, TransactionTestCase, override_settings
+from django.utils import timezone
 from django_bolt.testing import TestClient
 
 from accounts.models import User
@@ -128,7 +129,6 @@ class TestPRSyncEndpoint(TransactionTestCase):
             number=123,
             author=author,
             title="Old Title",
-            is_draft=True,
             is_mergeable=False,
             state=PullRequest.State.OPEN,
             source_owner="john_doe",
@@ -139,7 +139,8 @@ class TestPRSyncEndpoint(TransactionTestCase):
             pull_request=pr,
             revision_number=1,
             head_sha="1111111111111111111111111111111111111111",
-            base_sha="0000000000000000000000000000000000000000"
+            base_sha="0000000000000000000000000000000000000000",
+            is_draft=True,
         )
 
         from reviews.models import ReviewConfig
@@ -235,7 +236,6 @@ class TestPRSyncEndpoint(TransactionTestCase):
             number=123,
             author=author,
             title="Old Title",
-            is_draft=True,
             is_mergeable=False,
             state=PullRequest.State.OPEN,
             source_owner="john_doe",
@@ -246,7 +246,8 @@ class TestPRSyncEndpoint(TransactionTestCase):
             pull_request=pr,
             revision_number=1,
             head_sha="1111111111111111111111111111111111111111",
-            base_sha="0000000000000000000000000000000000000000"
+            base_sha="0000000000000000000000000000000000000000",
+            is_draft=True,
         )
 
         from reviews.models import ReviewConfig
@@ -321,7 +322,6 @@ class TestPRSyncEndpoint(TransactionTestCase):
             number=999,
             author=author,
             title="Rebase PR",
-            is_draft=False,
             is_mergeable=True,
             state=PullRequest.State.OPEN,
             source_owner="rebase_user",
@@ -407,7 +407,6 @@ class TestPRViews(TransactionTestCase):
             number=123,
             author=author,
             title="My PR",
-            is_draft=False,
             is_mergeable=True,
             state=PullRequest.State.OPEN,
             source_owner="john_doe",
@@ -442,7 +441,6 @@ class TestPRViews(TransactionTestCase):
                 number=i,
                 author=author1 if i % 2 == 0 else author2,
                 title=f"PR {i}",
-                is_draft=False,
                 is_mergeable=True,
                 state=PullRequest.State.OPEN,
                 source_owner="john_doe" if i % 2 == 0 else "jane_doe",
@@ -491,3 +489,43 @@ class TestPRRevisionPayload(TestCase):
         expected_json = b'{"base_sha":"base456","head_sha":"head123","target_branch":"main"}'
         self.assertEqual(payload._to_canonical_json(), expected_json)
         self.assertEqual(payload.compute_fingerprint(), hashlib.sha256(expected_json).hexdigest())
+
+
+class TestPullRequestRevisionModel(TestCase):
+    def test_revision_draft_fields_default_and_assignment(self):
+        project = Project.objects.create(name="test:project")
+        git_mapping = GitMapping.objects.create(owner="test", repo="repo", branch="main", project=project)
+        author = User.objects.create(username="author1", username_lower="author1", account_type=User.AccountType.HUMAN)
+        pr = PullRequest.objects.create(
+            target=git_mapping,
+            number=1,
+            author=author,
+            source_owner="author1",
+            source_repo="repo",
+            source_branch="feat",
+        )
+
+        # Default values
+        rev1 = PullRequestRevision.objects.create(
+            pull_request=pr,
+            revision_number=1,
+            head_sha="1111",
+            base_sha="0000",
+            fingerprint="fp1",
+        )
+        self.assertFalse(rev1.is_draft)
+        self.assertIsNone(rev1.draft_expires_at)
+
+        # Explicit draft values
+        expiry = timezone.now()
+        rev2 = PullRequestRevision.objects.create(
+            pull_request=pr,
+            revision_number=2,
+            head_sha="2222",
+            base_sha="0000",
+            fingerprint="fp2",
+            is_draft=True,
+            draft_expires_at=expiry,
+        )
+        self.assertTrue(rev2.is_draft)
+        self.assertEqual(rev2.draft_expires_at, expiry)

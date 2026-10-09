@@ -1,10 +1,11 @@
 from django.contrib.messages import get_messages
 from django.test import Client, TestCase, TransactionTestCase
 from django.urls import reverse
+from django.utils import timezone
 from accounts.models import User, Group
 from core.models import Project, GitMapping
 from pull_requests.models import PullRequest, PullRequestRevision, PullRequestReview
-from staging.models import StagingBatch, StagingReview
+from staging.models import StagingBatch, StagingBatchRevision, StagingReview
 
 
 class TestEmptyDatabase(TestCase):
@@ -618,3 +619,32 @@ class TestStagingBatchPayload(TestCase):
         expected_json = b'{"pr_revisions":["rev1","rev2"]}'
         self.assertEqual(payload1._to_canonical_json(), expected_json)
         self.assertEqual(payload1.compute_fingerprint(), hashlib.sha256(expected_json).hexdigest())
+
+
+class TestStagingBatchRevisionModel(TestCase):
+    def test_staging_revision_draft_fields_and_batch_property(self):
+        project = Project.objects.create(name="test:project")
+        batch = StagingBatch.objects.create(project=project)
+        self.assertFalse(batch.is_draft)
+
+        rev1 = StagingBatchRevision.objects.create(
+            staging_batch=batch,
+            revision_number=1,
+            fingerprint="fp1",
+        )
+        self.assertFalse(rev1.is_draft)
+        self.assertIsNone(rev1.draft_expires_at)
+        self.assertFalse(batch.is_draft)
+
+        expiry = timezone.now()
+        rev2 = StagingBatchRevision.objects.create(
+            staging_batch=batch,
+            revision_number=2,
+            fingerprint="fp2",
+            is_draft=True,
+            draft_expires_at=expiry,
+        )
+        self.assertTrue(rev2.is_draft)
+        self.assertEqual(rev2.draft_expires_at, expiry)
+        self.assertTrue(batch.is_draft)
+

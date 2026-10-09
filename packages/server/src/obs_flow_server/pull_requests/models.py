@@ -17,7 +17,6 @@ class PullRequest(models.Model):
     author = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="pull_requests")
     state = models.CharField(max_length=10, choices=State.choices, default=State.OPEN)
     title = models.CharField(max_length=255, null=True, blank=True)
-    is_draft = models.BooleanField(default=False)
     is_mergeable = models.BooleanField(null=True, blank=True)
     source_owner = models.CharField(max_length=255)
     source_repo = models.CharField(max_length=255)
@@ -25,6 +24,11 @@ class PullRequest(models.Model):
 
     class Meta:
         unique_together = ("target", "number")
+
+    @property
+    def is_draft(self) -> bool:
+        latest = self.revisions.order_by("-revision_number").first()
+        return latest.is_draft if latest else False
 
     @property
     def target_project(self) -> Project:
@@ -41,6 +45,8 @@ class PullRequestRevision(models.Model):
     base_sha = models.CharField(max_length=64)
     fingerprint = models.CharField(max_length=64)
     created_at = models.DateTimeField(auto_now_add=True)
+    is_draft = models.BooleanField(default=False)
+    draft_expires_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
         unique_together = ("pull_request", "revision_number")

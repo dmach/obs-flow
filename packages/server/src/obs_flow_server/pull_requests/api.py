@@ -275,7 +275,6 @@ def _do_sync_pull_request(req: PRSyncRequest) -> PRSyncResponse:
         defaults={
             "author": author,
             "title": title,
-            "is_draft": draft,
             "is_mergeable": mergeable,
             "state": pr_state,
             "source_owner": data.get("head", {}).get("repo", {}).get("owner", {}).get("login", req.owner),
@@ -287,7 +286,6 @@ def _do_sync_pull_request(req: PRSyncRequest) -> PRSyncResponse:
     if not created:
         # Update fields
         pr.title = title
-        pr.is_draft = draft
         pr.is_mergeable = mergeable
         pr.state = pr_state
         pr.save()
@@ -311,6 +309,7 @@ def _do_sync_pull_request(req: PRSyncRequest) -> PRSyncResponse:
             head_sha=head_sha,
             base_sha=base_sha,
             fingerprint=fingerprint,
+            is_draft=draft,
         )
 
         from reviews.models import ReviewConfig
