@@ -282,6 +282,32 @@
     }
   },
   {
+    "model": "reviews.reviewconfig",
+    "pk": 9,
+    "fields": {
+      "project": 1,
+      "type": "staging",
+      "reviewer_user": null,
+      "reviewer_group": 2,
+      "dynamic_role": null,
+      "depends_on": []
+    }
+  },
+  {
+    "model": "reviews.reviewconfig",
+    "pk": 10,
+    "fields": {
+      "project": 1,
+      "type": "staging",
+      "reviewer_user": 4,
+      "reviewer_group": null,
+      "dynamic_role": null,
+      "depends_on": [
+        9
+      ]
+    }
+  },
+  {
     "model": "pull_requests.pullrequest",
     "pk": 1,
     "fields": {

@@ -82,6 +82,22 @@ class TestFixtureData(TestCase):
         self.assertTrue(draft_batch.is_draft)
         self.assertEqual(draft_batch.revisions.first().draft_expires_at.year, 2100)
 
+        # Verify ReviewConfigs for openSUSE:Factory staging exist in fixture
+        from reviews.models import ReviewConfig
+        staging_configs = ReviewConfig.objects.filter(project__name="openSUSE:Factory", type="staging")
+        self.assertEqual(staging_configs.count(), 2)
+
+        # Transition Staging Batch #2 out of draft and verify reviews are provisioned from ReviewConfig
+        from staging.api import mark_staging_ready_for_review
+        rev2 = draft_batch.revisions.first()
+        self.assertEqual(rev2.reviews.count(), 0)
+        mark_staging_ready_for_review(rev2)
+        self.assertEqual(rev2.reviews.count(), 2)
+        group_review = rev2.reviews.get(reviewer_group__name="factory-staging")
+        user_review = rev2.reviews.get(reviewer_user__username="dimstar")
+        self.assertIn(group_review, user_review.depends_on.all())
+
+
 
 
 class TestStagingCreationWithReviewConfig(TransactionTestCase):
@@ -100,6 +116,9 @@ class TestStagingCreationWithReviewConfig(TransactionTestCase):
         user_darix = User.objects.get(username="darix")
         user_dimstar = User.objects.get(username="dimstar")
         group_team = Group.objects.get(name="opensuse-review-team")
+
+        # Clear existing staging review configs for project to test isolated creation
+        ReviewConfig.objects.filter(project=project, type="staging").delete()
 
         # 1. Add review configurations for staging
         config_darix = ReviewConfig.objects.create(
