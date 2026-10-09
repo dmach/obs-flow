@@ -38,7 +38,6 @@ from accounts.helpers import build_user_dto, get_authenticated_user, get_auth_he
 from accounts.models import User, Group
 from core.models import Project
 from pull_requests.models import PullRequest
-from pull_requests.api import get_pull_request, parse_reviewer
 from reviews.api import build_reviewer_dto_from_fields
 from staging.models import StagingBatch, StagingBatchRevision, StagingBatchRevisionPullRequest, StagingReview
 from staging.views import update_staging_batch
@@ -227,6 +226,8 @@ def review_to_detail(review: StagingReview) -> ReviewDetail:
 
 
 def get_review_for_request(batch: StagingBatch, reviewer_str: str | None) -> StagingReview:
+    from pull_requests.api import parse_reviewer
+
     latest_rev = batch.revisions.order_by("-revision_number").first()
     if not latest_rev:
         raise ValueError(f"Staging batch #{batch.id} has no revisions.")
@@ -293,6 +294,8 @@ def edit_staging_endpoint(payload: StagingEditRequest):
 @api.post("/api/v1/staging/add")
 @sync_to_async
 def add_to_staging_endpoint(payload: StagingAddRequest):
+    from pull_requests.api import get_pull_request
+
     batch = StagingBatch.objects.get(id=payload.id)
 
     # Validate that all requested PRs target the same project as the batch
@@ -334,6 +337,8 @@ def add_to_staging_endpoint(payload: StagingAddRequest):
 @api.post("/api/v1/staging/remove")
 @sync_to_async
 def remove_from_staging_endpoint(payload: StagingRemoveRequest):
+    from pull_requests.api import get_pull_request
+
     batch = StagingBatch.objects.get(id=payload.id)
 
     latest_rev = batch.revisions.order_by("-revision_number").first()
@@ -382,6 +387,7 @@ def show_staging_review_endpoint(payload: StagingReviewShowRequest):
     reviews = latest_rev.reviews.all()
 
     if payload.reviewer:
+        from pull_requests.api import parse_reviewer
         user, group = parse_reviewer(payload.reviewer)
         if user:
             reviews = reviews.filter(reviewer_user=user)

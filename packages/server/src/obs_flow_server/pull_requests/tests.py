@@ -943,3 +943,150 @@ class TestPRConvertToDraftEndpoint(TestCase):
         self.rev.refresh_from_db()
         self.assertTrue(self.rev.is_draft)
         self.assertIsNone(self.rev.draft_expires_at)
+
+
+class TestMarkExpiredDraftsReadyCommand(TestCase):
+    def setUp(self):
+        self.project = Project.objects.create(name="test:project")
+        self.git_mapping = GitMapping.objects.create(owner="suse", repo="obs-flow", branch="main", project=self.project)
+        self.author = User.objects.create(username="dev", username_lower="dev", account_type=User.AccountType.HUMAN)
+        self.reviewer = User.objects.create(username="rev", username_lower="rev", account_type=User.AccountType.HUMAN)
+        from reviews.models import ReviewConfig
+        ReviewConfig.objects.create(project=self.project, type=ReviewConfig.ConfigType.PROJECT, reviewer_user=self.reviewer)
+        ReviewConfig.objects.create(project=self.project, type="staging", reviewer_user=self.reviewer)
+
+        # 1. Expired PR revision
+        self.pr_expired = PullRequest.objects.create(
+            target=self.git_mapping,
+            number=1,
+            author=self.author,
+            source_owner="dev",
+            source_repo="obs-flow",
+            source_branch="feat-1",
+        )
+        self.rev_pr_expired = PullRequestRevision.objects.create(
+            pull_request=self.pr_expired,
+            revision_number=1,
+            head_sha="1111",
+            base_sha="0000",
+            fingerprint="fp1",
+            is_draft=True,
+            draft_expires_at=timezone.now() - timezone.timedelta(minutes=5),
+        )
+
+        # 2. Non-expired PR revision
+        self.pr_active = PullRequest.objects.create(
+            target=self.git_mapping,
+            number=2,
+            author=self.author,
+            source_owner="dev",
+            source_repo="obs-flow",
+            source_branch="feat-2",
+        )
+        self.rev_pr_active = PullRequestRevision.objects.create(
+            pull_request=self.pr_active,
+            revision_number=1,
+            head_sha="2222",
+            base_sha="0000",
+            fingerprint="fp2",
+            is_draft=True,
+            draft_expires_at=timezone.now() + timezone.timedelta(minutes=10),
+        )
+
+        # 3. Manual draft PR revision (no timer)
+        self.pr_manual = PullRequest.objects.create(
+            target=self.git_mapping,
+            number=3,
+            author=self.author,
+            source_owner="dev",
+            source_repo="obs-flow",
+            source_branch="feat-3",
+        )
+        self.rev_pr_manual = PullRequestRevision.objects.create(
+            pull_request=self.pr_manual,
+            revision_number=1,
+            head_sha="3333",
+            base_sha="0000",
+            fingerprint="fp3",
+            is_draft=True,
+            draft_expires_at=None,
+        )
+
+        # 4. Expired Staging Batch revision
+        from staging.models import StagingBatch, StagingBatchRevision
+        self.batch_expired = StagingBatch.objects.create(project=self.project)
+        self.rev_staging_expired = StagingBatchRevision.objects.create(
+            staging_batch=self.batch_expired,
+            revision_number=1,
+            fingerprint="sfp1",
+            is_draft=True,
+            draft_expires_at=timezone.now() - timezone.timedelta(minutes=5),
+        )
+
+        # 5. Non-expired Staging Batch revision
+        self.batch_active = StagingBatch.objects.create(project=self.project)
+        self.rev_staging_active = StagingBatchRevision.objects.create(
+            staging_batch=self.batch_active,
+            revision_number=1,
+            fingerprint="sfp2",
+            is_draft=True,
+            draft_expires_at=timezone.now() + timezone.timedelta(minutes=10),
+        )
+
+    def test_command_marks_expired_revisions_ready(self):
+        from django.core.management import call_command
+        import io
+
+        out = io.StringIO()
+        call_command("mark_expired_drafts_ready", stdout=out)
+        output = out.getvalue()
+
+        self.assertIn("Marked 1 PR revision(s) and 1 staging batch revision(s) ready for review.", output)
+
+        # Expired PR revision is published and has reviews
+        self.rev_pr_expired.refresh_from_db()
+        self.assertFalse(self.rev_pr_expired.is_draft)
+        self.assertIsNone(self.rev_pr_expired.draft_expires_at)
+        self.assertEqual(self.rev_pr_expired.reviews.count(), 1)
+
+        # Active PR revision remains in draft without reviews
+        self.rev_pr_active.refresh_from_db()
+        self.assertTrue(self.rev_pr_active.is_draft)
+        self.assertIsNotNone(self.rev_pr_active.draft_expires_at)
+        self.assertEqual(self.rev_pr_active.reviews.count(), 0)
+
+        # Manual draft PR revision remains in draft without reviews
+        self.rev_pr_manual.refresh_from_db()
+        self.assertTrue(self.rev_pr_manual.is_draft)
+        self.assertIsNone(self.rev_pr_manual.draft_expires_at)
+        self.assertEqual(self.rev_pr_manual.reviews.count(), 0)
+
+        # Expired Staging revision is published and has reviews
+        self.rev_staging_expired.refresh_from_db()
+        self.assertFalse(self.rev_staging_expired.is_draft)
+        self.assertIsNone(self.rev_staging_expired.draft_expires_at)
+        self.assertEqual(self.rev_staging_expired.reviews.count(), 1)
+
+        # Active Staging revision remains in draft without reviews
+        self.rev_staging_active.refresh_from_db()
+        self.assertTrue(self.rev_staging_active.is_draft)
+        self.assertEqual(self.rev_staging_active.reviews.count(), 0)
+
+    def test_command_dry_run_leaves_database_unmodified(self):
+        from django.core.management import call_command
+        import io
+
+        out = io.StringIO()
+        call_command("mark_expired_drafts_ready", dry_run=True, stdout=out)
+        output = out.getvalue()
+
+        self.assertIn("Would mark 1 PR revision(s) and 1 staging batch revision(s) ready for review.", output)
+
+        # Expired revisions should remain draft in dry-run
+        self.rev_pr_expired.refresh_from_db()
+        self.assertTrue(self.rev_pr_expired.is_draft)
+        self.assertEqual(self.rev_pr_expired.reviews.count(), 0)
+
+        self.rev_staging_expired.refresh_from_db()
+        self.assertTrue(self.rev_staging_expired.is_draft)
+        self.assertEqual(self.rev_staging_expired.reviews.count(), 0)
