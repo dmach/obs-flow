@@ -186,6 +186,29 @@ def pr_ready_for_review(request, pr_id):
 
 
 @require_POST
+def pr_cancel_timeout(request, pr_id):
+    pr = get_object_or_404(PullRequest, id=pr_id)
+    latest_revision = pr.revisions.order_by("-revision_number").first()
+    if latest_revision:
+        from pull_requests.api import mark_draft
+        mark_draft(latest_revision)
+        messages.success(request, f"Cancelled review debounce timeout for PR #{pr.number}.")
+        pr.refresh_from_db()
+        latest_revision.refresh_from_db()
+
+    if request.headers.get("HX-Request"):
+        return render(
+            request,
+            "pull_requests/partials/draft_section.html",
+            {
+                "pr": pr,
+                "latest_revision": latest_revision,
+            },
+        )
+    return redirect("pr_detail", pr_id=pr.id)
+
+
+@require_POST
 def pr_convert_to_draft(request, pr_id):
     pr = get_object_or_404(PullRequest, id=pr_id)
     latest_revision = pr.revisions.order_by("-revision_number").first()

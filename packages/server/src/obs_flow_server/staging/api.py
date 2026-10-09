@@ -15,6 +15,8 @@ from obs_flow_common.messages import (
     StagingEditResponse,
     StagingReadyForReviewRequest,
     StagingReadyForReviewResponse,
+    StagingConvertToDraftRequest,
+    StagingConvertToDraftResponse,
     StagingAddRequest,
     StagingAddResponse,
     StagingRemoveRequest,
@@ -501,4 +503,26 @@ def staging_ready_for_review_endpoint(payload: StagingReadyForReviewRequest):
         updated_batches.append(batch_to_detail(batch))
 
     res = StagingReadyForReviewResponse(staging_batches=updated_batches)
+    return msgspec.structs.asdict(res)
+
+
+@api.post("/api/v1/staging/convert-to-draft")
+@sync_to_async
+def staging_convert_to_draft_endpoint(payload: StagingConvertToDraftRequest):
+    updated_batches = []
+    for batch_id in payload.staging_ids:
+        try:
+            batch = StagingBatch.objects.get(id=batch_id)
+        except StagingBatch.DoesNotExist:
+            return HttpResponseBadRequest(f"Staging batch #{batch_id} does not exist.")
+
+        latest_rev = batch.revisions.order_by("-revision_number").first()
+        if not latest_rev:
+            return HttpResponseBadRequest(f"Staging batch #{batch_id} has no revisions.")
+
+        mark_staging_draft(latest_rev)
+        batch.refresh_from_db()
+        updated_batches.append(batch_to_detail(batch))
+
+    res = StagingConvertToDraftResponse(staging_batches=updated_batches)
     return msgspec.structs.asdict(res)

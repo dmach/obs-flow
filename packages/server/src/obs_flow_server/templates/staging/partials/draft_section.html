@@ -18,14 +18,22 @@
         {% endif %}
     </p>
     {% if batch.is_draft %}
-        <form method="post" action="{% url 'staging_ready_for_review' batch.id %}" hx-post="{% url 'staging_ready_for_review' batch.id %}" hx-target="#staging-draft-section" hx-swap="outerHTML">
-            {% csrf_token %}
-            <button type="submit" class="outline" style="margin-top: 0.5rem; width: 100%;">Ready for Review</button>
-        </form>
+        <div style="display: flex; gap: 0.5rem; margin-top: 0.5rem;">
+            <form method="post" action="{% url 'staging_ready_for_review' batch.id %}" hx-post="{% url 'staging_ready_for_review' batch.id %}" hx-target="#staging-draft-section" hx-swap="outerHTML" style="flex: 1; margin: 0;">
+                {% csrf_token %}
+                <button type="submit" class="outline" style="width: 100%; margin: 0;">Ready for Review</button>
+            </form>
+            {% if latest_revision and latest_revision.draft_expires_at %}
+                <form method="post" action="{% url 'staging_cancel_timeout' batch.id %}" hx-post="{% url 'staging_cancel_timeout' batch.id %}" hx-target="#staging-draft-section" hx-swap="outerHTML" style="flex: 1; margin: 0;">
+                    {% csrf_token %}
+                    <button type="submit" class="outline secondary" style="width: 100%; margin: 0;">Cancel Timeout</button>
+                </form>
+            {% endif %}
+        </div>
     {% else %}
-        <form method="post" action="{% url 'staging_convert_to_draft' batch.id %}" hx-post="{% url 'staging_convert_to_draft' batch.id %}" hx-target="#staging-draft-section" hx-swap="outerHTML">
+        <form method="post" action="{% url 'staging_convert_to_draft' batch.id %}" hx-post="{% url 'staging_convert_to_draft' batch.id %}" hx-target="#staging-draft-section" hx-swap="outerHTML" style="margin-top: 0.5rem;">
             {% csrf_token %}
-            <button type="submit" class="outline secondary" style="margin-top: 0.5rem; width: 100%;">Convert to Draft</button>
+            <button type="submit" class="outline secondary" style="width: 100%; margin: 0;">Convert to Draft</button>
         </form>
     {% endif %}
 </div>

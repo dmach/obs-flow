@@ -881,3 +881,59 @@ class TestPRDraftWebViews(TestCase):
         self.assertNotContains(res, "debouncing:")
         self.rev.refresh_from_db()
         self.assertFalse(self.rev.is_draft)
+
+    def test_pr_cancel_timeout_action(self):
+        from django.test import Client
+        client = Client()
+
+        # Initially in debounce with draft_expires_at
+        self.assertTrue(self.rev.is_draft)
+        self.assertIsNotNone(self.rev.draft_expires_at)
+
+        # Detail contains Cancel Timeout button
+        res = client.get(f"/pull-requests/{self.pr.id}/")
+        self.assertContains(res, "Cancel Timeout")
+
+        # Click Cancel Timeout
+        res = client.post(f"/pull-requests/{self.pr.id}/cancel-timeout/")
+        self.assertRedirects(res, f"/pull-requests/{self.pr.id}/")
+        self.rev.refresh_from_db()
+        self.assertTrue(self.rev.is_draft)
+        self.assertIsNone(self.rev.draft_expires_at)
+
+
+class TestPRConvertToDraftEndpoint(TestCase):
+    def setUp(self):
+        self.project = Project.objects.create(name="test:project")
+        self.git_mapping = GitMapping.objects.create(owner="suse", repo="obs-flow", branch="main", project=self.project)
+        self.author = User.objects.create(username="dev", username_lower="dev", account_type=User.AccountType.HUMAN)
+
+        self.pr = PullRequest.objects.create(
+            target=self.git_mapping,
+            number=42,
+            author=self.author,
+            source_owner="dev",
+            source_repo="obs-flow",
+            source_branch="feat",
+        )
+        self.rev = PullRequestRevision.objects.create(
+            pull_request=self.pr,
+            revision_number=1,
+            head_sha="1111",
+            base_sha="0000",
+            fingerprint="fp1",
+            is_draft=False,
+            draft_expires_at=None,
+        )
+
+    def test_convert_to_draft_endpoint_success(self):
+        payload = {"pull_request_ids": ["suse/obs-flow#42"]}
+        with TestClient(api) as client:
+            response = client.post("/api/v1/pr/convert-to-draft", content=json.dumps(payload))
+        self.assertEqual(response.status_code, 200)
+        res_data = response.json()
+        self.assertTrue(res_data["pull_requests"][0]["is_draft"])
+
+        self.rev.refresh_from_db()
+        self.assertTrue(self.rev.is_draft)
+        self.assertIsNone(self.rev.draft_expires_at)

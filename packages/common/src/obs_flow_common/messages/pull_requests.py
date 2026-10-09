@@ -38,6 +38,16 @@ class PRReadyForReviewResponse(msgspec.Struct):
     pull_requests: list[PRDetail]
 
 
+class PRConvertToDraftRequest(msgspec.Struct):
+    """Request to convert pull requests' latest revisions to draft mode."""
+    pull_request_ids: list[str]
+
+
+class PRConvertToDraftResponse(msgspec.Struct):
+    """Response containing updated pull request details after converting to draft."""
+    pull_requests: list[PRDetail]
+
+
 class PRReviewShowRequest(msgspec.Struct):
     """Request to show review details for a pull request."""
     pull_request_id: str

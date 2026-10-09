@@ -384,6 +384,29 @@ def staging_ready_for_review(request, batch_id):
 
 
 @require_POST
+def staging_cancel_timeout(request, batch_id):
+    batch = get_object_or_404(StagingBatch, id=batch_id)
+    latest_revision = batch.revisions.order_by("-revision_number").first()
+    if latest_revision:
+        from staging.api import mark_staging_draft
+        mark_staging_draft(latest_revision)
+        messages.success(request, f"Cancelled review debounce timeout for Staging Batch #{batch.id}.")
+        batch.refresh_from_db()
+        latest_revision.refresh_from_db()
+
+    if request.headers.get("HX-Request"):
+        return render(
+            request,
+            "staging/partials/draft_section.html",
+            {
+                "batch": batch,
+                "latest_revision": latest_revision,
+            },
+        )
+    return redirect("staging_detail", batch_id=batch.id)
+
+
+@require_POST
 def staging_convert_to_draft(request, batch_id):
     batch = get_object_or_404(StagingBatch, id=batch_id)
     latest_revision = batch.revisions.order_by("-revision_number").first()

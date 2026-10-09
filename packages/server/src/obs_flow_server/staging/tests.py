@@ -864,3 +864,49 @@ class TestStagingDraftWebViews(TestCase):
         self.assertNotContains(res, "debouncing:")
         self.rev.refresh_from_db()
         self.assertFalse(self.rev.is_draft)
+
+    def test_staging_cancel_timeout_action(self):
+        client = Client()
+
+        # Initially in debounce with draft_expires_at
+        self.assertTrue(self.rev.is_draft)
+        self.assertIsNotNone(self.rev.draft_expires_at)
+
+        # Detail contains Cancel Timeout button
+        res = client.get(f"/staging/{self.batch.id}/")
+        self.assertContains(res, "Cancel Timeout")
+
+        # Click Cancel Timeout
+        res = client.post(f"/staging/{self.batch.id}/cancel-timeout/")
+        self.assertRedirects(res, f"/staging/{self.batch.id}/")
+        self.rev.refresh_from_db()
+        self.assertTrue(self.rev.is_draft)
+        self.assertIsNone(self.rev.draft_expires_at)
+
+
+class TestStagingConvertToDraftEndpoint(TestCase):
+    def setUp(self):
+        self.project = Project.objects.create(name="test:project")
+        self.batch = StagingBatch.objects.create(project=self.project)
+        self.rev = StagingBatchRevision.objects.create(
+            staging_batch=self.batch,
+            revision_number=1,
+            fingerprint="fp1",
+            is_draft=False,
+            draft_expires_at=None,
+        )
+
+    def test_staging_convert_to_draft_endpoint_success(self):
+        payload = {"staging_ids": [self.batch.id]}
+        from django_bolt.testing import TestClient
+        from obs_flow_server.api import api
+        import json
+        with TestClient(api) as client:
+            response = client.post("/api/v1/staging/convert-to-draft", content=json.dumps(payload))
+        self.assertEqual(response.status_code, 200)
+        res_data = response.json()
+        self.assertTrue(res_data["staging_batches"][0]["is_draft"])
+
+        self.rev.refresh_from_db()
+        self.assertTrue(self.rev.is_draft)
+        self.assertIsNone(self.rev.draft_expires_at)

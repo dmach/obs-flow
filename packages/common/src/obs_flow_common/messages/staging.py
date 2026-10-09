@@ -33,6 +33,16 @@ class StagingReadyForReviewResponse(msgspec.Struct):
     staging_batches: list[StagingDetail]
 
 
+class StagingConvertToDraftRequest(msgspec.Struct):
+    """Request to convert staging batches' latest revisions to draft mode."""
+    staging_ids: list[int]
+
+
+class StagingConvertToDraftResponse(msgspec.Struct):
+    """Response containing updated staging batch details after converting to draft."""
+    staging_batches: list[StagingDetail]
+
+
 class StagingCreateRequest(msgspec.Struct):
     """Request to create a new staging batch."""
     project: str

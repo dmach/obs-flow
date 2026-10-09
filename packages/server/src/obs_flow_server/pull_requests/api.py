@@ -13,6 +13,8 @@ from obs_flow_common.messages import (
     PRSyncResponse,
     PRReadyForReviewRequest,
     PRReadyForReviewResponse,
+    PRConvertToDraftRequest,
+    PRConvertToDraftResponse,
     PRReviewShowRequest,
     PRReviewShowResponse,
     PRReviewActionResponse,
@@ -501,4 +503,39 @@ def pr_ready_for_review_endpoint(payload: PRReadyForReviewRequest):
         )
 
     res = PRReadyForReviewResponse(pull_requests=updated_prs)
+    return msgspec.structs.asdict(res)
+
+
+@api.post("/api/v1/pr/convert-to-draft")
+@sync_to_async
+def pr_convert_to_draft_endpoint(payload: PRConvertToDraftRequest):
+    updated_prs = []
+    for pr_id in payload.pull_request_ids:
+        try:
+            pr = get_pull_request(pr_id)
+        except (PullRequest.DoesNotExist, ValueError) as e:
+            return HttpResponseBadRequest(str(e))
+
+        latest_revision = pr.revisions.order_by("-revision_number").first()
+        if not latest_revision:
+            return HttpResponseBadRequest(f"Pull request {pr_id} has no revisions.")
+
+        mark_draft(latest_revision)
+        pr.refresh_from_db()
+        latest_revision.refresh_from_db()
+        updated_prs.append(
+            PRDetail(
+                id=pr_id,
+                title=pr.title,
+                state=pr.state,
+                is_draft=pr.is_draft,
+                is_mergeable=pr.is_mergeable,
+                author=build_user_dto(pr.author),
+                latest_revision=latest_revision.revision_number,
+                head_sha=latest_revision.head_sha,
+                base_sha=latest_revision.base_sha,
+            )
+        )
+
+    res = PRConvertToDraftResponse(pull_requests=updated_prs)
     return msgspec.structs.asdict(res)
