@@ -132,7 +132,7 @@ def provision_reviews_for_staging_revision(revision: StagingBatchRevision) -> li
                 reviewer_user=config.reviewer_user,
                 reviewer_group=config.reviewer_group,
                 dynamic_role=config.dynamic_role,
-                state=StagingReview.State.PENDING,
+                state=StagingReview.State.WAITING,
             )
             config_to_review[config] = review
             created_reviews.append(review)
@@ -142,6 +142,12 @@ def provision_reviews_for_staging_revision(revision: StagingBatchRevision) -> li
             for dep_config in config.depends_on.all():
                 if dep_config in config_to_review:
                     review.depends_on.add(config_to_review[dep_config])
+
+        # Reviews with no dependencies start as PENDING, others remain WAITING
+        for review in created_reviews:
+            if not review.depends_on.exists():
+                review.state = StagingReview.State.PENDING
+                review.save(update_fields=["state"])
 
     return created_reviews
 

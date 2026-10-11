@@ -249,15 +249,29 @@ def provision_reviews_for_revision(revision: PullRequestRevision) -> list[PullRe
     created_reviews = []
     if project and config_type:
         configs = ReviewConfig.objects.filter(project=project, type=config_type)
+        config_to_review = {}
         for config in configs:
             review = PullRequestReview.objects.create(
                 revision=rev,
                 reviewer_user=config.reviewer_user,
                 reviewer_group=config.reviewer_group,
                 dynamic_role=config.dynamic_role,
-                state=PullRequestReview.State.PENDING,
+                state=PullRequestReview.State.WAITING,
             )
+            config_to_review[config] = review
             created_reviews.append(review)
+
+        # Set up dependencies between the created reviews
+        for config, review in config_to_review.items():
+            for dep_config in config.depends_on.all():
+                if dep_config in config_to_review:
+                    review.depends_on.add(config_to_review[dep_config])
+
+        # Reviews with no dependencies start as PENDING, others remain WAITING
+        for review in created_reviews:
+            if not review.depends_on.exists():
+                review.state = PullRequestReview.State.PENDING
+                review.save(update_fields=["state"])
 
     return created_reviews
 

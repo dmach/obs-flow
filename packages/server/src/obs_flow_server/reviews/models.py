@@ -55,6 +55,28 @@ class ReviewConfigBase(models.Model):
             )
         ]
 
+    def validate_no_cycles(self, new_dependencies=None) -> None:
+        """
+        Validates that new_dependencies (or self.depends_on) do not form a cycle in the DAG.
+        Raises ValueError if a circular dependency is detected.
+        """
+        if new_dependencies is None:
+            new_dependencies = self.depends_on.all() if self.pk else []
+
+        visited = set()
+        stack = list(new_dependencies)
+        while stack:
+            current = stack.pop()
+            if self.pk and current.pk == self.pk:
+                reviewer = self.reviewer_user or self.reviewer_group or self.dynamic_role
+                raise ValueError(
+                    f"Circular dependency detected: '{reviewer}' cannot depend on itself directly or indirectly."
+                )
+            if current.pk not in visited:
+                visited.add(current.pk)
+                stack.extend(current.depends_on.all())
+
+
 
 class ReviewConfig(ReviewConfigBase):
     project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name="review_configurations")
@@ -210,3 +232,32 @@ class BaseReview(models.Model):
                 name="%(class)s_lock_fields_check",
             ),
         ]
+
+    def unblock_downstream_reviews(self) -> list["BaseReview"]:
+        """
+        When this review is resolved (ACCEPTED or OVERRIDDEN), inspects downstream
+        reviews that depend on it. If all their prerequisites are resolved,
+        transitions them from WAITING to PENDING.
+        """
+        unblocked = []
+        rel_name = f"{self.__class__.__name__.lower()}_dependents"
+        if not hasattr(self, rel_name):
+            return unblocked
+
+        dependents = getattr(self, rel_name).all()
+        for dep in dependents:
+            if dep.state == self.State.WAITING:
+                prereqs = dep.depends_on.all()
+                if prereqs.exists() and all(p.state in (self.State.ACCEPTED, self.State.OVERRIDDEN) for p in prereqs):
+                    dep.state = self.State.PENDING
+                    dep.save(update_fields=["state"])
+                    unblocked.append(dep)
+
+        return unblocked
+
+    def save(self, *args, **kwargs):
+        is_resolved = self.state in (self.State.ACCEPTED, self.State.OVERRIDDEN)
+        is_raw = kwargs.get("raw", False)
+        super().save(*args, **kwargs)
+        if is_resolved and self.pk and not is_raw:
+            self.unblock_downstream_reviews()

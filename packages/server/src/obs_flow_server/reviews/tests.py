@@ -242,6 +242,45 @@ class TestReviewConfigEndpoints(TransactionTestCase):
         self.assertEqual(response.status_code, 404)
         self.assertIn("User matching query does not exist", response.text)
 
+    def test_review_config_add_self_dependency_fails(self):
+        """Verify that adding a configuration that depends on itself fails."""
+        payload = {
+            "project": "openSUSE:Factory",
+            "type": "project",
+            "reviewer": "admin",
+            "depends_on": ["admin"]
+        }
+        with TestClient(api) as client:
+            response = client.post(
+                "/api/v1/review-config/add",
+                content=json.dumps(payload),
+            )
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("Circular dependency detected", response.text)
+        # Verify it was not saved
+        self.assertFalse(ReviewConfig.objects.filter(project__name="openSUSE:Factory", type="project", reviewer_user__username="admin").exists())
+
+    def test_review_config_validate_no_cycles_indirect(self):
+        """Verify that multi-node indirect cycles raise ValueError."""
+        project = Project.objects.create(name="test:dag-project")
+        u1 = User.objects.create(username="u1", username_lower="u1", account_type=User.AccountType.HUMAN)
+        u2 = User.objects.create(username="u2", username_lower="u2", account_type=User.AccountType.HUMAN)
+        u3 = User.objects.create(username="u3", username_lower="u3", account_type=User.AccountType.HUMAN)
+
+        c1 = ReviewConfig.objects.create(project=project, type=ReviewConfig.ConfigType.PROJECT, reviewer_user=u1)
+        c2 = ReviewConfig.objects.create(project=project, type=ReviewConfig.ConfigType.PROJECT, reviewer_user=u2)
+        c3 = ReviewConfig.objects.create(project=project, type=ReviewConfig.ConfigType.PROJECT, reviewer_user=u3)
+
+        # c2 depends on c1
+        c2.depends_on.add(c1)
+        # c3 depends on c2
+        c3.depends_on.add(c2)
+
+        # Trying to make c1 depend on c3 would create c1 -> c3 -> c2 -> c1
+        with self.assertRaises(ValueError) as ctx:
+            c1.validate_no_cycles([c3])
+        self.assertIn("Circular dependency detected", str(ctx.exception))
+
     def test_review_config_list(self):
         """Verify listing review configurations for a project."""
         project = Project.objects.get(name="openSUSE:Factory")

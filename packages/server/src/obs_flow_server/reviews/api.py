@@ -1,5 +1,6 @@
 import msgspec
 from asgiref.sync import sync_to_async
+from django.db import transaction
 
 from obs_flow_common.messages.reviews import (
     ReviewConfigDTO,
@@ -128,29 +129,33 @@ def add_review_config_endpoint(payload: ReviewConfigAddRequest):
     # Parse reviewer
     user, group, dynamic_role = parse_reviewer(payload.reviewer)
 
-    config, created = ReviewConfig.objects.get_or_create(
-        project=project,
-        type=payload.type,
-        reviewer_user=user,
-        reviewer_group=group,
-        dynamic_role=dynamic_role,
-    )
+    with transaction.atomic():
+        config, created = ReviewConfig.objects.get_or_create(
+            project=project,
+            type=payload.type,
+            reviewer_user=user,
+            reviewer_group=group,
+            dynamic_role=dynamic_role,
+        )
 
-    if not created:
-        raise ValueError(f"Review configuration for reviewer '{payload.reviewer}' with type '{payload.type}' already exists.")
+        if not created:
+            raise ValueError(f"Review configuration for reviewer '{payload.reviewer}' with type '{payload.type}' already exists.")
 
-    # Resolve depends_on
-    resolved_dependencies = []
-    for dep_str in payload.depends_on:
-        dep_config = get_review_config(project, payload.type, dep_str)
-        resolved_dependencies.append(dep_config)
+        # Resolve depends_on
+        resolved_dependencies = []
+        for dep_str in payload.depends_on:
+            dep_config = get_review_config(project, payload.type, dep_str)
+            resolved_dependencies.append(dep_config)
 
-    config.depends_on.set(resolved_dependencies)
+        # Validate DAG / no circular dependencies
+        config.validate_no_cycles(resolved_dependencies)
 
-    # Return the response
-    dto = build_review_config_dto(config)
-    res = ReviewConfigAddResponse(data=dto)
-    return msgspec.structs.asdict(res)
+        config.depends_on.set(resolved_dependencies)
+
+        # Return the response
+        dto = build_review_config_dto(config)
+        res = ReviewConfigAddResponse(data=dto)
+        return msgspec.structs.asdict(res)
 
 
 @api.post("/api/v1/review-config/remove")
