@@ -650,6 +650,140 @@ class TestPullRequestReviewProvisioning(TestCase):
         self.assertEqual(review_a.state, PullRequestReview.State.PENDING)
         self.assertEqual(review_b.state, PullRequestReview.State.WAITING)
 
+    def test_cascading_unblocking_on_approval(self):
+        from reviews.models import ReviewConfig
+        from pull_requests.api import provision_reviews_for_revision
+
+        project = Project.objects.create(name="test:cascade-pr")
+        git_mapping = GitMapping.objects.create(owner="test", repo="repo", branch="main", project=project)
+        author = User.objects.create(username="author_cas", username_lower="author_cas", account_type=User.AccountType.HUMAN)
+        u1 = User.objects.create(username="rev_1", username_lower="rev_1", account_type=User.AccountType.HUMAN)
+        u2 = User.objects.create(username="rev_2", username_lower="rev_2", account_type=User.AccountType.HUMAN)
+        u3 = User.objects.create(username="rev_3", username_lower="rev_3", account_type=User.AccountType.HUMAN)
+
+        cfg1 = ReviewConfig.objects.create(project=project, type=ReviewConfig.ConfigType.PROJECT, reviewer_user=u1)
+        cfg2 = ReviewConfig.objects.create(project=project, type=ReviewConfig.ConfigType.PROJECT, reviewer_user=u2)
+        cfg3 = ReviewConfig.objects.create(project=project, type=ReviewConfig.ConfigType.PROJECT, reviewer_user=u3)
+
+        # cfg3 depends on BOTH cfg1 and cfg2
+        cfg3.depends_on.add(cfg1, cfg2)
+
+        pr = PullRequest.objects.create(
+            target=git_mapping,
+            number=101,
+            author=author,
+            source_owner="author_cas",
+            source_repo="repo",
+            source_branch="feat",
+        )
+        rev = PullRequestRevision.objects.create(
+            pull_request=pr,
+            revision_number=1,
+            head_sha="1111",
+            base_sha="0000",
+            fingerprint="fp1",
+            is_draft=False,
+            draft_expires_at=None,
+        )
+
+        provision_reviews_for_revision(rev)
+
+        r1 = rev.reviews.get(reviewer_user=u1)
+        r2 = rev.reviews.get(reviewer_user=u2)
+        r3 = rev.reviews.get(reviewer_user=u3)
+
+        self.assertEqual(r1.state, PullRequestReview.State.PENDING)
+        self.assertEqual(r2.state, PullRequestReview.State.PENDING)
+        self.assertEqual(r3.state, PullRequestReview.State.WAITING)
+
+        from accounts.helpers import generate_secure_token
+        from accounts.models import Token
+        raw_token, last_eight, token_hash = generate_secure_token()
+        Token.objects.create(user=u1, token_hash=token_hash, last_eight=last_eight)
+        auth_headers = {"Authorization": f"Bearer {raw_token}"}
+
+        # Approve review 1 via API endpoint
+        payload = {"pull_request_id": "test/repo#101", "reviewer": "rev_1"}
+        with TestClient(api) as client:
+            res = client.post("/api/v1/pr_review/approve", content=json.dumps(payload), headers=auth_headers)
+        self.assertEqual(res.status_code, 200)
+
+        r1.refresh_from_db()
+        r2.refresh_from_db()
+        r3.refresh_from_db()
+        self.assertEqual(r1.state, PullRequestReview.State.ACCEPTED)
+        self.assertEqual(r2.state, PullRequestReview.State.PENDING)
+        # r3 is still WAITING because r2 is not resolved yet
+        self.assertEqual(r3.state, PullRequestReview.State.WAITING)
+
+        # Approve review 2 via API endpoint
+        payload = {"pull_request_id": "test/repo#101", "reviewer": "rev_2"}
+        with TestClient(api) as client:
+            res = client.post("/api/v1/pr_review/approve", content=json.dumps(payload), headers=auth_headers)
+        self.assertEqual(res.status_code, 200)
+
+        r2.refresh_from_db()
+        r3.refresh_from_db()
+        self.assertEqual(r2.state, PullRequestReview.State.ACCEPTED)
+        # All prerequisites resolved -> r3 cascades to PENDING!
+        self.assertEqual(r3.state, PullRequestReview.State.PENDING)
+
+    def test_early_approval_of_waiting_review(self):
+        from reviews.models import ReviewConfig
+        from pull_requests.api import provision_reviews_for_revision
+
+        project = Project.objects.create(name="test:early-pr")
+        git_mapping = GitMapping.objects.create(owner="test", repo="repo", branch="main", project=project)
+        author = User.objects.create(username="author_early", username_lower="author_early", account_type=User.AccountType.HUMAN)
+        u1 = User.objects.create(username="rev_early_1", username_lower="rev_early_1", account_type=User.AccountType.HUMAN)
+        u2 = User.objects.create(username="rev_early_2", username_lower="rev_early_2", account_type=User.AccountType.HUMAN)
+
+        cfg1 = ReviewConfig.objects.create(project=project, type=ReviewConfig.ConfigType.PROJECT, reviewer_user=u1)
+        cfg2 = ReviewConfig.objects.create(project=project, type=ReviewConfig.ConfigType.PROJECT, reviewer_user=u2)
+        cfg2.depends_on.add(cfg1)
+
+        pr = PullRequest.objects.create(
+            target=git_mapping,
+            number=102,
+            author=author,
+            source_owner="author_early",
+            source_repo="repo",
+            source_branch="feat",
+        )
+        rev = PullRequestRevision.objects.create(
+            pull_request=pr,
+            revision_number=1,
+            head_sha="1111",
+            base_sha="0000",
+            fingerprint="fp1",
+            is_draft=False,
+            draft_expires_at=None,
+        )
+
+        provision_reviews_for_revision(rev)
+
+        r1 = rev.reviews.get(reviewer_user=u1)
+        r2 = rev.reviews.get(reviewer_user=u2)
+
+        self.assertEqual(r1.state, PullRequestReview.State.PENDING)
+        self.assertEqual(r2.state, PullRequestReview.State.WAITING)
+
+        from accounts.helpers import generate_secure_token
+        from accounts.models import Token
+        raw_token, last_eight, token_hash = generate_secure_token()
+        Token.objects.create(user=u2, token_hash=token_hash, last_eight=last_eight)
+        auth_headers = {"Authorization": f"Bearer {raw_token}"}
+
+        # Early approval of r2 (which is in WAITING state)
+        payload = {"pull_request_id": "test/repo#102", "reviewer": "rev_early_2"}
+        with TestClient(api) as client:
+            res = client.post("/api/v1/pr_review/approve", content=json.dumps(payload), headers=auth_headers)
+        self.assertEqual(res.status_code, 200)
+
+        r2.refresh_from_db()
+        self.assertEqual(r2.state, PullRequestReview.State.ACCEPTED)
+
+
 
 class TestPRSyncDebounceLifecycle(TransactionTestCase):
     @override_settings(GITEA_URL="https://gitea.example.com", GITEA_TOKEN="secret-token", DEBOUNCE_TIMEOUT_MINUTES=15)

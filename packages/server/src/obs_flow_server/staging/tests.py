@@ -727,6 +727,56 @@ class TestStagingReviewProvisioning(TestCase):
         mark_staging_ready_for_review(rev)
         self.assertEqual(rev.reviews.count(), 1)
 
+    def test_cascading_unblocking_staging_reviews(self):
+        from reviews.models import ReviewConfig
+        from staging.api import mark_staging_ready_for_review
+        from django_bolt.testing import TestClient
+        from obs_flow_server.api import api
+        import json
+
+        project = Project.objects.create(name="test:cascade-staging")
+        u1 = User.objects.create(username="srev_1", username_lower="srev_1", account_type=User.AccountType.HUMAN)
+        u2 = User.objects.create(username="srev_2", username_lower="srev_2", account_type=User.AccountType.HUMAN)
+
+        cfg1 = ReviewConfig.objects.create(project=project, type="staging", reviewer_user=u1)
+        cfg2 = ReviewConfig.objects.create(project=project, type="staging", reviewer_user=u2)
+        cfg2.depends_on.add(cfg1)
+
+        batch = StagingBatch.objects.create(project=project)
+        rev = StagingBatchRevision.objects.create(
+            staging_batch=batch,
+            revision_number=1,
+            fingerprint="sfp1",
+            is_draft=True,
+            draft_expires_at=timezone.now(),
+        )
+
+        mark_staging_ready_for_review(rev)
+
+        r1 = rev.reviews.get(reviewer_user=u1)
+        r2 = rev.reviews.get(reviewer_user=u2)
+
+        self.assertEqual(r1.state, StagingReview.State.PENDING)
+        self.assertEqual(r2.state, StagingReview.State.WAITING)
+
+        from accounts.helpers import generate_secure_token
+        from accounts.models import Token
+        raw_token, last_eight, token_hash = generate_secure_token()
+        Token.objects.create(user=u1, token_hash=token_hash, last_eight=last_eight)
+        auth_headers = {"Authorization": f"Bearer {raw_token}"}
+
+        # Approve review 1 via API
+        payload = {"staging_id": batch.id, "reviewer": "srev_1"}
+        with TestClient(api) as client:
+            res = client.post("/api/v1/staging_review/approve", content=json.dumps(payload), headers=auth_headers)
+        self.assertEqual(res.status_code, 200)
+
+        r1.refresh_from_db()
+        r2.refresh_from_db()
+        self.assertEqual(r1.state, StagingReview.State.ACCEPTED)
+        # r2 unblocks to PENDING!
+        self.assertEqual(r2.state, StagingReview.State.PENDING)
+
     def test_staging_zero_debounce_publishes_immediately(self):
         from reviews.models import ReviewConfig
         from staging.api import create_staging_revision

@@ -232,3 +232,32 @@ class BaseReview(models.Model):
                 name="%(class)s_lock_fields_check",
             ),
         ]
+
+    def unblock_downstream_reviews(self) -> list["BaseReview"]:
+        """
+        When this review is resolved (ACCEPTED or OVERRIDDEN), inspects downstream
+        reviews that depend on it. If all their prerequisites are resolved,
+        transitions them from WAITING to PENDING.
+        """
+        unblocked = []
+        rel_name = f"{self.__class__.__name__.lower()}_dependents"
+        if not hasattr(self, rel_name):
+            return unblocked
+
+        dependents = getattr(self, rel_name).all()
+        for dep in dependents:
+            if dep.state == self.State.WAITING:
+                prereqs = dep.depends_on.all()
+                if prereqs.exists() and all(p.state in (self.State.ACCEPTED, self.State.OVERRIDDEN) for p in prereqs):
+                    dep.state = self.State.PENDING
+                    dep.save(update_fields=["state"])
+                    unblocked.append(dep)
+
+        return unblocked
+
+    def save(self, *args, **kwargs):
+        is_resolved = self.state in (self.State.ACCEPTED, self.State.OVERRIDDEN)
+        is_raw = kwargs.get("raw", False)
+        super().save(*args, **kwargs)
+        if is_resolved and self.pk and not is_raw:
+            self.unblock_downstream_reviews()
