@@ -44,6 +44,11 @@ class StagingBatch(models.Model):
             )
         ]
 
+    @property
+    def is_draft(self) -> bool:
+        latest = self.revisions.order_by("-revision_number").first()
+        return latest.is_draft if latest else False
+
     def __str__(self):
         return f"Staging Batch #{self.id} ({self.state}) for {self.project.name}"
 
@@ -53,6 +58,8 @@ class StagingBatchRevision(models.Model):
     revision_number = models.IntegerField()
     fingerprint = models.CharField(max_length=64)  # Designed for SHA-256
     created_at = models.DateTimeField(auto_now_add=True)
+    is_draft = models.BooleanField(default=False)
+    draft_expires_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
         unique_together = ("staging_batch", "revision_number")

@@ -14,12 +14,33 @@ class StagingResponse(msgspec.Struct):
     release_date: str | None = None
     latest_revision: int | None = None
     fingerprint: str | None = None
+    is_draft: bool = False
 
 
 # Aliases for backward compatibility
 StagingDetail = StagingResponse
 StagingCreateResponse = StagingResponse
 StagingEditResponse = StagingResponse
+
+
+class StagingReadyForReviewRequest(msgspec.Struct):
+    """Request to mark staging batches' latest revisions as ready for review."""
+    staging_ids: list[int]
+
+
+class StagingReadyForReviewResponse(msgspec.Struct):
+    """Response containing updated staging batch details after marking ready for review."""
+    staging_batches: list[StagingDetail]
+
+
+class StagingConvertToDraftRequest(msgspec.Struct):
+    """Request to convert staging batches' latest revisions to draft mode."""
+    staging_ids: list[int]
+
+
+class StagingConvertToDraftResponse(msgspec.Struct):
+    """Response containing updated staging batch details after converting to draft."""
+    staging_batches: list[StagingDetail]
 
 
 class StagingCreateRequest(msgspec.Struct):

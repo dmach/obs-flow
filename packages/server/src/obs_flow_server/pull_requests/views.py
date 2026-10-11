@@ -1,10 +1,12 @@
 import datetime
 import urllib.parse
+from django.contrib import messages
 from django.core.paginator import Paginator
 from django.db.models import Q
-from django.shortcuts import render, get_object_or_404
+from django.shortcuts import render, get_object_or_404, redirect
 from django.utils import timezone
 from django.views.decorators.csrf import ensure_csrf_cookie
+from django.views.decorators.http import require_POST
 
 from pull_requests.models import PullRequest
 from pull_requests.forms import PullRequestFilterForm
@@ -140,3 +142,75 @@ def pr_detail(request, pr_id):
             "reviews": reviews,
         },
     )
+
+
+def _render_pr_draft_section(request, pr, latest_revision):
+    reviews = latest_revision.reviews.all() if latest_revision else []
+    return render(
+        request,
+        "pull_requests/partials/draft_section.html",
+        {
+            "pr": pr,
+            "latest_revision": latest_revision,
+            "reviews": reviews,
+        },
+    )
+
+
+def pr_draft_status(request, pr_id):
+    pr = get_object_or_404(PullRequest, id=pr_id)
+    latest_revision = pr.revisions.order_by("-revision_number").first()
+    if latest_revision and latest_revision.is_draft and latest_revision.draft_expires_at and latest_revision.draft_expires_at <= timezone.now():
+        from pull_requests.api import mark_ready_for_review
+        mark_ready_for_review(latest_revision)
+        pr.refresh_from_db()
+        latest_revision.refresh_from_db()
+    return _render_pr_draft_section(request, pr, latest_revision)
+
+
+@require_POST
+def pr_ready_for_review(request, pr_id):
+    pr = get_object_or_404(PullRequest, id=pr_id)
+    latest_revision = pr.revisions.order_by("-revision_number").first()
+    if latest_revision:
+        from pull_requests.api import mark_ready_for_review
+        mark_ready_for_review(latest_revision)
+        messages.success(request, f"Pull request #{pr.number} is now ready for review.")
+        pr.refresh_from_db()
+        latest_revision.refresh_from_db()
+
+    if request.headers.get("HX-Request"):
+        return _render_pr_draft_section(request, pr, latest_revision)
+    return redirect("pr_detail", pr_id=pr.id)
+
+
+@require_POST
+def pr_cancel_timeout(request, pr_id):
+    pr = get_object_or_404(PullRequest, id=pr_id)
+    latest_revision = pr.revisions.order_by("-revision_number").first()
+    if latest_revision:
+        from pull_requests.api import mark_draft
+        mark_draft(latest_revision)
+        messages.success(request, f"Cancelled review debounce timeout for PR #{pr.number}.")
+        pr.refresh_from_db()
+        latest_revision.refresh_from_db()
+
+    if request.headers.get("HX-Request"):
+        return _render_pr_draft_section(request, pr, latest_revision)
+    return redirect("pr_detail", pr_id=pr.id)
+
+
+@require_POST
+def pr_convert_to_draft(request, pr_id):
+    pr = get_object_or_404(PullRequest, id=pr_id)
+    latest_revision = pr.revisions.order_by("-revision_number").first()
+    if latest_revision:
+        from pull_requests.api import mark_draft
+        mark_draft(latest_revision)
+        messages.success(request, f"Pull request #{pr.number} converted to draft.")
+        pr.refresh_from_db()
+        latest_revision.refresh_from_db()
+
+    if request.headers.get("HX-Request"):
+        return _render_pr_draft_section(request, pr, latest_revision)
+    return redirect("pr_detail", pr_id=pr.id)

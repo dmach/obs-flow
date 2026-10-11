@@ -1,6 +1,7 @@
 import json
 from unittest.mock import MagicMock, patch
 from django.test import TestCase, TransactionTestCase, override_settings
+from django.utils import timezone
 from django_bolt.testing import TestClient
 
 from accounts.models import User
@@ -97,7 +98,7 @@ class TestPRSyncEndpoint(TransactionTestCase):
         self.assertEqual(pr_detail["id"], "suse/obs-flow#123")
         self.assertEqual(pr_detail["title"], "Fix some bugs")
         self.assertEqual(pr_detail["state"], "open")
-        self.assertEqual(pr_detail["is_draft"], False)
+        self.assertEqual(pr_detail["is_draft"], True)
         self.assertEqual(pr_detail["is_mergeable"], True)
         self.assertEqual(pr_detail["author"], {
             "username": "john_doe",
@@ -112,6 +113,12 @@ class TestPRSyncEndpoint(TransactionTestCase):
         self.assertTrue(User.objects.filter(username="john_doe").exists())
         self.assertTrue(Project.objects.filter(name="suse:obs-flow").exists())
         self.assertTrue(GitMapping.objects.filter(owner="suse", repo="obs-flow").exists())
+        pr = PullRequest.objects.get(number=123)
+        self.assertTrue(pr.is_draft)
+        latest_rev = pr.revisions.first()
+        self.assertTrue(latest_rev.is_draft)
+        self.assertIsNotNone(latest_rev.draft_expires_at)
+        self.assertEqual(latest_rev.reviews.count(), 0)
         self.assertTrue(PullRequest.objects.filter(number=123).exists())
         self.assertTrue(PullRequestRevision.objects.filter(revision_number=1).exists())
 
@@ -128,7 +135,6 @@ class TestPRSyncEndpoint(TransactionTestCase):
             number=123,
             author=author,
             title="Old Title",
-            is_draft=True,
             is_mergeable=False,
             state=PullRequest.State.OPEN,
             source_owner="john_doe",
@@ -139,7 +145,8 @@ class TestPRSyncEndpoint(TransactionTestCase):
             pull_request=pr,
             revision_number=1,
             head_sha="1111111111111111111111111111111111111111",
-            base_sha="0000000000000000000000000000000000000000"
+            base_sha="0000000000000000000000000000000000000000",
+            is_draft=True,
         )
 
         from reviews.models import ReviewConfig
@@ -191,7 +198,7 @@ class TestPRSyncEndpoint(TransactionTestCase):
         res_data = response.json()
         pr_detail = res_data["pull_request"]
         self.assertEqual(pr_detail["title"], "New Title")
-        self.assertEqual(pr_detail["is_draft"], False)
+        self.assertEqual(pr_detail["is_draft"], True)
         self.assertEqual(pr_detail["is_mergeable"], True)
         self.assertEqual(pr_detail["latest_revision"], 2)
         self.assertEqual(pr_detail["head_sha"], "2222222222222222222222222222222222222222")
@@ -199,13 +206,13 @@ class TestPRSyncEndpoint(TransactionTestCase):
         # Verify DB state
         pr.refresh_from_db()
         self.assertEqual(pr.title, "New Title")
-        self.assertEqual(pr.is_draft, False)
+        self.assertEqual(pr.is_draft, True)
         self.assertEqual(pr.is_mergeable, True)
 
         # Verify both revisions exist
         self.assertEqual(pr.revisions.count(), 2)
 
-        # Verify review was created for the new revision
+        # Verify review is NOT created initially while in debounce draft mode
         latest_revision = pr.revisions.get(revision_number=2)
         from pull_requests.fingerprint import PRRevisionPayload
         expected_fp = PRRevisionPayload(
@@ -214,7 +221,15 @@ class TestPRSyncEndpoint(TransactionTestCase):
             target_branch="main"
         ).compute_fingerprint()
         self.assertEqual(latest_revision.fingerprint, expected_fp)
+        self.assertTrue(latest_revision.is_draft)
+        self.assertIsNotNone(latest_revision.draft_expires_at)
+        self.assertEqual(latest_revision.reviews.count(), 0)
 
+        # Transition out of draft mode and verify reviews are now created
+        from pull_requests.api import mark_ready_for_review
+        mark_ready_for_review(latest_revision)
+        pr.refresh_from_db()
+        self.assertFalse(pr.is_draft)
         self.assertEqual(latest_revision.reviews.count(), 1)
         review = latest_revision.reviews.first()
         self.assertEqual(review.reviewer_user, reviewer_user)
@@ -235,7 +250,6 @@ class TestPRSyncEndpoint(TransactionTestCase):
             number=123,
             author=author,
             title="Old Title",
-            is_draft=True,
             is_mergeable=False,
             state=PullRequest.State.OPEN,
             source_owner="john_doe",
@@ -246,7 +260,8 @@ class TestPRSyncEndpoint(TransactionTestCase):
             pull_request=pr,
             revision_number=1,
             head_sha="1111111111111111111111111111111111111111",
-            base_sha="0000000000000000000000000000000000000000"
+            base_sha="0000000000000000000000000000000000000000",
+            is_draft=True,
         )
 
         from reviews.models import ReviewConfig
@@ -301,8 +316,14 @@ class TestPRSyncEndpoint(TransactionTestCase):
             )
         self.assertEqual(response.status_code, 200)
 
-        # Verify review was created for the new revision and it is the package config, not project config
+        # Verify revision was created in draft mode and no reviews yet
         latest_revision = pr.revisions.get(revision_number=2)
+        self.assertTrue(latest_revision.is_draft)
+        self.assertEqual(latest_revision.reviews.count(), 0)
+
+        # Transition out of draft mode and verify review was created for the new revision and it is the package config, not project config
+        from pull_requests.api import mark_ready_for_review
+        mark_ready_for_review(latest_revision)
         self.assertEqual(latest_revision.reviews.count(), 1)
         review = latest_revision.reviews.first()
         self.assertEqual(review.reviewer_user, reviewer_user)
@@ -321,7 +342,6 @@ class TestPRSyncEndpoint(TransactionTestCase):
             number=999,
             author=author,
             title="Rebase PR",
-            is_draft=False,
             is_mergeable=True,
             state=PullRequest.State.OPEN,
             source_owner="rebase_user",
@@ -407,7 +427,6 @@ class TestPRViews(TransactionTestCase):
             number=123,
             author=author,
             title="My PR",
-            is_draft=False,
             is_mergeable=True,
             state=PullRequest.State.OPEN,
             source_owner="john_doe",
@@ -442,7 +461,6 @@ class TestPRViews(TransactionTestCase):
                 number=i,
                 author=author1 if i % 2 == 0 else author2,
                 title=f"PR {i}",
-                is_draft=False,
                 is_mergeable=True,
                 state=PullRequest.State.OPEN,
                 source_owner="john_doe" if i % 2 == 0 else "jane_doe",
@@ -491,3 +509,584 @@ class TestPRRevisionPayload(TestCase):
         expected_json = b'{"base_sha":"base456","head_sha":"head123","target_branch":"main"}'
         self.assertEqual(payload._to_canonical_json(), expected_json)
         self.assertEqual(payload.compute_fingerprint(), hashlib.sha256(expected_json).hexdigest())
+
+
+class TestPullRequestRevisionModel(TestCase):
+    def test_revision_draft_fields_default_and_assignment(self):
+        project = Project.objects.create(name="test:project")
+        git_mapping = GitMapping.objects.create(owner="test", repo="repo", branch="main", project=project)
+        author = User.objects.create(username="author1", username_lower="author1", account_type=User.AccountType.HUMAN)
+        pr = PullRequest.objects.create(
+            target=git_mapping,
+            number=1,
+            author=author,
+            source_owner="author1",
+            source_repo="repo",
+            source_branch="feat",
+        )
+
+        # Default values
+        rev1 = PullRequestRevision.objects.create(
+            pull_request=pr,
+            revision_number=1,
+            head_sha="1111",
+            base_sha="0000",
+            fingerprint="fp1",
+        )
+        self.assertFalse(rev1.is_draft)
+        self.assertIsNone(rev1.draft_expires_at)
+
+        # Explicit draft values
+        expiry = timezone.now()
+        rev2 = PullRequestRevision.objects.create(
+            pull_request=pr,
+            revision_number=2,
+            head_sha="2222",
+            base_sha="0000",
+            fingerprint="fp2",
+            is_draft=True,
+            draft_expires_at=expiry,
+        )
+        self.assertTrue(rev2.is_draft)
+        self.assertEqual(rev2.draft_expires_at, expiry)
+
+
+class TestPullRequestReviewProvisioning(TestCase):
+    def test_provision_reviews_and_mark_ready_for_review(self):
+        from reviews.models import ReviewConfig
+        from pull_requests.api import provision_reviews_for_revision, mark_ready_for_review
+
+        project = Project.objects.create(name="test:project")
+        git_mapping = GitMapping.objects.create(owner="test", repo="repo", branch="main", project=project)
+        author = User.objects.create(username="author1", username_lower="author1", account_type=User.AccountType.HUMAN)
+        reviewer = User.objects.create(username="reviewer1", username_lower="reviewer1", account_type=User.AccountType.HUMAN)
+        ReviewConfig.objects.create(
+            project=project,
+            type=ReviewConfig.ConfigType.PROJECT,
+            reviewer_user=reviewer,
+        )
+
+        pr = PullRequest.objects.create(
+            target=git_mapping,
+            number=1,
+            author=author,
+            source_owner="author1",
+            source_repo="repo",
+            source_branch="feat",
+        )
+        rev = PullRequestRevision.objects.create(
+            pull_request=pr,
+            revision_number=1,
+            head_sha="1111",
+            base_sha="0000",
+            fingerprint="fp1",
+            is_draft=True,
+            draft_expires_at=timezone.now(),
+        )
+
+        # Reviews should not exist initially
+        self.assertEqual(rev.reviews.count(), 0)
+
+        # Calling mark_ready_for_review clears draft and provisions reviews
+        mark_ready_for_review(rev)
+        rev.refresh_from_db()
+        self.assertFalse(rev.is_draft)
+        self.assertIsNone(rev.draft_expires_at)
+        self.assertEqual(rev.reviews.count(), 1)
+        self.assertEqual(rev.reviews.first().reviewer_user, reviewer)
+
+        # Subsequent call does not duplicate reviews
+        mark_ready_for_review(rev)
+        self.assertEqual(rev.reviews.count(), 1)
+
+
+class TestPRSyncDebounceLifecycle(TransactionTestCase):
+    @override_settings(GITEA_URL="https://gitea.example.com", GITEA_TOKEN="secret-token", DEBOUNCE_TIMEOUT_MINUTES=15)
+    @patch("urllib.request.urlopen")
+    def test_sync_manual_draft_pr_sets_no_expiry(self, mock_urlopen):
+        project = Project.objects.create(name="suse:obs-flow")
+        GitMapping.objects.create(owner="suse", repo="obs-flow", branch="main", project=project)
+
+        mock_response = MagicMock()
+        mock_response.read.return_value = json.dumps({
+            "title": "Manual Draft PR",
+            "draft": True,
+            "mergeable": True,
+            "state": "open",
+            "user": {"login": "dev"},
+            "head": {"sha": "1111", "ref": "feat", "repo": {"owner": {"login": "dev"}, "name": "obs-flow"}},
+            "base": {"sha": "0000", "ref": "main"},
+        }).encode("utf-8")
+        mock_urlopen.return_value.__enter__.return_value = mock_response
+
+        with TestClient(api) as client:
+            res = client.post("/api/v1/pr/sync", content=json.dumps({"owner": "suse", "repo": "obs-flow", "number": 1}))
+        self.assertEqual(res.status_code, 200)
+
+        pr = PullRequest.objects.get(number=1)
+        rev = pr.revisions.first()
+        self.assertTrue(rev.is_draft)
+        self.assertIsNone(rev.draft_expires_at)
+        self.assertEqual(rev.reviews.count(), 0)
+
+    @override_settings(GITEA_URL="https://gitea.example.com", GITEA_TOKEN="secret-token", DEBOUNCE_TIMEOUT_MINUTES=15)
+    @patch("urllib.request.urlopen")
+    def test_sync_transition_manual_draft_to_published_without_new_push(self, mock_urlopen):
+        project = Project.objects.create(name="suse:obs-flow")
+        git_mapping = GitMapping.objects.create(owner="suse", repo="obs-flow", branch="main", project=project)
+        author = User.objects.create(username="dev", username_lower="dev", account_type=User.AccountType.HUMAN)
+        reviewer = User.objects.create(username="rev", username_lower="rev", account_type=User.AccountType.HUMAN)
+        from reviews.models import ReviewConfig
+        ReviewConfig.objects.create(project=project, type=ReviewConfig.ConfigType.PROJECT, reviewer_user=reviewer)
+
+        pr = PullRequest.objects.create(
+            target=git_mapping,
+            number=1,
+            author=author,
+            source_owner="dev",
+            source_repo="obs-flow",
+            source_branch="feat",
+        )
+        from pull_requests.fingerprint import PRRevisionPayload
+        fp = PRRevisionPayload(head_sha="1111", base_sha="0000", target_branch="main").compute_fingerprint()
+        rev = PullRequestRevision.objects.create(
+            pull_request=pr,
+            revision_number=1,
+            head_sha="1111",
+            base_sha="0000",
+            fingerprint=fp,
+            is_draft=True,
+            draft_expires_at=None,
+        )
+
+        # Now mock Gitea returning draft: False with the exact same head & base sha
+        mock_response = MagicMock()
+        mock_response.read.return_value = json.dumps({
+            "title": "Published PR",
+            "draft": False,
+            "mergeable": True,
+            "state": "open",
+            "user": {"login": "dev"},
+            "head": {"sha": "1111", "ref": "feat", "repo": {"owner": {"login": "dev"}, "name": "obs-flow"}},
+            "base": {"sha": "0000", "ref": "main"},
+        }).encode("utf-8")
+        mock_urlopen.return_value.__enter__.return_value = mock_response
+
+        with TestClient(api) as client:
+            res = client.post("/api/v1/pr/sync", content=json.dumps({"owner": "suse", "repo": "obs-flow", "number": 1}))
+        self.assertEqual(res.status_code, 200)
+
+        rev.refresh_from_db()
+        self.assertFalse(rev.is_draft)
+        self.assertIsNone(rev.draft_expires_at)
+        self.assertEqual(rev.reviews.count(), 1)
+
+    @override_settings(GITEA_URL="https://gitea.example.com", GITEA_TOKEN="secret-token", REVIEW_DEBOUNCE_MINUTES=0)
+    @patch("urllib.request.urlopen")
+    def test_sync_zero_debounce_publishes_immediately(self, mock_urlopen):
+        project = Project.objects.create(name="suse:obs-flow")
+        git_mapping = GitMapping.objects.create(owner="suse", repo="obs-flow", branch="main", project=project)
+        reviewer = User.objects.create(username="rev", username_lower="rev", account_type=User.AccountType.HUMAN)
+        from reviews.models import ReviewConfig
+        ReviewConfig.objects.create(project=project, type=ReviewConfig.ConfigType.PROJECT, reviewer_user=reviewer)
+
+        mock_response = MagicMock()
+        mock_response.read.return_value = json.dumps({
+            "title": "Zero Debounce PR",
+            "draft": False,
+            "mergeable": True,
+            "state": "open",
+            "user": {"login": "dev"},
+            "head": {"sha": "1111", "ref": "feat", "repo": {"owner": {"login": "dev"}, "name": "obs-flow"}},
+            "base": {"sha": "0000", "ref": "main"},
+        }).encode("utf-8")
+        mock_urlopen.return_value.__enter__.return_value = mock_response
+
+        with TestClient(api) as client:
+            res = client.post("/api/v1/pr/sync", content=json.dumps({"owner": "suse", "repo": "obs-flow", "number": 1}))
+        self.assertEqual(res.status_code, 200)
+
+        pr = PullRequest.objects.get(number=1)
+        rev = pr.revisions.first()
+        self.assertFalse(rev.is_draft)
+        self.assertIsNone(rev.draft_expires_at)
+        self.assertFalse(pr.is_draft)
+        self.assertEqual(rev.reviews.count(), 1)
+
+
+class TestPRReadyForReviewEndpoint(TestCase):
+    def setUp(self):
+        self.project = Project.objects.create(name="test:project")
+        self.git_mapping = GitMapping.objects.create(owner="suse", repo="obs-flow", branch="main", project=self.project)
+        self.author = User.objects.create(username="dev", username_lower="dev", account_type=User.AccountType.HUMAN)
+        self.reviewer = User.objects.create(username="rev", username_lower="rev", account_type=User.AccountType.HUMAN)
+        from reviews.models import ReviewConfig
+        ReviewConfig.objects.create(project=self.project, type=ReviewConfig.ConfigType.PROJECT, reviewer_user=self.reviewer)
+
+        self.pr1 = PullRequest.objects.create(
+            target=self.git_mapping,
+            number=42,
+            author=self.author,
+            source_owner="dev",
+            source_repo="obs-flow",
+            source_branch="feat-1",
+        )
+        self.rev1 = PullRequestRevision.objects.create(
+            pull_request=self.pr1,
+            revision_number=1,
+            head_sha="1111",
+            base_sha="0000",
+            fingerprint="fp1",
+            is_draft=True,
+            draft_expires_at=timezone.now(),
+        )
+
+        self.pr2 = PullRequest.objects.create(
+            target=self.git_mapping,
+            number=43,
+            author=self.author,
+            source_owner="dev",
+            source_repo="obs-flow",
+            source_branch="feat-2",
+        )
+        self.rev2 = PullRequestRevision.objects.create(
+            pull_request=self.pr2,
+            revision_number=1,
+            head_sha="2222",
+            base_sha="0000",
+            fingerprint="fp2",
+            is_draft=True,
+            draft_expires_at=timezone.now(),
+        )
+
+    def test_ready_for_review_bulk_success(self):
+        self.assertTrue(self.pr1.is_draft)
+        self.assertTrue(self.pr2.is_draft)
+        self.assertEqual(self.rev1.reviews.count(), 0)
+        self.assertEqual(self.rev2.reviews.count(), 0)
+
+        payload = {"pull_request_ids": ["suse/obs-flow#42", "suse/obs-flow#43"]}
+        with TestClient(api) as client:
+            response = client.post("/api/v1/pr/ready-for-review", content=json.dumps(payload))
+        self.assertEqual(response.status_code, 200)
+
+        res_data = response.json()
+        self.assertEqual(len(res_data["pull_requests"]), 2)
+        self.assertFalse(res_data["pull_requests"][0]["is_draft"])
+        self.assertFalse(res_data["pull_requests"][1]["is_draft"])
+
+        self.pr1.refresh_from_db()
+        self.rev1.refresh_from_db()
+        self.assertFalse(self.pr1.is_draft)
+        self.assertFalse(self.rev1.is_draft)
+        self.assertEqual(self.rev1.reviews.count(), 1)
+
+        self.pr2.refresh_from_db()
+        self.rev2.refresh_from_db()
+        self.assertFalse(self.pr2.is_draft)
+        self.assertFalse(self.rev2.is_draft)
+        self.assertEqual(self.rev2.reviews.count(), 1)
+
+    def test_ready_for_review_invalid_id(self):
+        with TestClient(api) as client:
+            response = client.post("/api/v1/pr/ready-for-review", content=json.dumps({"pull_request_ids": ["invalid"]}))
+        self.assertEqual(response.status_code, 400)
+
+    def test_ready_for_review_nonexistent_pr(self):
+        with TestClient(api) as client:
+            response = client.post("/api/v1/pr/ready-for-review", content=json.dumps({"pull_request_ids": ["suse/obs-flow#999"]}))
+        self.assertEqual(response.status_code, 400)
+
+
+class TestPRDraftWebViews(TestCase):
+    def setUp(self):
+        self.project = Project.objects.create(name="test:project")
+        self.git_mapping = GitMapping.objects.create(owner="suse", repo="obs-flow", branch="main", project=self.project)
+        self.author = User.objects.create(username="dev", username_lower="dev", account_type=User.AccountType.HUMAN)
+        self.reviewer = User.objects.create(username="rev", username_lower="rev", account_type=User.AccountType.HUMAN)
+        from reviews.models import ReviewConfig
+        ReviewConfig.objects.create(project=self.project, type=ReviewConfig.ConfigType.PROJECT, reviewer_user=self.reviewer)
+
+        self.pr = PullRequest.objects.create(
+            target=self.git_mapping,
+            number=42,
+            author=self.author,
+            source_owner="dev",
+            source_repo="obs-flow",
+            source_branch="feat",
+        )
+        self.rev = PullRequestRevision.objects.create(
+            pull_request=self.pr,
+            revision_number=1,
+            head_sha="1111",
+            base_sha="0000",
+            fingerprint="fp1",
+            is_draft=True,
+            draft_expires_at=timezone.now() + timezone.timedelta(days=1),
+        )
+
+    def test_pr_detail_shows_countdown_and_ready_button(self):
+        from django.test import Client
+        client = Client()
+        res = client.get(f"/pull-requests/{self.pr.id}/")
+        self.assertEqual(res.status_code, 200)
+        self.assertContains(res, "debouncing:")
+        self.assertContains(res, "Ready for Review")
+
+    def test_pr_ready_and_convert_to_draft_actions(self):
+        from django.test import Client
+        client = Client()
+
+        # 1. Click Ready for Review
+        res = client.post(f"/pull-requests/{self.pr.id}/ready-for-review/")
+        self.assertRedirects(res, f"/pull-requests/{self.pr.id}/")
+        self.pr.refresh_from_db()
+        self.assertFalse(self.pr.is_draft)
+        self.assertEqual(self.rev.reviews.count(), 1)
+
+        # PR detail now shows Convert to Draft
+        res = client.get(f"/pull-requests/{self.pr.id}/")
+        self.assertContains(res, "Convert to Draft")
+        self.assertNotContains(res, "debouncing:")
+
+        # 2. Click Convert to Draft
+        res = client.post(f"/pull-requests/{self.pr.id}/convert-to-draft/")
+        self.assertRedirects(res, f"/pull-requests/{self.pr.id}/")
+        self.pr.refresh_from_db()
+        self.rev.refresh_from_db()
+        self.assertTrue(self.pr.is_draft)
+        self.assertIsNone(self.rev.draft_expires_at)
+        # Reviews remain intact
+        self.assertEqual(self.rev.reviews.count(), 1)
+
+    def test_pr_htmx_actions_and_draft_status_expiration(self):
+        from django.test import Client
+        client = Client()
+
+        # HTMX ready for review returns partial directly with OOB reviews section containing reviewer
+        res = client.post(f"/pull-requests/{self.pr.id}/ready-for-review/", HTTP_HX_REQUEST="true")
+        self.assertEqual(res.status_code, 200)
+        self.assertContains(res, 'id="pr-draft-section"')
+        self.assertContains(res, "Convert to Draft")
+        self.assertContains(res, 'id="pr-reviews-section"')
+        self.assertContains(res, 'hx-swap-oob="true"')
+        self.assertContains(res, "rev")
+
+        # Set expired draft timer
+        self.rev.is_draft = True
+        self.rev.draft_expires_at = timezone.now() - timezone.timedelta(seconds=1)
+        self.rev.save()
+
+        # GET /draft-status/ auto-publishes expired draft and returns partial with Convert to Draft and updated reviews
+        res = client.get(f"/pull-requests/{self.pr.id}/draft-status/", HTTP_HX_REQUEST="true")
+        self.assertEqual(res.status_code, 200)
+        self.assertContains(res, "Convert to Draft")
+        self.assertNotContains(res, "debouncing:")
+        self.assertContains(res, 'id="pr-reviews-section"')
+        self.assertContains(res, 'hx-swap-oob="true"')
+        self.assertContains(res, "rev")
+        self.rev.refresh_from_db()
+        self.assertFalse(self.rev.is_draft)
+
+    def test_pr_cancel_timeout_action(self):
+        from django.test import Client
+        client = Client()
+
+        # Initially in debounce with draft_expires_at
+        self.assertTrue(self.rev.is_draft)
+        self.assertIsNotNone(self.rev.draft_expires_at)
+
+        # Detail contains Cancel Timeout button
+        res = client.get(f"/pull-requests/{self.pr.id}/")
+        self.assertContains(res, "Cancel Timeout")
+
+        # Click Cancel Timeout
+        res = client.post(f"/pull-requests/{self.pr.id}/cancel-timeout/")
+        self.assertRedirects(res, f"/pull-requests/{self.pr.id}/")
+        self.rev.refresh_from_db()
+        self.assertTrue(self.rev.is_draft)
+        self.assertIsNone(self.rev.draft_expires_at)
+
+
+class TestPRConvertToDraftEndpoint(TestCase):
+    def setUp(self):
+        self.project = Project.objects.create(name="test:project")
+        self.git_mapping = GitMapping.objects.create(owner="suse", repo="obs-flow", branch="main", project=self.project)
+        self.author = User.objects.create(username="dev", username_lower="dev", account_type=User.AccountType.HUMAN)
+
+        self.pr = PullRequest.objects.create(
+            target=self.git_mapping,
+            number=42,
+            author=self.author,
+            source_owner="dev",
+            source_repo="obs-flow",
+            source_branch="feat",
+        )
+        self.rev = PullRequestRevision.objects.create(
+            pull_request=self.pr,
+            revision_number=1,
+            head_sha="1111",
+            base_sha="0000",
+            fingerprint="fp1",
+            is_draft=False,
+            draft_expires_at=None,
+        )
+
+    def test_convert_to_draft_endpoint_success(self):
+        payload = {"pull_request_ids": ["suse/obs-flow#42"]}
+        with TestClient(api) as client:
+            response = client.post("/api/v1/pr/convert-to-draft", content=json.dumps(payload))
+        self.assertEqual(response.status_code, 200)
+        res_data = response.json()
+        self.assertTrue(res_data["pull_requests"][0]["is_draft"])
+
+        self.rev.refresh_from_db()
+        self.assertTrue(self.rev.is_draft)
+        self.assertIsNone(self.rev.draft_expires_at)
+
+
+class TestMarkExpiredDraftsReadyCommand(TestCase):
+    def setUp(self):
+        self.project = Project.objects.create(name="test:project")
+        self.git_mapping = GitMapping.objects.create(owner="suse", repo="obs-flow", branch="main", project=self.project)
+        self.author = User.objects.create(username="dev", username_lower="dev", account_type=User.AccountType.HUMAN)
+        self.reviewer = User.objects.create(username="rev", username_lower="rev", account_type=User.AccountType.HUMAN)
+        from reviews.models import ReviewConfig
+        ReviewConfig.objects.create(project=self.project, type=ReviewConfig.ConfigType.PROJECT, reviewer_user=self.reviewer)
+        ReviewConfig.objects.create(project=self.project, type="staging", reviewer_user=self.reviewer)
+
+        # 1. Expired PR revision
+        self.pr_expired = PullRequest.objects.create(
+            target=self.git_mapping,
+            number=1,
+            author=self.author,
+            source_owner="dev",
+            source_repo="obs-flow",
+            source_branch="feat-1",
+        )
+        self.rev_pr_expired = PullRequestRevision.objects.create(
+            pull_request=self.pr_expired,
+            revision_number=1,
+            head_sha="1111",
+            base_sha="0000",
+            fingerprint="fp1",
+            is_draft=True,
+            draft_expires_at=timezone.now() - timezone.timedelta(minutes=5),
+        )
+
+        # 2. Non-expired PR revision
+        self.pr_active = PullRequest.objects.create(
+            target=self.git_mapping,
+            number=2,
+            author=self.author,
+            source_owner="dev",
+            source_repo="obs-flow",
+            source_branch="feat-2",
+        )
+        self.rev_pr_active = PullRequestRevision.objects.create(
+            pull_request=self.pr_active,
+            revision_number=1,
+            head_sha="2222",
+            base_sha="0000",
+            fingerprint="fp2",
+            is_draft=True,
+            draft_expires_at=timezone.now() + timezone.timedelta(minutes=10),
+        )
+
+        # 3. Manual draft PR revision (no timer)
+        self.pr_manual = PullRequest.objects.create(
+            target=self.git_mapping,
+            number=3,
+            author=self.author,
+            source_owner="dev",
+            source_repo="obs-flow",
+            source_branch="feat-3",
+        )
+        self.rev_pr_manual = PullRequestRevision.objects.create(
+            pull_request=self.pr_manual,
+            revision_number=1,
+            head_sha="3333",
+            base_sha="0000",
+            fingerprint="fp3",
+            is_draft=True,
+            draft_expires_at=None,
+        )
+
+        # 4. Expired Staging Batch revision
+        from staging.models import StagingBatch, StagingBatchRevision
+        self.batch_expired = StagingBatch.objects.create(project=self.project)
+        self.rev_staging_expired = StagingBatchRevision.objects.create(
+            staging_batch=self.batch_expired,
+            revision_number=1,
+            fingerprint="sfp1",
+            is_draft=True,
+            draft_expires_at=timezone.now() - timezone.timedelta(minutes=5),
+        )
+
+        # 5. Non-expired Staging Batch revision
+        self.batch_active = StagingBatch.objects.create(project=self.project)
+        self.rev_staging_active = StagingBatchRevision.objects.create(
+            staging_batch=self.batch_active,
+            revision_number=1,
+            fingerprint="sfp2",
+            is_draft=True,
+            draft_expires_at=timezone.now() + timezone.timedelta(minutes=10),
+        )
+
+    def test_command_marks_expired_revisions_ready(self):
+        from django.core.management import call_command
+        import io
+
+        out = io.StringIO()
+        call_command("mark_expired_drafts_ready", stdout=out)
+        output = out.getvalue()
+
+        self.assertIn("Marked 1 PR revision(s) and 1 staging batch revision(s) ready for review.", output)
+
+        # Expired PR revision is published and has reviews
+        self.rev_pr_expired.refresh_from_db()
+        self.assertFalse(self.rev_pr_expired.is_draft)
+        self.assertIsNone(self.rev_pr_expired.draft_expires_at)
+        self.assertEqual(self.rev_pr_expired.reviews.count(), 1)
+
+        # Active PR revision remains in draft without reviews
+        self.rev_pr_active.refresh_from_db()
+        self.assertTrue(self.rev_pr_active.is_draft)
+        self.assertIsNotNone(self.rev_pr_active.draft_expires_at)
+        self.assertEqual(self.rev_pr_active.reviews.count(), 0)
+
+        # Manual draft PR revision remains in draft without reviews
+        self.rev_pr_manual.refresh_from_db()
+        self.assertTrue(self.rev_pr_manual.is_draft)
+        self.assertIsNone(self.rev_pr_manual.draft_expires_at)
+        self.assertEqual(self.rev_pr_manual.reviews.count(), 0)
+
+        # Expired Staging revision is published and has reviews
+        self.rev_staging_expired.refresh_from_db()
+        self.assertFalse(self.rev_staging_expired.is_draft)
+        self.assertIsNone(self.rev_staging_expired.draft_expires_at)
+        self.assertEqual(self.rev_staging_expired.reviews.count(), 1)
+
+        # Active Staging revision remains in draft without reviews
+        self.rev_staging_active.refresh_from_db()
+        self.assertTrue(self.rev_staging_active.is_draft)
+        self.assertEqual(self.rev_staging_active.reviews.count(), 0)
+
+    def test_command_dry_run_leaves_database_unmodified(self):
+        from django.core.management import call_command
+        import io
+
+        out = io.StringIO()
+        call_command("mark_expired_drafts_ready", dry_run=True, stdout=out)
+        output = out.getvalue()
+
+        self.assertIn("Would mark 1 PR revision(s) and 1 staging batch revision(s) ready for review.", output)
+
+        # Expired revisions should remain draft in dry-run
+        self.rev_pr_expired.refresh_from_db()
+        self.assertTrue(self.rev_pr_expired.is_draft)
+        self.assertEqual(self.rev_pr_expired.reviews.count(), 0)
+
+        self.rev_staging_expired.refresh_from_db()
+        self.assertTrue(self.rev_staging_expired.is_draft)
+        self.assertEqual(self.rev_staging_expired.reviews.count(), 0)

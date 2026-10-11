@@ -15,58 +15,9 @@
 
 <div class="layout-with-sidebar">
     <div>
-        <section>
+        <section id="pr-reviews-section">
             <h3>Reviews (Latest Revision)</h3>
-            {% if reviews %}
-                <table class="striped">
-                    <thead>
-                        <tr>
-                            <th>Reviewer</th>
-                            <th>Actor</th>
-                            <th>State</th>
-                            <th>Date</th>
-                            <th>Justification</th>
-                            <th>URL</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for review in reviews %}
-                            <tr>
-                                <td data-label="Reviewer">
-                                    {% if review.reviewer_user %}
-                                        {{ review.reviewer_user.username }}
-                                    {% elif review.reviewer_group %}
-                                        @{{ review.reviewer_group.name }}
-                                    {% else %}
-                                        role:{{ review.dynamic_role }}
-                                    {% endif %}
-                                </td>
-                                <td data-label="Actor">
-                                    {% if review.actor %}
-                                        {% if review.reviewer_group or review.dynamic_role or review.reviewer_user != review.actor %}
-                                            {{ review.actor.username }}
-                                        {% endif %}
-                                    {% else %}
-                                        -
-                                    {% endif %}
-                                </td>
-                                <td data-label="State">{{ review.state }}</td>
-                                <td data-label="Date">{{ review.updated_at|date:"Y-m-d H:i" }}</td>
-                                <td data-label="Justification">{{ review.justification|default:"-" }}</td>
-                                <td data-label="URL">
-                                    {% if review.external_review_url %}
-                                        <a href="{{ review.external_review_url }}" target="_blank">link</a>
-                                    {% else %}
-                                        -
-                                    {% endif %}
-                                </td>
-                            </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            {% else %}
-                <p class="muted">No reviews configured or pending.</p>
-            {% endif %}
+            {% include "pull_requests/partials/reviews_table.html" %}
         </section>
 
         <section>
@@ -102,10 +53,7 @@
                 <h4>State</h4>
                 <p>{{ pr.state }}</p>
             </div>
-            <div class="sidebar-section">
-                <h4>Draft</h4>
-                <p>{% if pr.is_draft %}yes{% else %}no{% endif %}</p>
-            </div>
+            {% include "pull_requests/partials/draft_section.html" %}
             <div class="sidebar-section">
                 <h4>Mergeable</h4>
                 <p>{% if pr.is_mergeable %}yes{% else %}no{% endif %}</p>

@@ -223,7 +223,7 @@ class TestReviewConfigEndpoints(TransactionTestCase):
         ])
 
         # Verify database relations
-        config = ReviewConfig.objects.get(reviewer_user__username="dimstar")
+        config = ReviewConfig.objects.get(reviewer_user__username="dimstar", type="project")
         self.assertCountEqual(config.depends_on.all(), [dep1, dep2])
 
     def test_add_fails_with_missing_dependency(self):
@@ -268,7 +268,7 @@ class TestReviewConfigEndpoints(TransactionTestCase):
         self.assertEqual(response.status_code, 200)
         res_data = response.json()
         configs = res_data["data"]
-        self.assertEqual(len(configs), 2)
+        self.assertEqual(len(configs), 4)
 
         # List filtered by type
         payload = {

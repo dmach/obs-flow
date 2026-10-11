@@ -1,5 +1,8 @@
+from datetime import timedelta
 import msgspec
 from asgiref.sync import sync_to_async
+from django.conf import settings
+from django.db import transaction
 from django.utils import timezone
 from django.http import HttpResponseBadRequest
 from django_bolt import BoltAPI
@@ -10,6 +13,10 @@ from obs_flow_common.messages import (
     StagingCreateResponse,
     StagingEditRequest,
     StagingEditResponse,
+    StagingReadyForReviewRequest,
+    StagingReadyForReviewResponse,
+    StagingConvertToDraftRequest,
+    StagingConvertToDraftResponse,
     StagingAddRequest,
     StagingAddResponse,
     StagingRemoveRequest,
@@ -31,7 +38,6 @@ from accounts.helpers import build_user_dto, get_authenticated_user, get_auth_he
 from accounts.models import User, Group
 from core.models import Project
 from pull_requests.models import PullRequest
-from pull_requests.api import get_pull_request, parse_reviewer
 from reviews.api import build_reviewer_dto_from_fields
 from staging.models import StagingBatch, StagingBatchRevision, StagingBatchRevisionPullRequest, StagingReview
 from staging.views import update_staging_batch
@@ -63,8 +69,8 @@ def create_staging_revision(batch: StagingBatch, pr_revisions) -> StagingBatchRe
     """
     Creates a new StagingBatchRevision for the given StagingBatch and list of PullRequestRevisions.
     If the latest revision has the exact same fingerprint, it returns the existing one.
-    Otherwise, it increments the revision number, creates the new revision, links the PR revisions,
-    and re-creates pending StagingReviews based on ReviewConfig.
+    Otherwise, it increments the revision number, creates the new revision in draft mode with debounce timer,
+    and links the PR revisions. Reviews are not provisioned while in draft.
     """
     fingerprint = compute_staging_fingerprint(batch, pr_revisions)
     latest_rev = batch.revisions.order_by("-revision_number").first()
@@ -72,11 +78,22 @@ def create_staging_revision(batch: StagingBatch, pr_revisions) -> StagingBatchRe
     if latest_rev and latest_rev.fingerprint == fingerprint:
         return latest_rev
 
+    timeout_minutes = batch.project.effective_review_debounce_minutes
     rev_number = (latest_rev.revision_number + 1) if latest_rev else 1
+
+    if timeout_minutes == 0:
+        rev_is_draft = False
+        rev_draft_expires_at = None
+    else:
+        rev_is_draft = True
+        rev_draft_expires_at = timezone.now() + timedelta(minutes=timeout_minutes)
+
     new_rev = StagingBatchRevision.objects.create(
         staging_batch=batch,
         revision_number=rev_number,
         fingerprint=fingerprint,
+        is_draft=rev_is_draft,
+        draft_expires_at=rev_draft_expires_at,
     )
 
     for pr_rev in pr_revisions:
@@ -85,20 +102,40 @@ def create_staging_revision(batch: StagingBatch, pr_revisions) -> StagingBatchRe
             pull_request_revision=pr_rev,
         )
 
-    # Create reviews for the new revision based on ReviewConfig
+    if not rev_is_draft:
+        provision_reviews_for_staging_revision(new_rev)
+
+    return new_rev
+
+
+@transaction.atomic
+def provision_reviews_for_staging_revision(revision: StagingBatchRevision) -> list[StagingReview]:
+    """
+    Provisions reviews for a StagingBatchRevision based on ReviewConfig if no reviews exist.
+    While a revision is in draft mode, no review records are created.
+    Existing reviews are never re-provisioned.
+    """
+    rev = StagingBatchRevision.objects.select_for_update().get(pk=revision.pk)
+    if rev.is_draft:
+        return []
+    if rev.reviews.exists():
+        return list(rev.reviews.all())
+
     from reviews.models import ReviewConfig
-    configs = ReviewConfig.objects.filter(project=batch.project, type="staging")
+    configs = ReviewConfig.objects.filter(project=rev.staging_batch.project, type="staging")
+    created_reviews = []
     if configs.exists():
         config_to_review = {}
         for config in configs:
             review = StagingReview.objects.create(
-                revision=new_rev,
+                revision=rev,
                 reviewer_user=config.reviewer_user,
                 reviewer_group=config.reviewer_group,
                 dynamic_role=config.dynamic_role,
                 state=StagingReview.State.PENDING,
             )
             config_to_review[config] = review
+            created_reviews.append(review)
 
         # Set up dependencies between the created reviews
         for config, review in config_to_review.items():
@@ -106,7 +143,39 @@ def create_staging_revision(batch: StagingBatch, pr_revisions) -> StagingBatchRe
                 if dep_config in config_to_review:
                     review.depends_on.add(config_to_review[dep_config])
 
-    return new_rev
+    return created_reviews
+
+
+@transaction.atomic
+def mark_staging_ready_for_review(revision: StagingBatchRevision) -> None:
+    """
+    Transitions a StagingBatchRevision out of draft mode and provisions reviews.
+    """
+    rev = StagingBatchRevision.objects.select_for_update().get(pk=revision.pk)
+    if not rev.is_draft and rev.draft_expires_at is None:
+        return
+    rev.is_draft = False
+    rev.draft_expires_at = None
+    rev.save(update_fields=["is_draft", "draft_expires_at"])
+    revision.is_draft = False
+    revision.draft_expires_at = None
+    provision_reviews_for_staging_revision(rev)
+
+
+@transaction.atomic
+def mark_staging_draft(revision: StagingBatchRevision) -> None:
+    """
+    Transitions a StagingBatchRevision into manual draft mode without debounce timer.
+    Existing reviews are not modified or removed.
+    """
+    rev = StagingBatchRevision.objects.select_for_update().get(pk=revision.pk)
+    if rev.is_draft and rev.draft_expires_at is None:
+        return
+    rev.is_draft = True
+    rev.draft_expires_at = None
+    rev.save(update_fields=["is_draft", "draft_expires_at"])
+    revision.is_draft = True
+    revision.draft_expires_at = None
 
 
 def batch_to_detail(batch: StagingBatch) -> StagingDetail:
@@ -135,6 +204,7 @@ def batch_to_detail(batch: StagingBatch) -> StagingDetail:
         release_date=batch.release_date.isoformat() if batch.release_date else None,
         latest_revision=latest_rev_num,
         fingerprint=fingerprint,
+        is_draft=batch.is_draft,
     )
 
 
@@ -156,6 +226,8 @@ def review_to_detail(review: StagingReview) -> ReviewDetail:
 
 
 def get_review_for_request(batch: StagingBatch, reviewer_str: str | None) -> StagingReview:
+    from pull_requests.api import parse_reviewer
+
     latest_rev = batch.revisions.order_by("-revision_number").first()
     if not latest_rev:
         raise ValueError(f"Staging batch #{batch.id} has no revisions.")
@@ -222,6 +294,8 @@ def edit_staging_endpoint(payload: StagingEditRequest):
 @api.post("/api/v1/staging/add")
 @sync_to_async
 def add_to_staging_endpoint(payload: StagingAddRequest):
+    from pull_requests.api import get_pull_request
+
     batch = StagingBatch.objects.get(id=payload.id)
 
     # Validate that all requested PRs target the same project as the batch
@@ -263,6 +337,8 @@ def add_to_staging_endpoint(payload: StagingAddRequest):
 @api.post("/api/v1/staging/remove")
 @sync_to_async
 def remove_from_staging_endpoint(payload: StagingRemoveRequest):
+    from pull_requests.api import get_pull_request
+
     batch = StagingBatch.objects.get(id=payload.id)
 
     latest_rev = batch.revisions.order_by("-revision_number").first()
@@ -311,6 +387,7 @@ def show_staging_review_endpoint(payload: StagingReviewShowRequest):
     reviews = latest_rev.reviews.all()
 
     if payload.reviewer:
+        from pull_requests.api import parse_reviewer
         user, group = parse_reviewer(payload.reviewer)
         if user:
             reviews = reviews.filter(reviewer_user=user)
@@ -410,4 +487,48 @@ def reopen_staging_review_endpoint(payload: StagingReviewReopenRequest, request)
     review.save()
 
     res = StagingReviewActionResponse(staging_id=payload.staging_id, review=review_to_detail(review))
+    return msgspec.structs.asdict(res)
+
+
+@api.post("/api/v1/staging/ready-for-review")
+@sync_to_async
+def staging_ready_for_review_endpoint(payload: StagingReadyForReviewRequest):
+    updated_batches = []
+    for batch_id in payload.staging_ids:
+        try:
+            batch = StagingBatch.objects.get(id=batch_id)
+        except StagingBatch.DoesNotExist:
+            return HttpResponseBadRequest(f"Staging batch #{batch_id} does not exist.")
+
+        latest_rev = batch.revisions.order_by("-revision_number").first()
+        if not latest_rev:
+            return HttpResponseBadRequest(f"Staging batch #{batch_id} has no revisions.")
+
+        mark_staging_ready_for_review(latest_rev)
+        batch.refresh_from_db()
+        updated_batches.append(batch_to_detail(batch))
+
+    res = StagingReadyForReviewResponse(staging_batches=updated_batches)
+    return msgspec.structs.asdict(res)
+
+
+@api.post("/api/v1/staging/convert-to-draft")
+@sync_to_async
+def staging_convert_to_draft_endpoint(payload: StagingConvertToDraftRequest):
+    updated_batches = []
+    for batch_id in payload.staging_ids:
+        try:
+            batch = StagingBatch.objects.get(id=batch_id)
+        except StagingBatch.DoesNotExist:
+            return HttpResponseBadRequest(f"Staging batch #{batch_id} does not exist.")
+
+        latest_rev = batch.revisions.order_by("-revision_number").first()
+        if not latest_rev:
+            return HttpResponseBadRequest(f"Staging batch #{batch_id} has no revisions.")
+
+        mark_staging_draft(latest_rev)
+        batch.refresh_from_db()
+        updated_batches.append(batch_to_detail(batch))
+
+    res = StagingConvertToDraftResponse(staging_batches=updated_batches)
     return msgspec.structs.asdict(res)

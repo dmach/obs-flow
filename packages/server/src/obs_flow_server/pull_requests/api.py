@@ -1,7 +1,9 @@
+from datetime import timedelta
 import re
 
 import msgspec
 from asgiref.sync import sync_to_async
+from django.db import transaction
 from django.utils import timezone
 from django_bolt import BoltAPI
 
@@ -9,6 +11,10 @@ from obs_flow_common.messages import (
     PRDetail,
     PRSyncRequest,
     PRSyncResponse,
+    PRReadyForReviewRequest,
+    PRReadyForReviewResponse,
+    PRConvertToDraftRequest,
+    PRConvertToDraftResponse,
     PRReviewShowRequest,
     PRReviewShowResponse,
     PRReviewActionResponse,
@@ -212,7 +218,80 @@ import urllib.request
 import urllib.error
 import json
 from django.conf import settings
-from django.http import HttpResponseServerError
+from django.http import HttpResponseBadRequest, HttpResponseServerError
+
+
+@transaction.atomic
+def provision_reviews_for_revision(revision: PullRequestRevision) -> list[PullRequestReview]:
+    """
+    Provisions reviews for a PullRequestRevision based on ReviewConfig if no reviews exist.
+    While a revision is in draft mode, no review records are created.
+    Existing reviews are never re-provisioned.
+    """
+    rev = PullRequestRevision.objects.select_for_update().get(pk=revision.pk)
+    if rev.is_draft:
+        return []
+    if rev.reviews.exists():
+        return list(rev.reviews.all())
+
+    from reviews.models import ReviewConfig
+
+    pr = rev.pull_request
+    git_mapping = pr.target
+    project = git_mapping.target_project
+    if git_mapping.project_id:
+        config_type = ReviewConfig.ConfigType.PROJECT
+    elif git_mapping.package_id:
+        config_type = ReviewConfig.ConfigType.PACKAGE
+    else:
+        config_type = None
+
+    created_reviews = []
+    if project and config_type:
+        configs = ReviewConfig.objects.filter(project=project, type=config_type)
+        for config in configs:
+            review = PullRequestReview.objects.create(
+                revision=rev,
+                reviewer_user=config.reviewer_user,
+                reviewer_group=config.reviewer_group,
+                dynamic_role=config.dynamic_role,
+                state=PullRequestReview.State.PENDING,
+            )
+            created_reviews.append(review)
+
+    return created_reviews
+
+
+@transaction.atomic
+def mark_ready_for_review(revision: PullRequestRevision) -> None:
+    """
+    Transitions a PullRequestRevision out of draft mode and provisions reviews.
+    """
+    rev = PullRequestRevision.objects.select_for_update().get(pk=revision.pk)
+    if not rev.is_draft and rev.draft_expires_at is None:
+        return
+    rev.is_draft = False
+    rev.draft_expires_at = None
+    rev.save(update_fields=["is_draft", "draft_expires_at"])
+    revision.is_draft = False
+    revision.draft_expires_at = None
+    provision_reviews_for_revision(rev)
+
+
+@transaction.atomic
+def mark_draft(revision: PullRequestRevision) -> None:
+    """
+    Transitions a PullRequestRevision into manual draft mode without debounce timer.
+    Existing reviews are not modified or removed.
+    """
+    rev = PullRequestRevision.objects.select_for_update().get(pk=revision.pk)
+    if rev.is_draft and rev.draft_expires_at is None:
+        return
+    rev.is_draft = True
+    rev.draft_expires_at = None
+    rev.save(update_fields=["is_draft", "draft_expires_at"])
+    revision.is_draft = True
+    revision.draft_expires_at = None
 
 
 def _do_sync_pull_request(req: PRSyncRequest) -> PRSyncResponse:
@@ -275,7 +354,6 @@ def _do_sync_pull_request(req: PRSyncRequest) -> PRSyncResponse:
         defaults={
             "author": author,
             "title": title,
-            "is_draft": draft,
             "is_mergeable": mergeable,
             "state": pr_state,
             "source_owner": data.get("head", {}).get("repo", {}).get("owner", {}).get("login", req.owner),
@@ -287,7 +365,6 @@ def _do_sync_pull_request(req: PRSyncRequest) -> PRSyncResponse:
     if not created:
         # Update fields
         pr.title = title
-        pr.is_draft = draft
         pr.is_mergeable = mergeable
         pr.state = pr_state
         pr.save()
@@ -302,38 +379,34 @@ def _do_sync_pull_request(req: PRSyncRequest) -> PRSyncResponse:
     )
     fingerprint = pr_payload.compute_fingerprint()
 
+    target_project = pr.target.target_project
+    timeout_minutes = target_project.effective_review_debounce_minutes if target_project else settings.REVIEW_DEBOUNCE_MINUTES
     latest_revision = pr.revisions.order_by("-revision_number").first()
     if not latest_revision or latest_revision.fingerprint != fingerprint:
         rev_number = (latest_revision.revision_number + 1) if latest_revision else 1
+
+        if draft:
+            rev_is_draft = True
+            rev_draft_expires_at = None
+        elif timeout_minutes == 0:
+            rev_is_draft = False
+            rev_draft_expires_at = None
+        else:
+            rev_is_draft = True
+            rev_draft_expires_at = timezone.now() + timedelta(minutes=timeout_minutes)
+
         latest_revision = PullRequestRevision.objects.create(
             pull_request=pr,
             revision_number=rev_number,
             head_sha=head_sha,
             base_sha=base_sha,
             fingerprint=fingerprint,
+            is_draft=rev_is_draft,
+            draft_expires_at=rev_draft_expires_at,
         )
 
-        from reviews.models import ReviewConfig
-
-        git_mapping = pr.target
-        project = git_mapping.target_project
-        if git_mapping.project_id:
-            config_type = ReviewConfig.ConfigType.PROJECT
-        elif git_mapping.package_id:
-            config_type = ReviewConfig.ConfigType.PACKAGE
-        else:
-            config_type = None
-
-        if project and config_type:
-            configs = ReviewConfig.objects.filter(project=project, type=config_type)
-            for config in configs:
-                PullRequestReview.objects.create(
-                    revision=latest_revision,
-                    reviewer_user=config.reviewer_user,
-                    reviewer_group=config.reviewer_group,
-                    dynamic_role=config.dynamic_role,
-                    state=PullRequestReview.State.PENDING
-                )
+        if not rev_is_draft:
+            provision_reviews_for_revision(latest_revision)
 
         # Update any StagingBatches containing this PR to use the new PullRequestRevision
         from staging.models import StagingBatch
@@ -359,6 +432,16 @@ def _do_sync_pull_request(req: PRSyncRequest) -> PRSyncResponse:
                         else:
                             updated_pr_revs.append(r)
                     create_staging_revision(batch, updated_pr_revs)
+    else:
+        # Same fingerprint (no new push). Check if upstream draft state changed.
+        if not draft and latest_revision.is_draft and latest_revision.draft_expires_at is None:
+            # Transitioned from manual draft to ready in upstream forge
+            mark_ready_for_review(latest_revision)
+        elif draft and not latest_revision.is_draft:
+            # Upstream toggled back to draft
+            latest_revision.is_draft = True
+            latest_revision.draft_expires_at = None
+            latest_revision.save(update_fields=["is_draft", "draft_expires_at"])
 
     return PRSyncResponse(
         pull_request=PRDetail(
@@ -385,4 +468,74 @@ async def sync_pull_request_endpoint(payload: PRSyncRequest):
     except Exception as e:
         return HttpResponseServerError(str(e))
 
+    return msgspec.structs.asdict(res)
+
+
+@api.post("/api/v1/pr/ready-for-review")
+@sync_to_async
+def pr_ready_for_review_endpoint(payload: PRReadyForReviewRequest):
+    updated_prs = []
+    for pr_id in payload.pull_request_ids:
+        try:
+            pr = get_pull_request(pr_id)
+        except (PullRequest.DoesNotExist, ValueError) as e:
+            return HttpResponseBadRequest(str(e))
+
+        latest_revision = pr.revisions.order_by("-revision_number").first()
+        if not latest_revision:
+            return HttpResponseBadRequest(f"Pull request {pr_id} has no revisions.")
+
+        mark_ready_for_review(latest_revision)
+        pr.refresh_from_db()
+        latest_revision.refresh_from_db()
+        updated_prs.append(
+            PRDetail(
+                id=pr_id,
+                title=pr.title,
+                state=pr.state,
+                is_draft=pr.is_draft,
+                is_mergeable=pr.is_mergeable,
+                author=build_user_dto(pr.author),
+                latest_revision=latest_revision.revision_number,
+                head_sha=latest_revision.head_sha,
+                base_sha=latest_revision.base_sha,
+            )
+        )
+
+    res = PRReadyForReviewResponse(pull_requests=updated_prs)
+    return msgspec.structs.asdict(res)
+
+
+@api.post("/api/v1/pr/convert-to-draft")
+@sync_to_async
+def pr_convert_to_draft_endpoint(payload: PRConvertToDraftRequest):
+    updated_prs = []
+    for pr_id in payload.pull_request_ids:
+        try:
+            pr = get_pull_request(pr_id)
+        except (PullRequest.DoesNotExist, ValueError) as e:
+            return HttpResponseBadRequest(str(e))
+
+        latest_revision = pr.revisions.order_by("-revision_number").first()
+        if not latest_revision:
+            return HttpResponseBadRequest(f"Pull request {pr_id} has no revisions.")
+
+        mark_draft(latest_revision)
+        pr.refresh_from_db()
+        latest_revision.refresh_from_db()
+        updated_prs.append(
+            PRDetail(
+                id=pr_id,
+                title=pr.title,
+                state=pr.state,
+                is_draft=pr.is_draft,
+                is_mergeable=pr.is_mergeable,
+                author=build_user_dto(pr.author),
+                latest_revision=latest_revision.revision_number,
+                head_sha=latest_revision.head_sha,
+                base_sha=latest_revision.base_sha,
+            )
+        )
+
+    res = PRConvertToDraftResponse(pull_requests=updated_prs)
     return msgspec.structs.asdict(res)

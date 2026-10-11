@@ -382,3 +382,45 @@ class TestProjectAPI(TransactionTestCase):
         with TestClient(api) as client:
             response = client.post("/api/v1/project/update", content=json.dumps(payload))
         self.assertNotEqual(response.status_code, 200)
+
+
+class TestProjectDebounceSetting(TestCase):
+    def test_effective_review_debounce_minutes(self):
+        from django.test import override_settings
+
+        with override_settings(REVIEW_DEBOUNCE_MINUTES=20):
+            proj_default = Project.objects.create(name="proj:default")
+            self.assertEqual(proj_default.effective_review_debounce_minutes, 20)
+
+            proj_custom = Project.objects.create(name="proj:custom", review_debounce_minutes=5)
+            self.assertEqual(proj_custom.effective_review_debounce_minutes, 5)
+
+            proj_zero = Project.objects.create(name="proj:zero", review_debounce_minutes=0)
+            self.assertEqual(proj_zero.effective_review_debounce_minutes, 0)
+
+    def test_system_check_validation(self):
+        from core.apps import check_review_debounce_setting
+        from django.test import override_settings
+
+        # Valid setting
+        with override_settings(REVIEW_DEBOUNCE_MINUTES=15):
+            errors = check_review_debounce_setting(None)
+            self.assertEqual(errors, [])
+
+        # Missing / None setting
+        with override_settings(REVIEW_DEBOUNCE_MINUTES=None):
+            errors = check_review_debounce_setting(None)
+            self.assertEqual(len(errors), 1)
+            self.assertEqual(errors[0].id, "core.E001")
+
+        # Invalid setting (negative)
+        with override_settings(REVIEW_DEBOUNCE_MINUTES=-1):
+            errors = check_review_debounce_setting(None)
+            self.assertEqual(len(errors), 1)
+            self.assertEqual(errors[0].id, "core.E002")
+
+        # Invalid setting (non-integer)
+        with override_settings(REVIEW_DEBOUNCE_MINUTES="not-an-int"):
+            errors = check_review_debounce_setting(None)
+            self.assertEqual(len(errors), 1)
+            self.assertEqual(errors[0].id, "core.E002")

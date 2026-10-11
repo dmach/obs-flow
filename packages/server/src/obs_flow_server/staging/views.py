@@ -2,8 +2,9 @@ import urllib.parse
 from django.contrib import messages
 from django.core.paginator import Paginator
 from django.http import HttpResponse
-from django.shortcuts import render, get_object_or_404
+from django.shortcuts import render, get_object_or_404, redirect
 from django.utils import timezone
+from django.views.decorators.http import require_POST
 
 from accounts.models import User
 from core.models import Project
@@ -339,3 +340,75 @@ def staging_ui_modal_confirm_add(request):
 
     messages.success(request, f"Successfully added {len(prs_to_add)} PRs to Staging Batch #{batch.id}.")
     return _close_modal_and_refresh()
+
+
+def _render_staging_draft_section(request, batch, latest_revision):
+    reviews = latest_revision.reviews.all() if latest_revision else []
+    return render(
+        request,
+        "staging/partials/draft_section.html",
+        {
+            "batch": batch,
+            "latest_revision": latest_revision,
+            "reviews": reviews,
+        },
+    )
+
+
+def staging_draft_status(request, batch_id):
+    batch = get_object_or_404(StagingBatch, id=batch_id)
+    latest_revision = batch.revisions.order_by("-revision_number").first()
+    if latest_revision and latest_revision.is_draft and latest_revision.draft_expires_at and latest_revision.draft_expires_at <= timezone.now():
+        from staging.api import mark_staging_ready_for_review
+        mark_staging_ready_for_review(latest_revision)
+        batch.refresh_from_db()
+        latest_revision.refresh_from_db()
+    return _render_staging_draft_section(request, batch, latest_revision)
+
+
+@require_POST
+def staging_ready_for_review(request, batch_id):
+    batch = get_object_or_404(StagingBatch, id=batch_id)
+    latest_revision = batch.revisions.order_by("-revision_number").first()
+    if latest_revision:
+        from staging.api import mark_staging_ready_for_review
+        mark_staging_ready_for_review(latest_revision)
+        messages.success(request, f"Staging batch #{batch.id} is now ready for review.")
+        batch.refresh_from_db()
+        latest_revision.refresh_from_db()
+
+    if request.headers.get("HX-Request"):
+        return _render_staging_draft_section(request, batch, latest_revision)
+    return redirect("staging_detail", batch_id=batch.id)
+
+
+@require_POST
+def staging_cancel_timeout(request, batch_id):
+    batch = get_object_or_404(StagingBatch, id=batch_id)
+    latest_revision = batch.revisions.order_by("-revision_number").first()
+    if latest_revision:
+        from staging.api import mark_staging_draft
+        mark_staging_draft(latest_revision)
+        messages.success(request, f"Cancelled review debounce timeout for Staging Batch #{batch.id}.")
+        batch.refresh_from_db()
+        latest_revision.refresh_from_db()
+
+    if request.headers.get("HX-Request"):
+        return _render_staging_draft_section(request, batch, latest_revision)
+    return redirect("staging_detail", batch_id=batch.id)
+
+
+@require_POST
+def staging_convert_to_draft(request, batch_id):
+    batch = get_object_or_404(StagingBatch, id=batch_id)
+    latest_revision = batch.revisions.order_by("-revision_number").first()
+    if latest_revision:
+        from staging.api import mark_staging_draft
+        mark_staging_draft(latest_revision)
+        messages.success(request, f"Staging batch #{batch.id} converted to draft.")
+        batch.refresh_from_db()
+        latest_revision.refresh_from_db()
+
+    if request.headers.get("HX-Request"):
+        return _render_staging_draft_section(request, batch, latest_revision)
+    return redirect("staging_detail", batch_id=batch.id)
