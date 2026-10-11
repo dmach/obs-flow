@@ -55,6 +55,28 @@ class ReviewConfigBase(models.Model):
             )
         ]
 
+    def validate_no_cycles(self, new_dependencies=None) -> None:
+        """
+        Validates that new_dependencies (or self.depends_on) do not form a cycle in the DAG.
+        Raises ValueError if a circular dependency is detected.
+        """
+        if new_dependencies is None:
+            new_dependencies = self.depends_on.all() if self.pk else []
+
+        visited = set()
+        stack = list(new_dependencies)
+        while stack:
+            current = stack.pop()
+            if self.pk and current.pk == self.pk:
+                reviewer = self.reviewer_user or self.reviewer_group or self.dynamic_role
+                raise ValueError(
+                    f"Circular dependency detected: '{reviewer}' cannot depend on itself directly or indirectly."
+                )
+            if current.pk not in visited:
+                visited.add(current.pk)
+                stack.extend(current.depends_on.all())
+
+
 
 class ReviewConfig(ReviewConfigBase):
     project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name="review_configurations")
