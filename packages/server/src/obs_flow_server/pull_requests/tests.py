@@ -6,7 +6,7 @@ from django_bolt.testing import TestClient
 
 from accounts.models import User
 from core.models import Project, GitMapping
-from pull_requests.models import PullRequest, PullRequestRevision
+from pull_requests.models import PullRequest, PullRequestRevision, PullRequestReview
 from obs_flow_server.api import api
 
 
@@ -647,6 +647,8 @@ class TestPullRequestReviewProvisioning(TestCase):
 
         self.assertIn(review_a, review_b.depends_on.all())
         self.assertEqual(review_a.depends_on.count(), 0)
+        self.assertEqual(review_a.state, PullRequestReview.State.PENDING)
+        self.assertEqual(review_b.state, PullRequestReview.State.WAITING)
 
 
 class TestPRSyncDebounceLifecycle(TransactionTestCase):

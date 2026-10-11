@@ -96,6 +96,8 @@ class TestFixtureData(TestCase):
         group_review = rev2.reviews.get(reviewer_group__name="factory-staging")
         user_review = rev2.reviews.get(reviewer_user__username="dimstar")
         self.assertIn(group_review, user_review.depends_on.all())
+        self.assertEqual(group_review.state, StagingReview.State.PENDING)
+        self.assertEqual(user_review.state, StagingReview.State.WAITING)
 
 
 
@@ -187,7 +189,7 @@ class TestStagingCreationWithReviewConfig(TransactionTestCase):
         self.assertEqual(review_team.state, StagingReview.State.PENDING)
 
         review_dimstar = reviews.get(reviewer_user=user_dimstar)
-        self.assertEqual(review_dimstar.state, StagingReview.State.PENDING)
+        self.assertEqual(review_dimstar.state, StagingReview.State.WAITING)
 
         # Verify dependencies are correctly mapped
         self.assertCountEqual(
