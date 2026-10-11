@@ -249,6 +249,7 @@ def provision_reviews_for_revision(revision: PullRequestRevision) -> list[PullRe
     created_reviews = []
     if project and config_type:
         configs = ReviewConfig.objects.filter(project=project, type=config_type)
+        config_to_review = {}
         for config in configs:
             review = PullRequestReview.objects.create(
                 revision=rev,
@@ -257,7 +258,14 @@ def provision_reviews_for_revision(revision: PullRequestRevision) -> list[PullRe
                 dynamic_role=config.dynamic_role,
                 state=PullRequestReview.State.PENDING,
             )
+            config_to_review[config] = review
             created_reviews.append(review)
+
+        # Set up dependencies between the created reviews
+        for config, review in config_to_review.items():
+            for dep_config in config.depends_on.all():
+                if dep_config in config_to_review:
+                    review.depends_on.add(config_to_review[dep_config])
 
     return created_reviews
 

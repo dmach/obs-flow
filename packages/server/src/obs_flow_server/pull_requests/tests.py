@@ -599,6 +599,55 @@ class TestPullRequestReviewProvisioning(TestCase):
         mark_ready_for_review(rev)
         self.assertEqual(rev.reviews.count(), 1)
 
+    def test_provision_reviews_wires_dependencies(self):
+        from reviews.models import ReviewConfig
+        from pull_requests.api import provision_reviews_for_revision
+
+        project = Project.objects.create(name="test:deps-project")
+        git_mapping = GitMapping.objects.create(owner="test", repo="repo", branch="main", project=project)
+        author = User.objects.create(username="author_dep", username_lower="author_dep", account_type=User.AccountType.HUMAN)
+        rev1 = User.objects.create(username="reviewer_a", username_lower="reviewer_a", account_type=User.AccountType.HUMAN)
+        rev2 = User.objects.create(username="reviewer_b", username_lower="reviewer_b", account_type=User.AccountType.HUMAN)
+
+        cfg1 = ReviewConfig.objects.create(
+            project=project,
+            type=ReviewConfig.ConfigType.PROJECT,
+            reviewer_user=rev1,
+        )
+        cfg2 = ReviewConfig.objects.create(
+            project=project,
+            type=ReviewConfig.ConfigType.PROJECT,
+            reviewer_user=rev2,
+        )
+        cfg2.depends_on.add(cfg1)
+
+        pr = PullRequest.objects.create(
+            target=git_mapping,
+            number=99,
+            author=author,
+            source_owner="author_dep",
+            source_repo="repo",
+            source_branch="feat",
+        )
+        rev = PullRequestRevision.objects.create(
+            pull_request=pr,
+            revision_number=1,
+            head_sha="1111",
+            base_sha="0000",
+            fingerprint="fp1",
+            is_draft=False,
+            draft_expires_at=None,
+        )
+
+        reviews = provision_reviews_for_revision(rev)
+        self.assertEqual(len(reviews), 2)
+
+        review_a = rev.reviews.get(reviewer_user=rev1)
+        review_b = rev.reviews.get(reviewer_user=rev2)
+
+        self.assertIn(review_a, review_b.depends_on.all())
+        self.assertEqual(review_a.depends_on.count(), 0)
+
 
 class TestPRSyncDebounceLifecycle(TransactionTestCase):
     @override_settings(GITEA_URL="https://gitea.example.com", GITEA_TOKEN="secret-token", DEBOUNCE_TIMEOUT_MINUTES=15)
