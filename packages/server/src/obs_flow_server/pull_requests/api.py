@@ -15,6 +15,8 @@ from obs_flow_common.messages import (
     PRReadyForReviewResponse,
     PRConvertToDraftRequest,
     PRConvertToDraftResponse,
+    PRMergeRequest,
+    PRMergeResponse,
     PRReviewShowRequest,
     PRReviewShowResponse,
     PRReviewActionResponse,
@@ -552,4 +554,115 @@ def pr_convert_to_draft_endpoint(payload: PRConvertToDraftRequest):
         )
 
     res = PRConvertToDraftResponse(pull_requests=updated_prs)
+    return msgspec.structs.asdict(res)
+
+
+def _do_gitea_merge(owner: str, repo: str, number: int) -> None:
+    if not getattr(settings, "GITEA_URL", None) or not getattr(settings, "GITEA_TOKEN", None):
+        raise ValueError("GITEA_URL and GITEA_TOKEN must be configured.")
+
+    url = f"{settings.GITEA_URL.rstrip('/')}/api/v1/repos/{owner}/{repo}/pulls/{number}/merge"
+    headers = {
+        "Authorization": f"token {settings.GITEA_TOKEN}",
+        "Content-Type": "application/json",
+        "Accept": "application/json",
+    }
+    data = json.dumps({"Do": "merge"}).encode("utf-8")
+    req = urllib.request.Request(url, data=data, headers=headers, method="POST")
+
+    try:
+        with urllib.request.urlopen(req) as response:
+            if response.status not in (200, 204):
+                raise ValueError(f"Failed to merge PR #{number} in Gitea: status {response.status}")
+    except urllib.error.HTTPError as e:
+        error_msg = e.read().decode("utf-8")
+        raise ValueError(f"Failed to merge PR #{number} in Gitea: {error_msg}")
+    except Exception as e:
+        raise ValueError(f"Failed to merge PR #{number} in Gitea: {e}")
+
+
+@api.post("/api/v1/pr/merge")
+@sync_to_async
+def pr_merge_endpoint(payload: PRMergeRequest):
+    if not payload.pull_request_ids:
+        return HttpResponseBadRequest("No pull request IDs provided.")
+
+    with transaction.atomic():
+        # First resolve PR objects to get DB IDs for deterministic ordering
+        prs_by_id_str = {}
+        errors = []
+        for pr_id in payload.pull_request_ids:
+            try:
+                pr = get_pull_request(pr_id)
+                prs_by_id_str[pr_id] = pr
+            except (PullRequest.DoesNotExist, ValueError) as e:
+                errors.append(str(e))
+
+        # Lock PRs in deterministic DB id order to prevent deadlocks
+        resolved_db_ids = sorted(p.id for p in prs_by_id_str.values())
+        locked_prs = {
+            p.id: p
+            for p in PullRequest.objects.select_for_update().filter(id__in=resolved_db_ids).order_by("id")
+        }
+
+        prs_to_merge = []
+        # Validate all PRs and collect all errors
+        for pr_id in payload.pull_request_ids:
+            pr = prs_by_id_str.get(pr_id)
+            if not pr:
+                continue
+
+            target_project = pr.target_project
+            if target_project and target_project.workflow_type == Project.WorkflowType.STAGING:
+                errors.append(
+                    f"Direct merges are not allowed for project '{target_project.name}' because it uses the staging workflow. "
+                    "Please merge via a staging batch."
+                )
+                continue
+
+            if pr.state == PullRequest.State.MERGED:
+                errors.append(f"Pull request {pr_id} is already merged.")
+                continue
+
+            latest_revision = pr.revisions.order_by("-revision_number").first()
+            if pr.is_draft or (latest_revision and latest_revision.is_draft):
+                errors.append(f"Pull request {pr_id} is in draft mode and cannot be merged.")
+                continue
+
+            prs_to_merge.append((pr_id, pr))
+
+        if errors:
+            return HttpResponseBadRequest("\n".join(errors))
+
+        # All valid, execute merges
+        updated_prs = []
+        for pr_id, pr in prs_to_merge:
+            try:
+                _do_gitea_merge(pr.target.owner, pr.target.repo, pr.number)
+            except ValueError as e:
+                return HttpResponseBadRequest(str(e))
+
+            pr.state = PullRequest.State.MERGED
+            pr.save(update_fields=["state"])
+
+            latest_revision = pr.revisions.order_by("-revision_number").first()
+            rev_num = latest_revision.revision_number if latest_revision else 0
+            head_sha = latest_revision.head_sha if latest_revision else ""
+            base_sha = latest_revision.base_sha if latest_revision else ""
+
+            updated_prs.append(
+                PRDetail(
+                    id=pr_id,
+                    title=pr.title,
+                    state=pr.state,
+                    is_draft=pr.is_draft,
+                    is_mergeable=pr.is_mergeable,
+                    author=build_user_dto(pr.author),
+                    latest_revision=rev_num,
+                    head_sha=head_sha,
+                    base_sha=base_sha,
+                )
+            )
+
+    res = PRMergeResponse(pull_requests=updated_prs)
     return msgspec.structs.asdict(res)

@@ -1,6 +1,6 @@
 import json
 from unittest.mock import MagicMock, patch
-from django.test import TestCase, TransactionTestCase, override_settings
+from django.test import Client, TestCase, TransactionTestCase, override_settings
 from django.utils import timezone
 from django_bolt.testing import TestClient
 
@@ -1275,3 +1275,107 @@ class TestMarkExpiredDraftsReadyCommand(TestCase):
         self.rev_staging_expired.refresh_from_db()
         self.assertTrue(self.rev_staging_expired.is_draft)
         self.assertEqual(self.rev_staging_expired.reviews.count(), 0)
+
+
+class TestPRMergeEndpoint(TestCase):
+    def setUp(self):
+        self.project_direct = Project.objects.create(name="test:direct", workflow_type=Project.WorkflowType.DIRECT)
+        self.mapping_direct = GitMapping.objects.create(owner="suse", repo="direct-repo", branch="main", project=self.project_direct)
+
+        self.project_staging = Project.objects.create(name="test:staging", workflow_type=Project.WorkflowType.STAGING)
+        self.mapping_staging = GitMapping.objects.create(owner="suse", repo="staging-repo", branch="main", project=self.project_staging)
+
+        self.author = User.objects.create(username="merger", username_lower="merger", account_type=User.AccountType.HUMAN)
+
+        self.pr_direct = PullRequest.objects.create(
+            target=self.mapping_direct,
+            number=1,
+            author=self.author,
+            source_owner="merger",
+            source_repo="direct-repo",
+            source_branch="feat-1",
+        )
+        self.pr_direct_2 = PullRequest.objects.create(
+            target=self.mapping_direct,
+            number=2,
+            author=self.author,
+            source_owner="merger",
+            source_repo="direct-repo",
+            source_branch="feat-2",
+        )
+        self.pr_staging = PullRequest.objects.create(
+            target=self.mapping_staging,
+            number=3,
+            author=self.author,
+            source_owner="merger",
+            source_repo="staging-repo",
+            source_branch="feat-3",
+        )
+
+    @override_settings(GITEA_URL="https://gitea.example.com", GITEA_TOKEN="secret-token")
+    @patch("urllib.request.urlopen")
+    def test_merge_direct_project_pr_success(self, mock_urlopen):
+        mock_response = MagicMock()
+        mock_response.status = 200
+        mock_urlopen.return_value.__enter__.return_value = mock_response
+
+        payload = {"pull_request_ids": ["suse/direct-repo#1"]}
+        with TestClient(api) as client:
+            res = client.post("/api/v1/pr/merge", content=json.dumps(payload))
+        self.assertEqual(res.status_code, 200)
+
+        data = res.json()
+        self.assertEqual(len(data["pull_requests"]), 1)
+        self.assertEqual(data["pull_requests"][0]["state"], "merged")
+
+        self.pr_direct.refresh_from_db()
+        self.assertEqual(self.pr_direct.state, PullRequest.State.MERGED)
+
+    @override_settings(GITEA_URL="https://gitea.example.com", GITEA_TOKEN="secret-token")
+    @patch("urllib.request.urlopen")
+    def test_merge_staging_project_pr_fails(self, mock_urlopen):
+        payload = {"pull_request_ids": ["suse/staging-repo#3"]}
+        with TestClient(api) as client:
+            res = client.post("/api/v1/pr/merge", content=json.dumps(payload))
+        self.assertEqual(res.status_code, 400)
+        self.assertIn("Direct merges are not allowed", res.text)
+
+        self.pr_staging.refresh_from_db()
+        self.assertEqual(self.pr_staging.state, PullRequest.State.OPEN)
+        mock_urlopen.assert_not_called()
+
+    @override_settings(GITEA_URL="https://gitea.example.com", GITEA_TOKEN="secret-token")
+    @patch("urllib.request.urlopen")
+    def test_merge_bulk_direct_prs(self, mock_urlopen):
+        mock_response = MagicMock()
+        mock_response.status = 200
+        mock_urlopen.return_value.__enter__.return_value = mock_response
+
+        payload = {"pull_request_ids": ["suse/direct-repo#1", "suse/direct-repo#2"]}
+        with TestClient(api) as client:
+            res = client.post("/api/v1/pr/merge", content=json.dumps(payload))
+        self.assertEqual(res.status_code, 200)
+
+        data = res.json()
+        self.assertEqual(len(data["pull_requests"]), 2)
+        self.assertEqual(data["pull_requests"][0]["state"], "merged")
+        self.assertEqual(data["pull_requests"][1]["state"], "merged")
+
+        self.pr_direct.refresh_from_db()
+        self.pr_direct_2.refresh_from_db()
+        self.assertEqual(self.pr_direct.state, PullRequest.State.MERGED)
+        self.assertEqual(self.pr_direct_2.state, PullRequest.State.MERGED)
+
+    def test_merge_collects_all_errors(self):
+        # Already merged PR
+        self.pr_direct.state = PullRequest.State.MERGED
+        self.pr_direct.save()
+
+        # Try merging pr_direct (already merged), pr_staging (staging workflow), and nonexistent PR
+        payload = {"pull_request_ids": ["suse/direct-repo#1", "suse/staging-repo#3", "suse/direct-repo#999"]}
+        with TestClient(api) as client:
+            res = client.post("/api/v1/pr/merge", content=json.dumps(payload))
+        self.assertEqual(res.status_code, 400)
+        self.assertIn("already merged", res.text)
+        self.assertIn("Direct merges are not allowed", res.text)
+        self.assertIn("does not exist", res.text)
