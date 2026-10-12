@@ -48,6 +48,16 @@ class PRConvertToDraftResponse(msgspec.Struct):
     pull_requests: list[PRDetail]
 
 
+class PRMergeRequest(msgspec.Struct):
+    """Request to merge pull requests."""
+    pull_request_ids: list[str]
+
+
+class PRMergeResponse(msgspec.Struct):
+    """Response containing updated pull request details after merging."""
+    pull_requests: list[PRDetail]
+
+
 class PRReviewShowRequest(msgspec.Struct):
     """Request to show review details for a pull request."""
     pull_request_id: str

@@ -81,6 +81,15 @@
                 <h4>State</h4>
                 <p>{{ batch.state }}</p>
             </div>
+            {% if batch.state != "merged/completed" %}
+            <div class="sidebar-section">
+                <form hx-post="{% url 'staging_ui_modal_check_merge' %}" hx-target="#modal-container">
+                    {% csrf_token %}
+                    <input type="hidden" name="selected_batches" value="{{ batch.id }}">
+                    <button type="submit" class="primary" style="width: 100%;">Merge Staging Batch</button>
+                </form>
+            </div>
+            {% endif %}
             {% include "staging/partials/draft_section.html" %}
             {% if latest_revision %}
             <div class="sidebar-section">

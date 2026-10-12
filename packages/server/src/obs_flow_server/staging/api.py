@@ -17,6 +17,8 @@ from obs_flow_common.messages import (
     StagingReadyForReviewResponse,
     StagingConvertToDraftRequest,
     StagingConvertToDraftResponse,
+    StagingMergeRequest,
+    StagingMergeResponse,
     StagingAddRequest,
     StagingAddResponse,
     StagingRemoveRequest,
@@ -537,4 +539,92 @@ def staging_convert_to_draft_endpoint(payload: StagingConvertToDraftRequest):
         updated_batches.append(batch_to_detail(batch))
 
     res = StagingConvertToDraftResponse(staging_batches=updated_batches)
+    return msgspec.structs.asdict(res)
+
+
+@api.post("/api/v1/staging/merge")
+@sync_to_async
+def staging_merge_endpoint(payload: StagingMergeRequest):
+    from pull_requests.api import _do_gitea_merge
+
+    if not payload.staging_ids:
+        return HttpResponseBadRequest("No staging batch IDs provided.")
+
+    sorted_ids = sorted(set(payload.staging_ids))
+
+    with transaction.atomic():
+        # Lock all requested batches in deterministic primary-key order to prevent deadlocks
+        batches_dict = {
+            b.id: b
+            for b in StagingBatch.objects.select_for_update().filter(id__in=sorted_ids).order_by("id")
+        }
+
+        errors = []
+        batches_to_merge = []
+
+        # 1. Validation pass: validate all batches and collect all errors
+        for batch_id in payload.staging_ids:
+            batch = batches_dict.get(batch_id)
+            if not batch:
+                errors.append(f"Staging batch #{batch_id} does not exist.")
+                continue
+
+            if batch.state == StagingBatch.State.MERGED:
+                errors.append(f"Staging batch #{batch_id} is already merged.")
+                continue
+
+            latest_rev = batch.revisions.order_by("-revision_number").first()
+            if not latest_rev:
+                errors.append(f"Staging batch #{batch_id} has no revisions.")
+                continue
+
+            if latest_rev.is_draft:
+                errors.append(f"Staging batch #{batch_id} is currently in draft mode and cannot be merged.")
+                continue
+
+            # Validate that all reviews on the latest revision are resolved (ACCEPTED or OVERRIDDEN)
+            reviews = latest_rev.reviews.all()
+            unapproved_reviews = reviews.exclude(
+                state__in=[StagingReview.State.ACCEPTED, StagingReview.State.OVERRIDDEN]
+            )
+            if unapproved_reviews.exists():
+                unapproved_names = [
+                    str(r.reviewer_user or r.reviewer_group or r.dynamic_role)
+                    for r in unapproved_reviews
+                ]
+                errors.append(
+                    f"Staging batch #{batch_id} cannot be merged because the following reviews are not approved: {', '.join(unapproved_names)}."
+                )
+                continue
+
+            batches_to_merge.append((batch, latest_rev))
+
+        if errors:
+            return HttpResponseBadRequest("\n".join(errors))
+
+        # 2. Execution pass: all batches validated, now perform atomic merges
+        updated_batches = []
+        for batch, latest_rev in batches_to_merge:
+            batch_prs = [
+                bpr.pull_request_revision.pull_request
+                for bpr in latest_rev.revision_pull_requests.all()
+            ]
+
+            for pr in batch_prs:
+                if pr.state != PullRequest.State.MERGED:
+                    try:
+                        _do_gitea_merge(pr.target.owner, pr.target.repo, pr.number)
+                    except ValueError as e:
+                        return HttpResponseBadRequest(str(e))
+                    pr.state = PullRequest.State.MERGED
+                    pr.save(update_fields=["state"])
+
+            # Update batch state and closed_at
+            batch.state = StagingBatch.State.MERGED
+            batch.closed_at = timezone.now()
+            batch.save(update_fields=["state", "closed_at"])
+
+            updated_batches.append(batch_to_detail(batch))
+
+    res = StagingMergeResponse(staging_batches=updated_batches)
     return msgspec.structs.asdict(res)

@@ -1,5 +1,6 @@
+from unittest.mock import MagicMock, patch
 from django.contrib.messages import get_messages
-from django.test import Client, TestCase, TransactionTestCase
+from django.test import Client, TestCase, TransactionTestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
 from accounts.models import User, Group
@@ -987,3 +988,285 @@ class TestStagingConvertToDraftEndpoint(TestCase):
         self.rev.refresh_from_db()
         self.assertTrue(self.rev.is_draft)
         self.assertIsNone(self.rev.draft_expires_at)
+
+
+class TestStagingMergeEndpoint(TestCase):
+    def setUp(self):
+        self.project = Project.objects.create(name="test:staging-merge", workflow_type=Project.WorkflowType.STAGING)
+        self.mapping = GitMapping.objects.create(owner="suse", repo="staging-repo", branch="main", project=self.project)
+        self.author = User.objects.create(username="staging_author", username_lower="staging_author", account_type=User.AccountType.HUMAN)
+        self.reviewer = User.objects.create(username="staging_reviewer", username_lower="staging_reviewer", account_type=User.AccountType.HUMAN)
+
+        self.pr1 = PullRequest.objects.create(
+            target=self.mapping,
+            number=10,
+            author=self.author,
+            source_owner="staging_author",
+            source_repo="staging-repo",
+            source_branch="feat-10",
+        )
+        self.pr1_rev = PullRequestRevision.objects.create(
+            pull_request=self.pr1,
+            revision_number=1,
+            head_sha="1010",
+            base_sha="0000",
+            fingerprint="fp10",
+        )
+
+        self.pr2 = PullRequest.objects.create(
+            target=self.mapping,
+            number=20,
+            author=self.author,
+            source_owner="staging_author",
+            source_repo="staging-repo",
+            source_branch="feat-20",
+        )
+        self.pr2_rev = PullRequestRevision.objects.create(
+            pull_request=self.pr2,
+            revision_number=1,
+            head_sha="2020",
+            base_sha="0000",
+            fingerprint="fp20",
+        )
+
+        self.batch = StagingBatch.objects.create(project=self.project)
+        self.batch_rev = StagingBatchRevision.objects.create(
+            staging_batch=self.batch,
+            revision_number=1,
+            fingerprint="bfp1",
+            is_draft=False,
+            draft_expires_at=None,
+        )
+        from staging.models import StagingBatchRevisionPullRequest
+        StagingBatchRevisionPullRequest.objects.create(staging_batch_revision=self.batch_rev, pull_request_revision=self.pr1_rev)
+        StagingBatchRevisionPullRequest.objects.create(staging_batch_revision=self.batch_rev, pull_request_revision=self.pr2_rev)
+
+        self.review = StagingReview.objects.create(
+            revision=self.batch_rev,
+            reviewer_user=self.reviewer,
+            state=StagingReview.State.ACCEPTED,
+        )
+
+    @override_settings(GITEA_URL="https://gitea.example.com", GITEA_TOKEN="secret-token")
+    @patch("urllib.request.urlopen")
+    def test_staging_merge_success(self, mock_urlopen):
+        mock_response = MagicMock()
+        mock_response.status = 200
+        mock_urlopen.return_value.__enter__.return_value = mock_response
+
+        payload = {"staging_ids": [self.batch.id]}
+        from django_bolt.testing import TestClient
+        from obs_flow_server.api import api
+        import json
+
+        with TestClient(api) as client:
+            res = client.post("/api/v1/staging/merge", content=json.dumps(payload))
+        self.assertEqual(res.status_code, 200)
+
+        data = res.json()
+        self.assertEqual(len(data["staging_batches"]), 1)
+        self.assertEqual(data["staging_batches"][0]["state"], StagingBatch.State.MERGED)
+
+        self.batch.refresh_from_db()
+        self.assertEqual(self.batch.state, StagingBatch.State.MERGED)
+        self.assertIsNotNone(self.batch.closed_at)
+
+        self.pr1.refresh_from_db()
+        self.pr2.refresh_from_db()
+        self.assertEqual(self.pr1.state, PullRequest.State.MERGED)
+        self.assertEqual(self.pr2.state, PullRequest.State.MERGED)
+
+    def test_staging_merge_unapproved_reviews_fails(self):
+        self.review.state = StagingReview.State.PENDING
+        self.review.save()
+
+        payload = {"staging_ids": [self.batch.id]}
+        from django_bolt.testing import TestClient
+        from obs_flow_server.api import api
+        import json
+
+        with TestClient(api) as client:
+            res = client.post("/api/v1/staging/merge", content=json.dumps(payload))
+        self.assertEqual(res.status_code, 400)
+        self.assertIn("cannot be merged because the following reviews are not approved", res.text)
+
+        self.batch.refresh_from_db()
+        self.assertNotEqual(self.batch.state, StagingBatch.State.MERGED)
+
+    def test_staging_merge_draft_batch_fails(self):
+        self.batch_rev.is_draft = True
+        self.batch_rev.save()
+
+        payload = {"staging_ids": [self.batch.id]}
+        from django_bolt.testing import TestClient
+        from obs_flow_server.api import api
+        import json
+
+        with TestClient(api) as client:
+            res = client.post("/api/v1/staging/merge", content=json.dumps(payload))
+        self.assertEqual(res.status_code, 400)
+        self.assertIn("currently in draft mode", res.text)
+
+    def test_staging_merge_collects_all_errors(self):
+        # Create second batch with unapproved reviews
+        batch2 = StagingBatch.objects.create(project=self.project)
+        batch2_rev = StagingBatchRevision.objects.create(
+            staging_batch=batch2,
+            revision_number=1,
+            fingerprint="bfp2",
+            is_draft=False,
+            draft_expires_at=None,
+        )
+        StagingReview.objects.create(
+            revision=batch2_rev,
+            reviewer_user=self.reviewer,
+            state=StagingReview.State.PENDING,
+        )
+
+        # Make batch 1 already merged
+        self.batch.state = StagingBatch.State.MERGED
+        self.batch.save()
+
+        # Try merging batch 1 (already merged), batch 2 (unapproved reviews), and nonexistent batch 999
+        payload = {"staging_ids": [self.batch.id, batch2.id, 999]}
+        from django_bolt.testing import TestClient
+        from obs_flow_server.api import api
+        import json
+
+        with TestClient(api) as client:
+            res = client.post("/api/v1/staging/merge", content=json.dumps(payload))
+        self.assertEqual(res.status_code, 400)
+        self.assertIn(f"Staging batch #{self.batch.id} is already merged.", res.text)
+        self.assertIn(f"Staging batch #{batch2.id} cannot be merged because the following reviews are not approved", res.text)
+        self.assertIn("Staging batch #999 does not exist.", res.text)
+
+
+class TestStagingWebMergeActions(TestCase):
+    def setUp(self):
+        self.project = Project.objects.create(name="test:staging-web-merge", workflow_type=Project.WorkflowType.STAGING)
+        self.mapping = GitMapping.objects.create(owner="suse", repo="web-staging-repo", branch="main", project=self.project)
+        self.author = User.objects.create(username="web_staging_author", username_lower="web_staging_author", account_type=User.AccountType.HUMAN)
+        self.reviewer = User.objects.create(username="web_staging_reviewer", username_lower="web_staging_reviewer", account_type=User.AccountType.HUMAN)
+
+        self.pr = PullRequest.objects.create(
+            target=self.mapping,
+            number=33,
+            author=self.author,
+            source_owner="web_staging_author",
+            source_repo="web-staging-repo",
+            source_branch="feat-33",
+        )
+        self.pr_rev = PullRequestRevision.objects.create(
+            pull_request=self.pr,
+            revision_number=1,
+            head_sha="3333",
+            base_sha="0000",
+            fingerprint="fp33",
+        )
+
+        self.batch = StagingBatch.objects.create(project=self.project)
+        self.batch_rev = StagingBatchRevision.objects.create(
+            staging_batch=self.batch,
+            revision_number=1,
+            fingerprint="bfp33",
+            is_draft=False,
+            draft_expires_at=None,
+        )
+        from staging.models import StagingBatchRevisionPullRequest
+        StagingBatchRevisionPullRequest.objects.create(staging_batch_revision=self.batch_rev, pull_request_revision=self.pr_rev)
+
+        self.review = StagingReview.objects.create(
+            revision=self.batch_rev,
+            reviewer_user=self.reviewer,
+            state=StagingReview.State.PENDING,
+        )
+
+    def test_staging_detail_renders_merge_button_and_hides_when_merged(self):
+        client = Client()
+        # Open batch -> merge button is present
+        res = client.get(f"/staging/{self.batch.id}/")
+        self.assertEqual(res.status_code, 200)
+        self.assertContains(res, "Merge Staging Batch")
+
+        # Merged batch -> merge button is hidden
+        self.batch.state = StagingBatch.State.MERGED
+        self.batch.save()
+        res = client.get(f"/staging/{self.batch.id}/")
+        self.assertEqual(res.status_code, 200)
+        self.assertNotContains(res, "Merge Staging Batch")
+
+    @override_settings(GITEA_URL="https://gitea.example.com", GITEA_TOKEN="secret-token")
+    @patch("urllib.request.urlopen")
+    def test_staging_merge_action_success(self, mock_urlopen):
+        mock_response = MagicMock()
+        mock_response.status = 200
+        mock_urlopen.return_value.__enter__.return_value = mock_response
+
+        self.review.state = StagingReview.State.ACCEPTED
+        self.review.save()
+
+        client = Client()
+        res = client.post(f"/staging/{self.batch.id}/merge/")
+        self.assertRedirects(res, f"/staging/{self.batch.id}/")
+
+        self.batch.refresh_from_db()
+        self.assertEqual(self.batch.state, StagingBatch.State.MERGED)
+        self.pr.refresh_from_db()
+        self.assertEqual(self.pr.state, PullRequest.State.MERGED)
+
+    @override_settings(GITEA_URL="https://gitea.example.com", GITEA_TOKEN="secret-token")
+    @patch("urllib.request.urlopen")
+    def test_staging_bulk_merge_view(self, mock_urlopen):
+        mock_response = MagicMock()
+        mock_response.status = 200
+        mock_urlopen.return_value.__enter__.return_value = mock_response
+
+        self.review.state = StagingReview.State.ACCEPTED
+        self.review.save()
+
+        client = Client()
+        res = client.post("/staging/bulk-merge/", {"selected_batches": [self.batch.id]})
+        self.assertRedirects(res, "/staging/")
+
+        self.batch.refresh_from_db()
+        self.assertEqual(self.batch.state, StagingBatch.State.MERGED)
+        self.pr.refresh_from_db()
+        self.assertEqual(self.pr.state, PullRequest.State.MERGED)
+
+    def test_staging_ui_modal_check_merge(self):
+        client = Client()
+        # Unapproved review -> Cannot merge
+        res = client.post("/staging/ui/modal/check-merge/", {"selected_batches": [self.batch.id]})
+        self.assertEqual(res.status_code, 200)
+        self.assertContains(res, "Confirm Staging Batch Merge")
+        self.assertContains(res, "Cannot merge")
+        self.assertContains(res, "Unapproved reviews")
+        self.assertNotContains(res, "Confirm Merge")
+
+        # Approve review -> Ready to merge
+        self.review.state = StagingReview.State.ACCEPTED
+        self.review.save()
+        res = client.post("/staging/ui/modal/check-merge/", {"selected_batches": [self.batch.id]})
+        self.assertEqual(res.status_code, 200)
+        self.assertContains(res, "Ready to merge")
+        self.assertContains(res, "Confirm Merge")
+
+    @override_settings(GITEA_URL="https://gitea.example.com", GITEA_TOKEN="secret-token")
+    @patch("urllib.request.urlopen")
+    def test_staging_ui_modal_execute_merge(self, mock_urlopen):
+        mock_response = MagicMock()
+        mock_response.status = 200
+        mock_urlopen.return_value.__enter__.return_value = mock_response
+
+        self.review.state = StagingReview.State.ACCEPTED
+        self.review.save()
+
+        client = Client()
+        res = client.post("/staging/ui/modal/execute-merge/", {"selected_batches": [self.batch.id]})
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(res.headers.get("HX-Refresh"), "true")
+
+        self.batch.refresh_from_db()
+        self.assertEqual(self.batch.state, StagingBatch.State.MERGED)
+        self.pr.refresh_from_db()
+        self.assertEqual(self.pr.state, PullRequest.State.MERGED)
