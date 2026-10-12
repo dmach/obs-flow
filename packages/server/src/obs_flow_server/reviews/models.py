@@ -233,6 +233,14 @@ class BaseReview(models.Model):
             ),
         ]
 
+    @property
+    def reviewer_name(self) -> str:
+        if self.reviewer_user_id:
+            return self.reviewer_user.username
+        if self.reviewer_group_id:
+            return self.reviewer_group.name
+        return self.dynamic_role or ""
+
     def unblock_downstream_reviews(self) -> list["BaseReview"]:
         """
         When this review is resolved (ACCEPTED or OVERRIDDEN), inspects downstream

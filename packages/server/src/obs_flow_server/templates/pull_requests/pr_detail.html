@@ -53,6 +53,23 @@
                 <h4>State</h4>
                 <p>{{ pr.state }}</p>
             </div>
+            {% if pr.state == "open" %}
+                {% if pr.target_project.workflow_type == "direct" %}
+                    <div class="sidebar-section">
+                        <form hx-post="{% url 'pr_ui_modal_check_merge' %}" hx-target="#modal-container">
+                            {% csrf_token %}
+                            <input type="hidden" name="selected_prs" value="{{ pr.id }}">
+                            <button type="submit" class="primary" style="width: 100%;">Merge Pull Request</button>
+                        </form>
+                    </div>
+                {% elif pr.target_project.workflow_type == "staging" %}
+                    <div class="sidebar-section">
+                        <small class="muted" style="display: block; padding: 0.5rem; background: var(--pico-card-background-color); border-radius: var(--pico-border-radius); border-left: 3px solid var(--pico-primary);">
+                            <strong>Staging Workflow:</strong> Direct merges are disabled for this project. This pull request must be integrated and merged via a Staging Batch.
+                        </small>
+                    </div>
+                {% endif %}
+            {% endif %}
             {% include "pull_requests/partials/draft_section.html" %}
             <div class="sidebar-section">
                 <h4>Mergeable</h4>

@@ -68,9 +68,20 @@
     {# Unnamed checkbox: drives the mobile "select mode" via CSS only and is never submitted. #}
     <input type="checkbox" id="select-mode" class="select-mode-toggle">
 
-    <form hx-post="{% url 'staging_ui_modal_select_batch' %}" hx-target="#modal-container">
+    <form id="pr-table-form">
         {% csrf_token %}
-        <button type="submit" class="primary">Stage Selected</button>
+        <button type="submit"
+                hx-post="{% url 'staging_ui_modal_select_batch' %}"
+                hx-target="#modal-container"
+                class="primary">
+            Stage Selected
+        </button>
+        <button type="submit"
+                hx-post="{% url 'pr_ui_modal_check_merge' %}"
+                hx-target="#modal-container"
+                class="secondary">
+            Merge Selected
+        </button>
         <label for="select-mode" role="button" class="secondary outline mobile-only select-mode-label">
             <span class="select-mode-on">Select Mode</span>
             <span class="select-mode-off">Exit Select Mode</span>

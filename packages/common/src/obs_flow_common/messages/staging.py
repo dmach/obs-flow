@@ -43,6 +43,16 @@ class StagingConvertToDraftResponse(msgspec.Struct):
     staging_batches: list[StagingDetail]
 
 
+class StagingMergeRequest(msgspec.Struct):
+    """Request to merge staging batches."""
+    staging_ids: list[int]
+
+
+class StagingMergeResponse(msgspec.Struct):
+    """Response containing updated staging batch details after merging."""
+    staging_batches: list[StagingDetail]
+
+
 class StagingCreateRequest(msgspec.Struct):
     """Request to create a new staging batch."""
     project: str

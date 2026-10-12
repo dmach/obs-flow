@@ -3,12 +3,14 @@ import urllib.parse
 from django.contrib import messages
 from django.core.paginator import Paginator
 from django.db.models import Q
+from django.http import HttpResponse
 from django.shortcuts import render, get_object_or_404, redirect
 from django.utils import timezone
 from django.views.decorators.csrf import ensure_csrf_cookie
 from django.views.decorators.http import require_POST
 
-from pull_requests.models import PullRequest
+from core.models import Project
+from pull_requests.models import PullRequest, PullRequestReview
 from pull_requests.forms import PullRequestFilterForm
 
 
@@ -214,3 +216,168 @@ def pr_convert_to_draft(request, pr_id):
     if request.headers.get("HX-Request"):
         return _render_pr_draft_section(request, pr, latest_revision)
     return redirect("pr_detail", pr_id=pr.id)
+
+
+@require_POST
+def pr_merge_action(request, pr_id):
+    pr = get_object_or_404(PullRequest, id=pr_id)
+    if pr.target_project and pr.target_project.workflow_type == Project.WorkflowType.STAGING:
+        messages.error(
+            request,
+            f"Direct merges are not allowed for project '{pr.target_project.name}'. This PR must be merged via a staging batch."
+        )
+        return redirect("pr_detail", pr_id=pr.id)
+
+    if pr.state == PullRequest.State.MERGED:
+        messages.error(request, f"Pull request #{pr.number} is already merged.")
+        return redirect("pr_detail", pr_id=pr.id)
+
+    from pull_requests.api import _do_gitea_merge
+    try:
+        _do_gitea_merge(pr.target.owner, pr.target.repo, pr.number)
+        pr.state = PullRequest.State.MERGED
+        pr.save(update_fields=["state"])
+        messages.success(request, f"Pull request #{pr.number} merged successfully.")
+    except Exception as e:
+        messages.error(request, str(e))
+
+    return redirect("pr_detail", pr_id=pr.id)
+
+
+@require_POST
+def pr_bulk_merge(request):
+    pr_ids = request.POST.getlist("selected_prs")
+    if not pr_ids:
+        messages.warning(request, "No pull requests selected for merge.")
+        return redirect("pr_list")
+
+    from pull_requests.api import _do_gitea_merge
+
+    merged_count = 0
+    errors = []
+    for pr_id in pr_ids:
+        try:
+            pr = get_object_or_404(PullRequest, id=pr_id)
+            if pr.target_project and pr.target_project.workflow_type == Project.WorkflowType.STAGING:
+                errors.append(f"PR #{pr.number}: Direct merges disabled for project '{pr.target_project.name}'.")
+                continue
+            if pr.state == PullRequest.State.MERGED:
+                errors.append(f"PR #{pr.number}: Already merged.")
+                continue
+
+            _do_gitea_merge(pr.target.owner, pr.target.repo, pr.number)
+            pr.state = PullRequest.State.MERGED
+            pr.save(update_fields=["state"])
+            merged_count += 1
+        except Exception as e:
+            errors.append(str(e))
+
+    if merged_count > 0:
+        messages.success(request, f"Successfully merged {merged_count} pull request(s).")
+    for err in errors:
+        messages.error(request, err)
+
+    return redirect("pr_list")
+
+
+def _close_modal_and_refresh() -> HttpResponse:
+    response = HttpResponse("")
+    response["HX-Refresh"] = "true"
+    return response
+
+
+def _check_pr_for_merge(pr: PullRequest) -> tuple[bool, str | None, list[str]]:
+    warnings = []
+    target_project = pr.target_project
+    if target_project and target_project.workflow_type == Project.WorkflowType.STAGING:
+        return False, f"Project '{target_project.name}' uses the staging workflow. Direct merges are disabled.", []
+
+    if pr.state == PullRequest.State.MERGED:
+        return False, f"Pull request #{pr.number} is already merged.", []
+
+    if pr.state == PullRequest.State.CLOSED:
+        return False, f"Pull request #{pr.number} is closed.", []
+
+    latest_rev = pr.revisions.order_by("-revision_number").first()
+    if pr.is_draft or (latest_rev and latest_rev.is_draft):
+        return False, f"Pull request #{pr.number} is in draft mode and cannot be merged.", []
+
+    if pr.is_mergeable is False:
+        return False, f"Pull request #{pr.number} has merge conflicts and cannot be merged.", []
+
+    if latest_rev:
+        reviews = latest_rev.reviews.all()
+        if reviews.exists():
+            unapproved = reviews.exclude(state__in=[PullRequestReview.State.ACCEPTED, PullRequestReview.State.OVERRIDDEN])
+            if unapproved.exists():
+                names = [r.reviewer_name for r in unapproved]
+                return False, f"Reviews not approved: {', '.join(names)}.", []
+
+    return True, None, warnings
+
+
+@require_POST
+def pr_ui_modal_check_merge(request):
+    pr_ids = request.POST.getlist("selected_prs")
+    items = []
+    mergeable_prs = []
+
+    for pr_id in pr_ids:
+        try:
+            pr = PullRequest.objects.get(id=pr_id)
+            can_merge, error, warnings = _check_pr_for_merge(pr)
+            items.append({
+                "pr": pr,
+                "can_merge": can_merge,
+                "error": error,
+                "warnings": warnings,
+            })
+            if can_merge:
+                mergeable_prs.append(pr)
+        except PullRequest.DoesNotExist:
+            continue
+
+    return render(
+        request,
+        "pull_requests/partials/modal_merge_check.html",
+        {
+            "items": items,
+            "mergeable_prs": mergeable_prs,
+        },
+    )
+
+
+@require_POST
+def pr_ui_modal_execute_merge(request):
+    pr_ids = request.POST.getlist("selected_prs")
+    if not pr_ids:
+        messages.warning(request, "No pull requests selected for merge.")
+        return _close_modal_and_refresh()
+
+    from pull_requests.api import _do_gitea_merge
+
+    merged_count = 0
+    errors = []
+    for pr_id in pr_ids:
+        try:
+            pr = PullRequest.objects.get(id=pr_id)
+            can_merge, error, _ = _check_pr_for_merge(pr)
+            if not can_merge:
+                errors.append(f"PR #{pr.number}: {error}")
+                continue
+
+            _do_gitea_merge(pr.target.owner, pr.target.repo, pr.number)
+            pr.state = PullRequest.State.MERGED
+            pr.save(update_fields=["state"])
+            merged_count += 1
+        except Exception as e:
+            errors.append(f"PR #{pr_id}: {e}")
+
+    if merged_count > 0:
+        messages.success(request, f"Successfully merged {merged_count} pull request(s).")
+    for err in errors:
+        messages.error(request, err)
+
+    return _close_modal_and_refresh()
+
+

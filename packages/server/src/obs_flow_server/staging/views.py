@@ -9,7 +9,7 @@ from django.views.decorators.http import require_POST
 from accounts.models import User
 from core.models import Project
 from pull_requests.models import PullRequest
-from staging.models import StagingBatch
+from staging.models import StagingBatch, StagingReview
 from staging.forms import StagingBatchFilterForm
 
 
@@ -183,6 +183,11 @@ def staging_detail(request, batch_id):
             )
 
     reviews = latest_revision.reviews.all() if latest_revision else []
+    can_merge = False
+    if latest_revision and not latest_revision.is_draft and batch.state != StagingBatch.State.MERGED:
+        if reviews.exists() and not reviews.exclude(state__in=[StagingReview.State.ACCEPTED, StagingReview.State.OVERRIDDEN]).exists():
+            can_merge = True
+
     return render(
         request,
         "staging/staging_detail.html",
@@ -192,6 +197,7 @@ def staging_detail(request, batch_id):
             "latest_revision": latest_revision,
             "pull_requests_data": pull_requests_data,
             "reviews": reviews,
+            "can_merge": can_merge,
         },
     )
 
@@ -412,3 +418,196 @@ def staging_convert_to_draft(request, batch_id):
     if request.headers.get("HX-Request"):
         return _render_staging_draft_section(request, batch, latest_revision)
     return redirect("staging_detail", batch_id=batch.id)
+
+
+@require_POST
+def staging_merge_action(request, batch_id):
+    batch = get_object_or_404(StagingBatch, id=batch_id)
+    if batch.state == StagingBatch.State.MERGED:
+        messages.error(request, f"Staging batch #{batch.id} is already merged.")
+        return redirect("staging_detail", batch_id=batch.id)
+
+    latest_rev = batch.revisions.order_by("-revision_number").first()
+    if not latest_rev:
+        messages.error(request, f"Staging batch #{batch.id} has no revisions.")
+        return redirect("staging_detail", batch_id=batch.id)
+
+    if latest_rev.is_draft:
+        messages.error(request, f"Staging batch #{batch.id} is currently in draft mode and cannot be merged.")
+        return redirect("staging_detail", batch_id=batch.id)
+
+    unapproved = latest_rev.reviews.exclude(state__in=[StagingReview.State.ACCEPTED, StagingReview.State.OVERRIDDEN])
+    if unapproved.exists():
+        names = [str(r.reviewer_user or r.reviewer_group or r.dynamic_role) for r in unapproved]
+        messages.error(request, f"Cannot merge staging batch #{batch.id}: unapproved reviews: {', '.join(names)}.")
+        return redirect("staging_detail", batch_id=batch.id)
+
+    from pull_requests.api import _do_gitea_merge
+    prs = [bpr.pull_request_revision.pull_request for bpr in latest_rev.revision_pull_requests.all()]
+    for pr in prs:
+        if pr.state != PullRequest.State.MERGED:
+            try:
+                _do_gitea_merge(pr.target.owner, pr.target.repo, pr.number)
+                pr.state = PullRequest.State.MERGED
+                pr.save(update_fields=["state"])
+            except Exception as e:
+                messages.error(request, f"Failed to merge PR #{pr.number}: {e}")
+                return redirect("staging_detail", batch_id=batch.id)
+
+    batch.state = StagingBatch.State.MERGED
+    batch.closed_at = timezone.now()
+    batch.save(update_fields=["state", "closed_at"])
+    messages.success(request, f"Staging batch #{batch.id} merged successfully.")
+    return redirect("staging_detail", batch_id=batch.id)
+
+
+@require_POST
+def staging_bulk_merge(request):
+    batch_ids = request.POST.getlist("selected_batches")
+    if not batch_ids:
+        messages.warning(request, "No staging batches selected for merge.")
+        return redirect("staging_list")
+
+    from pull_requests.api import _do_gitea_merge
+
+    merged_count = 0
+    errors = []
+    for b_id in batch_ids:
+        try:
+            batch = get_object_or_404(StagingBatch, id=b_id)
+            if batch.state == StagingBatch.State.MERGED:
+                errors.append(f"Batch #{batch.id}: Already merged.")
+                continue
+
+            latest_rev = batch.revisions.order_by("-revision_number").first()
+            if not latest_rev or latest_rev.is_draft:
+                errors.append(f"Batch #{batch.id}: In draft or no revisions.")
+                continue
+
+            unapproved = latest_rev.reviews.exclude(state__in=[StagingReview.State.ACCEPTED, StagingReview.State.OVERRIDDEN])
+            if unapproved.exists():
+                names = [str(r.reviewer_user or r.reviewer_group or r.dynamic_role) for r in unapproved]
+                errors.append(f"Batch #{batch.id}: Unapproved reviews: {', '.join(names)}.")
+                continue
+
+            prs = [bpr.pull_request_revision.pull_request for bpr in latest_rev.revision_pull_requests.all()]
+            for pr in prs:
+                if pr.state != PullRequest.State.MERGED:
+                    _do_gitea_merge(pr.target.owner, pr.target.repo, pr.number)
+                    pr.state = PullRequest.State.MERGED
+                    pr.save(update_fields=["state"])
+
+            batch.state = StagingBatch.State.MERGED
+            batch.closed_at = timezone.now()
+            batch.save(update_fields=["state", "closed_at"])
+            merged_count += 1
+        except Exception as e:
+            errors.append(str(e))
+
+    if merged_count > 0:
+        messages.success(request, f"Successfully merged {merged_count} staging batch(es).")
+    for err in errors:
+        messages.error(request, err)
+
+    return redirect("staging_list")
+
+
+def _check_staging_for_merge(batch: StagingBatch) -> tuple[bool, str | None, list, list]:
+    if batch.state == StagingBatch.State.MERGED:
+        return False, "Staging batch is already merged.", [], []
+
+    latest_rev = batch.revisions.order_by("-revision_number").first()
+    if not latest_rev:
+        return False, "Staging batch has no revisions.", [], []
+
+    if latest_rev.is_draft:
+        return False, "Staging batch is currently in draft mode and cannot be merged.", [], []
+
+    reviews = list(latest_rev.reviews.all())
+    unapproved = latest_rev.reviews.exclude(state__in=[StagingReview.State.ACCEPTED, StagingReview.State.OVERRIDDEN])
+    if unapproved.exists():
+        names = [r.reviewer_name for r in unapproved]
+        return False, f"Unapproved reviews: {', '.join(names)}.", reviews, []
+
+    prs = [bpr.pull_request_revision.pull_request for bpr in latest_rev.revision_pull_requests.all()]
+    for pr in prs:
+        if pr.is_draft:
+            return False, f"Pull request #{pr.number} in batch is in draft mode.", reviews, prs
+        if pr.is_mergeable is False:
+            return False, f"Pull request #{pr.number} in batch has merge conflicts.", reviews, prs
+
+    return True, None, reviews, prs
+
+
+@require_POST
+def staging_ui_modal_check_merge(request):
+    batch_ids = request.POST.getlist("selected_batches")
+    items = []
+    mergeable_batches = []
+
+    for b_id in batch_ids:
+        try:
+            batch = StagingBatch.objects.get(id=b_id)
+            can_merge, error, reviews, prs = _check_staging_for_merge(batch)
+            items.append({
+                "batch": batch,
+                "can_merge": can_merge,
+                "error": error,
+                "reviews": reviews,
+                "prs": prs,
+            })
+            if can_merge:
+                mergeable_batches.append(batch)
+        except StagingBatch.DoesNotExist:
+            continue
+
+    return render(
+        request,
+        "staging/partials/modal_merge_check.html",
+        {
+            "items": items,
+            "mergeable_batches": mergeable_batches,
+        },
+    )
+
+
+@require_POST
+def staging_ui_modal_execute_merge(request):
+    batch_ids = request.POST.getlist("selected_batches")
+    if not batch_ids:
+        messages.warning(request, "No staging batches selected for merge.")
+        return _close_modal_and_refresh()
+
+    from pull_requests.api import _do_gitea_merge
+
+    merged_count = 0
+    errors = []
+    for b_id in batch_ids:
+        try:
+            batch = StagingBatch.objects.get(id=b_id)
+            can_merge, error, _, prs = _check_staging_for_merge(batch)
+            if not can_merge:
+                errors.append(f"Batch #{batch.id}: {error}")
+                continue
+
+            for pr in prs:
+                if pr.state != PullRequest.State.MERGED:
+                    _do_gitea_merge(pr.target.owner, pr.target.repo, pr.number)
+                    pr.state = PullRequest.State.MERGED
+                    pr.save(update_fields=["state"])
+
+            batch.state = StagingBatch.State.MERGED
+            batch.closed_at = timezone.now()
+            batch.save(update_fields=["state", "closed_at"])
+            merged_count += 1
+        except Exception as e:
+            errors.append(f"Batch #{b_id}: {e}")
+
+    if merged_count > 0:
+        messages.success(request, f"Successfully merged {merged_count} staging batch(es).")
+    for err in errors:
+        messages.error(request, err)
+
+    return _close_modal_and_refresh()
+
+

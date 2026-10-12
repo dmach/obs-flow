@@ -1,0 +1,60 @@
+<dialog open id="pr-merge-modal">
+    <form id="pr-merge-modal-close" method="dialog" hx-get="{% url 'home' %}" hx-select="#modal-container" hx-target="#modal-container" hx-swap="innerHTML" hx-trigger="submit, keyup[key=='Escape'] from:body"></form>
+    <article style="max-width: 650px;">
+        <header>
+            <h3>Confirm Pull Request Merge</h3>
+        </header>
+
+        {% if not items %}
+            <p class="muted">No pull requests selected.</p>
+        {% else %}
+            <table class="striped" style="margin-bottom: 1rem;">
+                <thead>
+                    <tr>
+                        <th>PR</th>
+                        <th>Target</th>
+                        <th>Check Result</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in items %}
+                        <tr>
+                            <td><strong>#{{ item.pr.number }}</strong> {{ item.pr.title|default:"" }}</td>
+                            <td>{{ item.pr.target.owner }}/{{ item.pr.target.repo }}</td>
+                            <td>
+                                {% if item.can_merge %}
+                                    <span style="color: var(--pico-ins-color); font-weight: bold;">✓ Ready to merge</span>
+                                    {% if item.warnings %}
+                                        <br><small class="muted">{{ item.warnings|join:", " }}</small>
+                                    {% endif %}
+                                {% else %}
+                                    <span style="color: var(--pico-del-color); font-weight: bold;">✗ Cannot merge</span>
+                                    <br><small style="color: var(--pico-del-color);">{{ item.error }}</small>
+                                {% endif %}
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+
+            {% if mergeable_prs %}
+                <form id="pr-merge-execute-form" hx-post="{% url 'pr_ui_modal_execute_merge' %}" hx-target="#modal-container">
+                    {% csrf_token %}
+                    {% for pr in mergeable_prs %}
+                        <input type="hidden" name="selected_prs" value="{{ pr.id }}">
+                    {% endfor %}
+                    <p>Are you sure you want to merge <strong>{{ mergeable_prs|length }}</strong> pull request(s)? This will merge the changes in Git.</p>
+                </form>
+            {% else %}
+                <p style="color: var(--pico-del-color);">None of the selected pull requests can be merged.</p>
+            {% endif %}
+        {% endif %}
+
+        <footer>
+            <button class="secondary outline" form="pr-merge-modal-close">Cancel</button>
+            {% if mergeable_prs %}
+                <button type="submit" class="primary" form="pr-merge-execute-form">Confirm Merge</button>
+            {% endif %}
+        </footer>
+    </article>
+</dialog>
