@@ -1,31 +1,31 @@
 <dialog open id="staging-merge-modal">
     <form id="staging-merge-modal-close" method="dialog" hx-get="{% url 'home' %}" hx-select="#modal-container" hx-target="#modal-container" hx-swap="innerHTML" hx-trigger="submit, keyup[key=='Escape'] from:body"></form>
-    <article style="max-width: 700px;">
+    <article>
         <header>
             <h3>Confirm Staging Batch Merge</h3>
         </header>
 
         {% if not items %}
-            <p class="muted">No staging batches selected.</p>
+            <p>No staging batches selected.</p>
         {% else %}
-            <div style="margin-bottom: 1rem;">
+            <div>
                 {% for item in items %}
-                    <div style="border: 1px solid var(--pico-muted-border-color); border-radius: var(--pico-border-radius); padding: 0.75rem; margin-bottom: 0.75rem;">
-                        <div style="display: flex; justify-content: space-between; align-items: center;">
-                            <h4 style="margin: 0;">Batch #{{ item.batch.id }} ({{ item.batch.project.name }})</h4>
+                    <div>
+                        <header>
+                            <h4>Batch #{{ item.batch.id }} ({{ item.batch.project.name }})</h4>
                             {% if item.can_merge %}
-                                <span style="color: var(--pico-ins-color); font-weight: bold;">✓ Ready to merge</span>
+                                <data data-variant="success" value="ready"><strong>✓ Ready to merge</strong></data>
                             {% else %}
-                                <span style="color: var(--pico-del-color); font-weight: bold;">✗ Cannot merge</span>
+                                <data data-variant="danger" value="cannot"><strong>✗ Cannot merge</strong></data>
                             {% endif %}
-                        </div>
+                        </header>
 
                         {% if not item.can_merge %}
-                            <p style="color: var(--pico-del-color); margin: 0.5rem 0 0 0;"><small>{{ item.error }}</small></p>
+                            <p role="alert"><small>{{ item.error }}</small></p>
                         {% endif %}
 
                         {% if item.reviews %}
-                            <div style="margin-top: 0.5rem;">
+                            <div>
                                 <strong>Reviews:</strong>
                                 <small>
                                     {% for r in item.reviews %}
@@ -36,7 +36,7 @@
                         {% endif %}
 
                         {% if item.prs %}
-                            <div style="margin-top: 0.5rem;">
+                            <div>
                                 <strong>Included PRs ({{ item.prs|length }}):</strong>
                                 <ul>
                                     {% for pr in item.prs %}
@@ -58,14 +58,14 @@
                     <p>Are you sure you want to merge <strong>{{ mergeable_batches|length }}</strong> staging batch(es)? All included pull requests will be merged atomically in Git.</p>
                 </form>
             {% else %}
-                <p style="color: var(--pico-del-color);">None of the selected staging batches can be merged.</p>
+                <p role="alert">None of the selected staging batches can be merged.</p>
             {% endif %}
         {% endif %}
 
         <footer>
-            <button class="secondary outline" form="staging-merge-modal-close">Cancel</button>
+            <button form="staging-merge-modal-close">Cancel</button>
             {% if mergeable_batches %}
-                <button type="submit" class="primary" form="staging-merge-execute-form">Confirm Merge</button>
+                <button type="submit" data-variant="primary" form="staging-merge-execute-form">Confirm Merge</button>
             {% endif %}
         </footer>
     </article>

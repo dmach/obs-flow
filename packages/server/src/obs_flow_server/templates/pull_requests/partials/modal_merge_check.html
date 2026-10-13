@@ -1,14 +1,14 @@
 <dialog open id="pr-merge-modal">
     <form id="pr-merge-modal-close" method="dialog" hx-get="{% url 'home' %}" hx-select="#modal-container" hx-target="#modal-container" hx-swap="innerHTML" hx-trigger="submit, keyup[key=='Escape'] from:body"></form>
-    <article style="max-width: 650px;">
+    <article>
         <header>
             <h3>Confirm Pull Request Merge</h3>
         </header>
 
         {% if not items %}
-            <p class="muted">No pull requests selected.</p>
+            <p>No pull requests selected.</p>
         {% else %}
-            <table class="striped" style="margin-bottom: 1rem;">
+            <table>
                 <thead>
                     <tr>
                         <th>PR</th>
@@ -23,13 +23,13 @@
                             <td>{{ item.pr.target.owner }}/{{ item.pr.target.repo }}</td>
                             <td>
                                 {% if item.can_merge %}
-                                    <span style="color: var(--pico-ins-color); font-weight: bold;">✓ Ready to merge</span>
+                                    <data data-variant="success" value="ready"><strong>✓ Ready to merge</strong></data>
                                     {% if item.warnings %}
-                                        <br><small class="muted">{{ item.warnings|join:", " }}</small>
+                                        <br><small>{{ item.warnings|join:", " }}</small>
                                     {% endif %}
                                 {% else %}
-                                    <span style="color: var(--pico-del-color); font-weight: bold;">✗ Cannot merge</span>
-                                    <br><small style="color: var(--pico-del-color);">{{ item.error }}</small>
+                                    <data data-variant="danger" value="cannot"><strong>✗ Cannot merge</strong></data>
+                                    <br><small role="alert">{{ item.error }}</small>
                                 {% endif %}
                             </td>
                         </tr>
@@ -46,14 +46,14 @@
                     <p>Are you sure you want to merge <strong>{{ mergeable_prs|length }}</strong> pull request(s)? This will merge the changes in Git.</p>
                 </form>
             {% else %}
-                <p style="color: var(--pico-del-color);">None of the selected pull requests can be merged.</p>
+                <p role="alert">None of the selected pull requests can be merged.</p>
             {% endif %}
         {% endif %}
 
         <footer>
-            <button class="secondary outline" form="pr-merge-modal-close">Cancel</button>
+            <button form="pr-merge-modal-close">Cancel</button>
             {% if mergeable_prs %}
-                <button type="submit" class="primary" form="pr-merge-execute-form">Confirm Merge</button>
+                <button type="submit" data-variant="primary" form="pr-merge-execute-form">Confirm Merge</button>
             {% endif %}
         </footer>
     </article>

@@ -8,36 +8,37 @@
             <h3>Log In</h3>
         </header>
 
-        {% if auth_oidc_enabled %}
-            <a href="#" role="button" class="primary">Login with SSO</a>
-        {% endif %}
+        {% if auth_oidc_enabled and auth_local_enabled %}
+            <div class="tabs">
+                <input type="radio" name="login_tabs" id="tab-sso" {% if not form.errors %}checked{% endif %}>
+                <label for="tab-sso">SSO</label>
 
-        {% if auth_local_enabled %}
-            {% if auth_oidc_enabled and not form.errors %}
-                {# Both enabled and no errors: SSO is prominent, local login is collapsed behind HTMX #}
-                <div id="local-login-section">
-                    <hr>
-                    <button class="secondary outline"
-                            hx-get="{% url 'local_login_form' %}?next={{ next|urlencode }}"
-                            hx-target="#local-login-section"
-                            hx-swap="outerHTML">
-                        Use local account
-                    </button>
+                <input type="radio" name="login_tabs" id="tab-local" {% if form.errors %}checked{% endif %}>
+                <label for="tab-local">Local Account</label>
+
+                <hr>
+
+                <div class="tab-content">
+                    <p>Log in using your organization's Single Sign-On provider.</p>
+                    <a href="#" role="button" data-variant="primary">Login with SSO</a>
                 </div>
-            {% else %}
-                {# Only local enabled, or there are errors: show form directly #}
-                {% include "accounts/partials/local_login_form.html" %}
-            {% endif %}
+
+                <div class="tab-content">
+                    {% include "accounts/partials/local_login_form.html" %}
+                </div>
+            </div>
+        {% elif auth_oidc_enabled %}
+            <p>Log in using your organization's Single Sign-On provider.</p>
+            <a href="#" role="button" data-variant="primary">Login with SSO</a>
+        {% else %}
+            {% include "accounts/partials/local_login_form.html" %}
         {% endif %}
 
         <footer>
             {% if is_htmx %}
-                <button class="secondary outline" form="login-modal-close">Cancel</button>
+                <button form="login-modal-close">Cancel</button>
             {% else %}
-                <a href="{% url 'home' %}" role="button" class="secondary outline">Cancel</a>
-            {% endif %}
-            {% if auth_local_enabled %}
-                <button type="submit" class="primary local-login-submit" form="local-login-form">Log In</button>
+                <a href="{% url 'home' %}" role="button">Cancel</a>
             {% endif %}
         </footer>
     </article>

@@ -2,30 +2,30 @@ from django import forms
 
 class PullRequestFilterForm(forms.Form):
     title = forms.CharField(required=False, max_length=255)
-    title_exact = forms.BooleanField(required=False)
+    title_exact = forms.BooleanField(required=False, label="Exact")
 
     author = forms.CharField(required=False, max_length=255)
-    author_exact = forms.BooleanField(required=False)
+    author_exact = forms.BooleanField(required=False, label="Exact")
 
     in_progress_days = forms.IntegerField(required=False, min_value=0)
 
     source_owner = forms.CharField(required=False, max_length=255)
-    source_owner_exact = forms.BooleanField(required=False)
+    source_owner_exact = forms.BooleanField(required=False, label="Exact")
 
     source_repo = forms.CharField(required=False, max_length=255)
-    source_repo_exact = forms.BooleanField(required=False)
+    source_repo_exact = forms.BooleanField(required=False, label="Exact")
 
     source_branch = forms.CharField(required=False, max_length=255)
-    source_branch_exact = forms.BooleanField(required=False)
+    source_branch_exact = forms.BooleanField(required=False, label="Exact")
 
     target_owner = forms.CharField(required=False, max_length=255)
-    target_owner_exact = forms.BooleanField(required=False)
+    target_owner_exact = forms.BooleanField(required=False, label="Exact")
 
     target_repo = forms.CharField(required=False, max_length=255)
-    target_repo_exact = forms.BooleanField(required=False)
+    target_repo_exact = forms.BooleanField(required=False, label="Exact")
 
     target_branch = forms.CharField(required=False, max_length=255)
-    target_branch_exact = forms.BooleanField(required=False)
+    target_branch_exact = forms.BooleanField(required=False, label="Exact")
 
     reviewer_person = forms.CharField(required=False, max_length=255, label="Reviewer Person")
     reviewer_person_include_groups = forms.BooleanField(required=False, label="Include Groups")

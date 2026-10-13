@@ -23,13 +23,13 @@
                     {% endfor %}
                 </select>
             {% else %}
-                <p class="muted">No open staging batches found for project {{ project.name }}. Please create one first.</p>
+                <p>No open staging batches found for project {{ project.name }}. Please create one first.</p>
             {% endif %}
         </form>
         <footer>
-            <button class="secondary outline" form="staging-modal-close">Cancel</button>
+            <button form="staging-modal-close">Cancel</button>
             {% if batches %}
-                <button type="submit" class="primary" form="staging-action-form">Next</button>
+                <button type="submit" data-variant="primary" form="staging-action-form">Next</button>
             {% endif %}
         </footer>
     </article>

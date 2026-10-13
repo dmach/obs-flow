@@ -97,9 +97,10 @@ class AuthViewsTests(TestCase):
         self.assertTrue(response.context["auth_local_enabled"])
         self.assertTrue(response.context["auth_oidc_enabled"])
         self.assertContains(response, "Login with SSO")
-        # Local form should be collapsed behind HTMX button
-        self.assertContains(response, "Use local account")
-        self.assertNotContains(response, 'name="username"')
+        # Both SSO and Local tabs are rendered
+        self.assertContains(response, 'id="tab-sso"')
+        self.assertContains(response, 'id="tab-local"')
+        self.assertContains(response, 'name="username"')
 
     def test_local_login_form_partial(self):
         response = self.client.get(reverse("local_login_form"))

@@ -5,7 +5,7 @@
     {% if form.errors %}
         {% for field, errors in form.errors.items %}
             {% for error in errors %}
-                <p class="muted">{{ error }}</p>
+                <p role="alert">{{ error }}</p>
             {% endfor %}
         {% endfor %}
     {% endif %}
@@ -15,4 +15,8 @@
 
     <label for="id_password">Password</label>
     <input type="password" name="password" required id="id_password" placeholder="Enter your password">
+
+    <footer>
+        <button type="submit" data-variant="primary">Log In</button>
+    </footer>
 </form>

@@ -138,6 +138,8 @@ GITEA_TOKEN = os.environ.get("GITEA_TOKEN")
 AUTH_LOCAL_ENABLED = os.environ.get("AUTH_LOCAL_ENABLED", "True").lower() == "true"
 AUTH_OIDC_ENABLED = os.environ.get("AUTH_OIDC_ENABLED", "False").lower() == "true"
 
+AUTH_OIDC_ENABLED = True
+
 if not (AUTH_LOCAL_ENABLED or AUTH_OIDC_ENABLED):
     raise ValueError("At least one authentication method must be enabled.")
 
