@@ -11,7 +11,7 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css">
     <link rel="stylesheet" href="{% static 'css/flow.css' %}">
     <script src="{% static 'js/flow.js' %}"></script>
-    <script src="https://unpkg.com/htmx.org@4.0.0/dist/htmx.min.js"></script>
+    <script src="{% static 'vendor/htmx/htmx.min.js' %}"></script>
 </head>
 {# hx-headers:inherited is inherited by every htmx request on the page, so all non-GET #}
 {# requests carry the CSRF token without any JavaScript. Rendering the token #}
