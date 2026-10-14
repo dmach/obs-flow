@@ -3,159 +3,110 @@
 {% block title %}Staging Batches - OBS Flow{% endblock %}
 
 {% block content %}
-<h2>Staging Batches <small>{{ total_count }}</small></h2>
+<header>
+    <h1>Staging Batches <data value="{{ total_count }}">{{ total_count }}</data></h1>
+</header>
 
-<details class="filter-panel" {% if base_query %}open{% endif %}>
+<details {% if base_query %}open{% endif %}>
     <summary>Search &amp; Filters</summary>
-    <div class="filter-panel-body">
         <form method="GET" action="" data-clean-url="true">
             <fieldset>
                 <legend>Target Filter</legend>
-                <div class="grid">
-                    {% for field, exact_field in form.target_fields %}
-                    <div>
-                        {{ field.label_tag }}
-                        {{ field }}
-                        {% if exact_field %}<label>{{ exact_field }} {{ exact_field.label }}</label>{% endif %}
-                    </div>
-                    {% endfor %}
-                </div>
+                {% include "partials/filter_fields.html" with fields=form.target_fields %}
             </fieldset>
 
             <fieldset>
                 <legend>PR Filter</legend>
-                <div class="grid">
-                    {% for field, exact_field in form.pr_fields %}
-                    <div>
-                        {{ field.label_tag }}
-                        {{ field }}
-                        {% if exact_field %}<label>{{ exact_field }} {{ exact_field.label }}</label>{% endif %}
-                    </div>
-                    {% endfor %}
-                </div>
+                {% include "partials/filter_fields.html" with fields=form.pr_fields %}
             </fieldset>
 
             <fieldset>
                 <legend>PR Source Filter</legend>
-                <div class="grid">
-                    {% for field, exact_field in form.pr_source_fields %}
-                    <div>
-                        {{ field.label_tag }}
-                        {{ field }}
-                        {% if exact_field %}<label>{{ exact_field }} {{ exact_field.label }}</label>{% endif %}
-                    </div>
-                    {% endfor %}
-                </div>
+                {% include "partials/filter_fields.html" with fields=form.pr_source_fields %}
             </fieldset>
 
             <fieldset>
                 <legend>PR Target Filter</legend>
-                <div class="grid">
-                    {% for field, exact_field in form.pr_target_fields %}
-                    <div>
-                        {{ field.label_tag }}
-                        {{ field }}
-                        {% if exact_field %}<label>{{ exact_field }} {{ exact_field.label }}</label>{% endif %}
-                    </div>
-                    {% endfor %}
-                </div>
+                {% include "partials/filter_fields.html" with fields=form.pr_target_fields %}
             </fieldset>
 
-            <a href="?" role="button" class="secondary outline">Reset</a>
-            <button type="submit">Apply Filter</button>
+            <footer>
+                <a href="?" role="button">Reset</a>
+                <button type="submit" data-variant="primary">Apply Filter</button>
+            </footer>
         </form>
-    </div>
 </details>
 
 {% if page_obj %}
     <form id="staging-table-form">
         {% csrf_token %}
-        <button type="submit"
-                hx-post="{% url 'staging_ui_modal_check_merge' %}"
-                hx-target="#modal-container"
-                class="primary">
-            Merge Selected
-        </button>
+        <p>
+            <button type="submit"
+                    data-variant="primary"
+                    hx-post="{% url 'staging_ui_modal_check_merge' %}"
+                    hx-target="#modal-container">
+                Merge Selected
+            </button>
+        </p>
 
-        <div id="staging-table-container">
-            <table class="striped">
-                <thead>
+        <table>
+            <thead>
+                <tr>
+                    <th aria-label="Select"></th>
+                    <th>
+                        <a href="?sort={% if current_sort == 'id' %}-id{% else %}id{% endif %}{{ base_query }}">
+                            ID
+                            {% if current_sort == 'id' %}▲{% elif current_sort == '-id' %}▼{% endif %}
+                        </a>
+                    </th>
+                    <th>
+                        <a href="?sort={% if current_sort == 'title' %}-title{% else %}title{% endif %}{{ base_query }}">
+                            Title
+                            {% if current_sort == 'title' %}▲{% elif current_sort == '-title' %}▼{% endif %}
+                        </a>
+                    </th>
+                    <th>
+                        <a href="?sort={% if current_sort == 'project__name' %}-project__name{% else %}project__name{% endif %}{{ base_query }}">
+                            Project
+                            {% if current_sort == 'project__name' %}▲{% elif current_sort == '-project__name' %}▼{% endif %}
+                        </a>
+                    </th>
+                    <th>
+                        <a href="?sort={% if current_sort == 'author__username' %}-author__username{% else %}author__username{% endif %}{{ base_query }}">
+                            Author
+                            {% if current_sort == 'author__username' %}▲{% elif current_sort == '-author__username' %}▼{% endif %}
+                        </a>
+                    </th>
+                    <th>
+                        <a href="?sort={% if current_sort == 'state' %}-state{% else %}state{% endif %}{{ base_query }}">
+                            State
+                            {% if current_sort == 'state' %}▲{% elif current_sort == '-state' %}▼{% endif %}
+                        </a>
+                    </th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for batch in page_obj %}
                     <tr>
-                        <th class="checkbox-cell">Select</th>
-                        <th>
-                            <a href="?sort={% if current_sort == 'id' %}-id{% else %}id{% endif %}{{ base_query }}">
-                                ID
-                                {% if current_sort == 'id' %}▲{% elif current_sort == '-id' %}▼{% endif %}
-                            </a>
-                        </th>
-                        <th>
-                            <a href="?sort={% if current_sort == 'title' %}-title{% else %}title{% endif %}{{ base_query }}">
-                                Title
-                                {% if current_sort == 'title' %}▲{% elif current_sort == '-title' %}▼{% endif %}
-                            </a>
-                        </th>
-                        <th>
-                            <a href="?sort={% if current_sort == 'project__name' %}-project__name{% else %}project__name{% endif %}{{ base_query }}">
-                                Project
-                                {% if current_sort == 'project__name' %}▲{% elif current_sort == '-project__name' %}▼{% endif %}
-                            </a>
-                        </th>
-                        <th>
-                            <a href="?sort={% if current_sort == 'author__username' %}-author__username{% else %}author__username{% endif %}{{ base_query }}">
-                                Author
-                                {% if current_sort == 'author__username' %}▲{% elif current_sort == '-author__username' %}▼{% endif %}
-                            </a>
-                        </th>
-                        <th>
-                            <a href="?sort={% if current_sort == 'state' %}-state{% else %}state{% endif %}{{ base_query }}">
-                                State
-                                {% if current_sort == 'state' %}▲{% elif current_sort == '-state' %}▼{% endif %}
-                            </a>
-                        </th>
+                        <td data-label="Select">
+                            <input type="checkbox" name="selected_batches" value="{{ batch.id }}" aria-label="Select batch #{{ batch.id }}">
+                        </td>
+                        <th scope="row" data-label="ID"><a href="{% url 'staging_detail' batch.id %}">#{{ batch.id }}</a></th>
+                        <td data-label="Title">{{ batch.title|default:"(No Title)" }}</td>
+                        <td data-label="Project">{{ batch.project.name }}</td>
+                        <td data-label="Author">{{ batch.author.username|default:"(Automated)" }}</td>
+                        <td data-label="State"><mark data-state="{{ batch.state }}">{{ batch.get_state_display }}</mark></td>
                     </tr>
-                </thead>
-                <tbody>
-                    {% for batch in page_obj %}
-                        <tr>
-                            <td class="checkbox-cell">
-                                <input type="checkbox" name="selected_batches" value="{{ batch.id }}">
-                            </td>
-                            <td data-label="ID"><a href="{% url 'staging_detail' batch.id %}">#{{ batch.id }}</a></td>
-                            <td data-label="Title">{{ batch.title|default:"(No Title)" }}</td>
-                            <td data-label="Project">{{ batch.project.name }}</td>
-                            <td data-label="Author">{{ batch.author.username|default:"(Automated)" }}</td>
-                            <td data-label="State">{{ batch.state }}</td>
-                        </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
+                {% endfor %}
+            </tbody>
+        </table>
     </form>
 
-    {% if page_obj.has_other_pages %}
-    <nav aria-label="pagination">
-        <ul>
-            {% if page_obj.has_previous %}
-            <li><a href="?page=1{{ filter_query }}">First</a></li>
-            <li><a href="?page={{ page_obj.previous_page_number }}{{ filter_query }}">Previous</a></li>
-            {% else %}
-            <li><span aria-disabled="true">First</span></li>
-            <li><span aria-disabled="true">Previous</span></li>
-            {% endif %}
-
-            <li>Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</li>
-
-            {% if page_obj.has_next %}
-            <li><a href="?page={{ page_obj.next_page_number }}{{ filter_query }}">Next</a></li>
-            <li><a href="?page={{ page_obj.paginator.num_pages }}{{ filter_query }}">Last</a></li>
-            {% else %}
-            <li><span aria-disabled="true">Next</span></li>
-            <li><span aria-disabled="true">Last</span></li>
-            {% endif %}
-        </ul>
-    </nav>
-    {% endif %}
+    {% include "partials/pagination.html" %}
 {% else %}
-    <p class="muted">No staging batches found.</p>
+    <article data-empty>
+        <h3>No staging batches found</h3>
+        {% if base_query %}<p>Try changing or <a href="?">resetting the filters</a>.</p>{% endif %}
+    </article>
 {% endif %}
 {% endblock %}

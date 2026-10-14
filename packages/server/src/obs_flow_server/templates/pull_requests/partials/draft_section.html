@@ -1,44 +1,42 @@
-<div id="pr-draft-section" class="sidebar-section">
+<section id="pr-draft-section">
     <h4>Draft</h4>
     <p>
         {% if pr.is_draft %}
-            yes
-            {% if latest_revision and latest_revision.draft_expires_at %}
-                <span class="debounce-countdown"
-                      data-expires="{{ latest_revision.draft_expires_at|date:'c' }}"
-                      hx-get="{% url 'pr_draft_status' pr.id %}"
-                      hx-trigger="countdown-expired"
-                      hx-target="#pr-draft-section"
-                      hx-swap="outerHTML">
-                    (debouncing: <span class="countdown-timer">...</span>)
-                </span>
-            {% endif %}
-        {% else %}
-            no
+        yes
+        {% if latest_revision and latest_revision.draft_expires_at %}
+            <span class="debounce-countdown"
+                  data-expires="{{ latest_revision.draft_expires_at|date:'c' }}"
+                  hx-get="{% url 'pr_draft_status' pr.id %}"
+                  hx-trigger="countdown-expired"
+                  hx-target="#pr-draft-section"
+                  hx-swap="outerHTML">
+                (debouncing: <span class="countdown-timer">...</span>)
+            </span>
         {% endif %}
-    </p>
-    {% if pr.is_draft %}
-        <div style="display: flex; gap: 0.5rem; margin-top: 0.5rem;">
-            <form method="post" action="{% url 'pr_ready_for_review' pr.id %}" hx-post="{% url 'pr_ready_for_review' pr.id %}" hx-target="#pr-draft-section" hx-swap="outerHTML" style="flex: 1; margin: 0;">
-                {% csrf_token %}
-                <button type="submit" class="outline" style="width: 100%; margin: 0;">Ready for Review</button>
-            </form>
-            {% if latest_revision and latest_revision.draft_expires_at %}
-                <form method="post" action="{% url 'pr_cancel_timeout' pr.id %}" hx-post="{% url 'pr_cancel_timeout' pr.id %}" hx-target="#pr-draft-section" hx-swap="outerHTML" style="flex: 1; margin: 0;">
-                    {% csrf_token %}
-                    <button type="submit" class="outline secondary" style="width: 100%; margin: 0;">Cancel Timeout</button>
-                </form>
-            {% endif %}
-        </div>
     {% else %}
-        <form method="post" action="{% url 'pr_convert_to_draft' pr.id %}" hx-post="{% url 'pr_convert_to_draft' pr.id %}" hx-target="#pr-draft-section" hx-swap="outerHTML" style="margin-top: 0.5rem;">
+        no
+    {% endif %}
+</p>
+{% if pr.is_draft %}
+        <form method="post" action="{% url 'pr_ready_for_review' pr.id %}" hx-post="{% url 'pr_ready_for_review' pr.id %}" hx-target="#pr-draft-section" hx-swap="outerHTML">
             {% csrf_token %}
-            <button type="submit" class="outline secondary" style="width: 100%; margin: 0;">Convert to Draft</button>
+            <button type="submit">Ready for Review</button>
+        </form>
+        {% if latest_revision and latest_revision.draft_expires_at %}
+            <form method="post" action="{% url 'pr_cancel_timeout' pr.id %}" hx-post="{% url 'pr_cancel_timeout' pr.id %}" hx-target="#pr-draft-section" hx-swap="outerHTML">
+                {% csrf_token %}
+                <button type="submit">Cancel Timeout</button>
+            </form>
+        {% endif %}
+    {% else %}
+        <form method="post" action="{% url 'pr_convert_to_draft' pr.id %}" hx-post="{% url 'pr_convert_to_draft' pr.id %}" hx-target="#pr-draft-section" hx-swap="outerHTML">
+            {% csrf_token %}
+            <button type="submit">Convert to Draft</button>
         </form>
     {% endif %}
-</div>
+</section>
 
-{% if request.headers.HX_Request %}
+{% if request.headers.hx_request or request.headers.HX_Request %}
 <section id="pr-reviews-section" hx-swap-oob="true">
     <h3>Reviews (Latest Revision)</h3>
     {% include "pull_requests/partials/reviews_table.html" %}

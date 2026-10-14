@@ -1,7 +1,7 @@
 {# Toasts are rendered server side from django.contrib.messages. #}
 {# Fade in/out is handled by CSS animations, no JavaScript involved. #}
-<div id="toast-container">
+<div aria-live="polite">
     {% for message in messages %}
-        <div class="toast toast-{{ message.tags|default:'success' }}" role="status">{{ message }}</div>
+        <output data-variant="{% if message.tags == 'error' %}danger{% else %}{{ message.tags|default:'success' }}{% endif %}">{{ message }}</output>
     {% endfor %}
 </div>

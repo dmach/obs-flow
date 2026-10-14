@@ -1,256 +1,989 @@
-/* OBS Flow - minimal custom layer on top of stock Pico CSS. */
+/* GitHub (Primer) look, plain semantic HTML, mostly classless. */
 
-.muted { color: var(--pico-muted-color); }
+/* Theme and tokens */
 
-/* SUSE green navbar */
-.navbar-container {
-    background-color: #30ba7c;
-    margin-bottom: 1.5rem;
+:root {
+	color-scheme: light dark;
+}
+:root[data-theme="light"] {
+	color-scheme: light;
+}
+:root[data-theme="dark"] {
+	color-scheme: dark;
 }
 
-.navbar-container nav {
-    --pico-nav-element-spacing-vertical: 0;
-    --pico-nav-link-spacing-vertical: 0.25rem;
-    padding-top: 0;
-    padding-bottom: 0;
+:root {
+	--flow-font: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans", Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji";
+	--flow-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+
+	--flow-bg: light-dark(#ffffff, #0d1117);
+	--flow-bg-subtle: light-dark(#f6f8fa, #151b23);
+	--flow-bg-hover: light-dark(#818b981f, #656c7633);
+	--flow-bg-accent: light-dark(#ddf4ff, #388bfd1a);
+	--flow-bg-success: light-dark(#dafbe1, #2ea04326);
+	--flow-bg-attention: light-dark(#fff8c5, #bb800926);
+	--flow-bg-danger: light-dark(#ffebe9, #f8514926);
+
+	--flow-fg: light-dark(#1f2328, #f0f6fc);
+	--flow-fg-muted: light-dark(#59636e, #9198a1);
+	--flow-fg-accent: light-dark(#0969da, #4493f8);
+	--flow-fg-success: light-dark(#1a7f37, #3fb950);
+	--flow-fg-attention: light-dark(#9a6700, #d29922);
+	--flow-fg-danger: light-dark(#d1242f, #f85149);
+
+	--flow-solid-success: light-dark(#1f883d, #238636);
+	--flow-solid-success-hover: light-dark(#1c8139, #29903b);
+	--flow-solid-done: light-dark(#8250df, #8957e5);
+	--flow-solid-danger: light-dark(#cf222e, #da3633);
+	--flow-solid-attention: light-dark(#9a6700, #9e6a03);
+	--flow-solid-accent: light-dark(#0969da, #1f6feb);
+	--flow-solid-neutral: light-dark(#59636e, #656c76);
+	--flow-on-solid: #ffffff;
+
+	--flow-border: light-dark(#d1d9e0, #3d444d);
+	--flow-border-muted: light-dark(#d1d9e0b3, #3d444db3);
+	--flow-backdrop: light-dark(#1f232866, #010409b3);
+	--flow-shadow: 0 0 0 1px var(--flow-border), 0 8px 24px 0 light-dark(#25292e1f, #010409);
+
+	--flow-radius: 6px;
 }
 
-.navbar-container nav > ul > li > a,
-.navbar-container nav > ul > li > strong > a,
-.navbar-container nav details.dropdown > summary:not([role]) {
-    color: #fff;
-    text-decoration: none;
+/* Variants only set two helper properties; elements decide how to use them. */
+[data-variant="success"] {
+	--flow-c: var(--flow-fg-success);
+	--flow-c-bg: var(--flow-bg-success);
+}
+[data-variant="warning"] {
+	--flow-c: var(--flow-fg-attention);
+	--flow-c-bg: var(--flow-bg-attention);
+}
+[data-variant="danger"] {
+	--flow-c: var(--flow-fg-danger);
+	--flow-c-bg: var(--flow-bg-danger);
 }
 
-.navbar-container nav > ul > li > a:hover,
-.navbar-container nav > ul > li > strong > a:hover {
-    color: #e0f7fa;
+/* Reset and typography */
+
+*,
+*::before,
+*::after {
+	box-sizing: border-box;
+}
+* {
+	margin: 0;
 }
 
-.navbar-container nav > ul > li > strong > a {
-    font-weight: 700;
-    font-size: 1rem;
+html {
+	font-size: 14px;
+	-webkit-text-size-adjust: 100%;
 }
 
-/* Make the account dropdown summary look like the other nav entries. */
-.navbar-container nav details.dropdown > summary:not([role]) {
-    padding: 0;
-    height: auto;
-    background-color: transparent;
-    border: none;
-    box-shadow: none;
+body {
+	background: var(--flow-bg);
+	color: var(--flow-fg);
+	font-family: var(--flow-font);
+	line-height: 1.5;
 }
 
-.navbar-container nav details.dropdown > summary:not([role])::after {
-    display: block;
-    float: right;
-    margin-inline-start: 0.25rem;
-    background-position: right center;
-    filter: brightness(0) invert(1);
-    transform: rotate(-90deg);
+::selection {
+	background: var(--flow-bg-accent);
 }
 
-.navbar-container nav details.dropdown[open] > summary:not([role])::after {
-    transform: rotate(0);
+p,
+ul,
+ol,
+dl,
+table,
+pre,
+form,
+fieldset,
+article,
+details,
+hr,
+h1,
+h2,
+h3,
+h4 {
+	margin-bottom: 1rem;
 }
 
-.navbar-container .desktop-menu { display: flex; }
-.navbar-container .mobile-menu { display: none; }
-
-@media (max-width: 768px) {
-    .navbar-container .desktop-menu { display: none; }
-    .navbar-container .mobile-menu { display: inline-block; }
-    .navbar-container .mobile-menu > summary { color: #fff; }
-    .navbar-container .mobile-menu ul { background-color: var(--pico-card-background-color); }
+h1,
+h2,
+h3,
+h4 {
+	font-weight: 600;
+	line-height: 1.25;
+}
+h1 {
+	font-size: 2rem;
+	font-weight: 400;
+}
+h2 {
+	font-size: 1.5rem;
+}
+h3 {
+	font-size: 1.25rem;
+}
+h4 {
+	font-size: 1rem;
+	line-height: 1.5;
+}
+h1 small {
+	font-size: inherit;
+	font-weight: 300;
 }
 
-/* Pico stretches buttons to 100%; keep them at their natural size.
-   Explicit types override Pico's [type=...] margin rule so buttons stay equally tall. */
+small {
+	color: var(--flow-fg-muted);
+	font-size: 0.857rem;
+}
+small[role="alert"],
+p[role="alert"] {
+	color: var(--flow-fg-danger);
+}
+
+a {
+	color: var(--flow-fg-accent);
+	text-decoration: none;
+}
+a:hover {
+	text-decoration: underline;
+}
+
+:focus-visible {
+B	outline: 2px solid var(--flow-fg-accent);
+	outline-offset: 1px;
+}
+
+code,
+pre {
+	font-family: var(--flow-mono);
+	font-size: 0.857rem;
+}
+code {
+	padding: 0.2em 0.4em;
+	border-radius: var(--flow-radius);
+	background: var(--flow-bg-hover);
+}
+pre {
+	overflow-x: auto;
+	padding: 1rem;
+	border: 1px solid var(--flow-border);
+	border-radius: var(--flow-radius);
+	background: var(--flow-bg-subtle);
+}
+pre > code {
+	padding: 0;
+	background: none;
+}
+
+hr {
+	border: 0;
+	border-top: 1px solid var(--flow-border-muted);
+}
+
+/* Buttons */
+
 button,
-[type="submit"],
-[type="button"],
-[type="reset"],
-[role="button"] {
-    width: auto !important;
-    margin: 0;
+a[role="button"] {
+	display: inline-block;
+	padding: 0.3125rem 0.75rem;
+	border: 1px solid var(--flow-border);
+	border-radius: var(--flow-radius);
+	background: var(--flow-bg-subtle);
+	color: var(--flow-fg);
+	font: inherit;
+	font-weight: 500;
+	text-align: center;
+	text-decoration: none;
+	cursor: pointer;
+}
+button:hover,
+a[role="button"]:hover {
+	background: var(--flow-bg-hover);
+	text-decoration: none;
 }
 
-/* Lightweight table row highlight on pointer devices. */
-@media (min-width: 769px) {
-    table.striped {
-        border: 1px solid var(--pico-muted-border-color);
-        border-radius: var(--pico-border-radius);
-        border-collapse: separate;
-        border-spacing: 0;
-        overflow: hidden;
-    }
-    table.striped tbody tr:last-child td { border-bottom: none; }
-    table.striped tbody tr:hover td {
-        background-color: rgba(128, 128, 128, 0.2);
-    }
+button[data-variant="primary"],
+a[role="button"][data-variant="primary"] {
+	border-color: transparent;
+	background: var(--flow-solid-success);
+	color: var(--flow-on-solid);
+}
+button[data-variant="primary"]:hover,
+a[role="button"][data-variant="primary"]:hover {
+	background: var(--flow-solid-success-hover);
 }
 
-/* Footer */
-body > footer { text-align: center; }
-
-/* Home page hero */
-.hero { text-align: center; }
-.hero footer {
-    display: flex;
-    justify-content: center;
-    gap: 1rem;
+button[data-variant="danger"] {
+	color: var(--flow-fg-danger);
+}
+button[data-variant="danger"]:hover {
+	border-color: var(--flow-solid-danger);
+	background: var(--flow-solid-danger);
+	color: var(--flow-on-solid);
 }
 
-/* Modal dialogs */
-/* All dialog actions live in the footer: right-aligned, on one row,
-   sized to their label (Pico stretches buttons to 100% by default) and equally tall. */
-dialog article > footer {
-    display: flex;
-    flex-wrap: wrap;
-    justify-content: flex-end;
-    align-items: stretch;
-    gap: 0.5rem;
+/* Inline text action next to a heading (e.g. "Edit"). */
+h4 > button {
+	padding: 0 0.25rem;
+	border-color: transparent;
+	background: none;
+	color: var(--flow-fg-accent);
+}
+h4 > button:hover {
+	background: var(--flow-bg-hover);
 }
 
-/* The submit button only makes sense once the local login form is on the page;
-   while the form is still collapsed behind "Use local account", hide it. */
-dialog article:has(#local-login-section) > footer .local-login-submit {
-    display: none;
+button:disabled {
+	opacity: 0.5;
+	cursor: not-allowed;
 }
 
-/* Filter panel */
-details.filter-panel {
-    border: 1px solid var(--pico-muted-border-color);
-    border-radius: var(--pico-border-radius);
-    margin-bottom: 1.5rem;
-    overflow: hidden;
+/* Forms */
+
+label,
+legend {
+	display: block;
+	padding: 0;
+	margin-bottom: 0.25rem;
+	font-weight: 600;
+}
+label:has(> input[type="checkbox"]) {
+	font-weight: 400;
 }
 
-details.filter-panel > summary {
-    margin-bottom: 0;
-    padding: 0.5rem 0.75rem;
+input,
+select,
+textarea {
+	display: block;
+	width: 100%;
+	margin-bottom: 0.75rem;
+	padding: 0.3125rem 0.75rem;
+	border: 1px solid var(--flow-border);
+	border-radius: var(--flow-radius);
+	background: var(--flow-bg);
+	color: var(--flow-fg);
+	font: inherit;
+}
+input[type="hidden"] {
+	display: none;
+}
+input::placeholder,
+textarea::placeholder {
+	color: var(--flow-fg-muted);
+}
+input:focus,
+select:focus,
+textarea:focus {
+	border-color: var(--flow-fg-accent);
+}
+[aria-invalid="true"] {
+	border-color: var(--flow-fg-danger);
 }
 
-details.filter-panel[open] > summary {
-    border-bottom: 1px solid var(--pico-muted-border-color);
+input[type="checkbox"],
+input[type="radio"] {
+	display: inline-block;
+	width: auto;
+	margin: 0 0.5rem 0 0;
+	accent-color: var(--flow-solid-accent);
+}
+input:not([type="checkbox"], [type="radio"]) + small,
+select + small {
+	display: block;
+	margin: -0.5rem 0 0.75rem;
 }
 
-.filter-panel-body { padding: 1rem 0.75rem; }
-.filter-panel-body form { margin-bottom: 0; }
+fieldset {
+	min-width: 0;
+	padding: 0;
+	border: 0;
+}
 
-/* Collapsible tables on small screens */
+/* Input + button in one row. */
+fieldset[role="group"] {
+	display: flex;
+}
+fieldset[role="group"] > * {
+	margin: 0;
+}
+fieldset[role="group"] > input {
+	flex: 1;
+	border-radius: var(--flow-radius) 0 0 var(--flow-radius);
+}
+fieldset[role="group"] > button {
+	border-radius: 0 var(--flow-radius) var(--flow-radius) 0;
+}
+
+/* Rows of fields (filters, inline edit). */
+form > div,
+fieldset > div {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
+	gap: 0 1rem;
+}
+
+/* Field caption row: label with its optional "exact" checkbox beside it. */
+form div > header {
+	display: flex;
+	align-items: baseline;
+	justify-content: space-between;
+	gap: 0.75rem;
+	margin-bottom: 0.25rem;
+}
+form div > header > label {
+	margin-bottom: 0;
+}
+form div > header > label:has(> input) {
+	font-size: 0.857rem;
+}
+
+/* Action rows: right-aligned buttons. */
+form > footer,
+article > footer,
+section > footer,
+td > footer {
+	display: flex;
+	flex-wrap: wrap;
+	justify-content: flex-end;
+	gap: 0.5rem;
+}
+main > section > footer {
+	justify-content: flex-start;
+}
+
+/* App header */
+
+body > header {
+	margin-bottom: 1.5rem;
+	border-bottom: 1px solid var(--flow-border);
+	background: var(--flow-bg-subtle);
+}
+body > header > *,
+main,
+body > footer {
+	max-width: 1280px;
+	margin-inline: auto;
+	padding-inline: 1rem;
+}
+
+/* Top row: brand left, account right. */
+body > header > div {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 1rem;
+	min-height: 3.5rem;
+}
+body > header > div > a {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.5rem;
+	color: var(--flow-fg);
+	font-size: 1.143rem;
+	font-weight: 600;
+}
+body > header > div > a:hover {
+	text-decoration: none;
+}
+
+header nav > ul {
+	display: flex;
+	gap: 0.25rem;
+	margin: 0;
+	padding: 0;
+	list-style: none;
+}
+header nav a,
+header summary {
+	display: flex;
+	align-items: center;
+	gap: 0.286rem;
+	padding: 0.375rem 0.5rem;
+	border-radius: var(--flow-radius);
+	color: var(--flow-fg);
+	white-space: nowrap;
+}
+header nav a:hover,
+header summary:hover {
+	background: var(--flow-bg-hover);
+	text-decoration: none;
+}
+
+/* Icons */
+.icon {
+	width: 1.15rem;
+	height: 1.15rem;
+	fill: currentColor;
+}
+
+/* Section tabs (GitHub UnderlineNav). */
+nav[aria-label="Main"] {
+	padding-inline: 0.5rem;
+}
+nav[aria-label="Main"] > ul {
+	flex-wrap: wrap;
+}
+nav[aria-label="Main"] li {
+	padding-bottom: 0.5rem;
+	border-bottom: 2px solid transparent;
+}
+nav[aria-label="Main"] li:has(> [aria-current="page"]) {
+	border-bottom-color: var(--flow-fg-accent);
+}
+nav[aria-label="Main"] [aria-current="page"] {
+	font-weight: 600;
+}
+
+/* Account dropdown. */
+header details {
+	position: relative;
+	margin: 0;
+}
+header summary {
+	border: 1px solid var(--flow-border);
+	cursor: pointer;
+	list-style: none;
+}
+header details:not([open]) > summary + ul {
+	display: none;
+}
+header summary::-webkit-details-marker {
+	display: none;
+}
+header summary::after {
+	content: "\25BE";
+}
+header summary + ul {
+	position: absolute;
+	right: 0;
+	z-index: 10;
+	min-width: 10rem;
+	margin: 0.25rem 0 0;
+	padding: 0.5rem;
+	border-radius: 12px;
+	background: var(--flow-bg-subtle);
+	box-shadow: var(--flow-shadow);
+	list-style: none;
+}
+
+/* Invert black octicons in dark mode. */
+@media (prefers-color-scheme: dark) {
+	:root:not([data-theme="light"]) header img {
+		filter: invert(1);
+	}
+}
+:root[data-theme="dark"] header img {
+	filter: invert(1);
+}
+
+/* Page layout */
+
+/* Title row: heading left, actions right. */
+main > header {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	justify-content: space-between;
+	gap: 0.5rem 1rem;
+	margin-bottom: 1rem;
+}
+main > header > h1 {
+	margin-bottom: 0;
+}
+main > header + p {
+	color: var(--flow-fg-muted);
+}
+main section {
+	margin-bottom: 1.5rem;
+}
+main > section > h1 + p {
+	color: var(--flow-fg-muted);
+	font-size: 1.143rem;
+}
+
+/* Detail pages: main column + sidebar. */
+div:has(> aside) {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 1.5rem;
+}
+div:has(> aside) > div {
+	flex: 3 1 28rem;
+	min-width: 0;
+}
+aside {
+	flex: 1 1 14rem;
+	min-width: 0;
+}
+aside > section {
+	margin-bottom: 1rem;
+	padding-bottom: 1rem;
+	border-bottom: 1px solid var(--flow-border-muted);
+}
+aside > section:last-child {
+	border-bottom: 0;
+}
+aside p {
+	margin-bottom: 0;
+}
+aside h4 {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	margin-bottom: 0.25rem;
+	color: var(--flow-fg-muted);
+	font-size: 0.857rem;
+}
+aside form {
+	margin: 0.5rem 0 0;
+}
+aside form > button:only-child {
+	width: 100%;
+}
+aside form input {
+	margin-bottom: 0.5rem;
+}
+
+nav[aria-label="breadcrumb"] {
+	margin-bottom: 0.5rem;
+	font-size: 0.857rem;
+}
+nav[aria-label="breadcrumb"] ul {
+	display: flex;
+	margin: 0;
+	padding: 0;
+	list-style: none;
+}
+nav[aria-label="breadcrumb"] li + li::before {
+	content: "/";
+	margin: 0 0.5rem;
+	color: var(--flow-fg-muted);
+}
+nav[aria-label="breadcrumb"] li:last-child {
+	font-weight: 600;
+}
+nav[aria-label="breadcrumb"] a {
+	color: var(--flow-fg-muted);
+}
+nav[aria-label="breadcrumb"] a:hover {
+	color: var(--flow-fg-accent);
+}
+
+nav[aria-label="pagination"] {
+	margin-top: 1rem;
+}
+nav[aria-label="pagination"] ul {
+	display: flex;
+	justify-content: center;
+	gap: 0.25rem;
+	margin: 0;
+	padding: 0;
+	list-style: none;
+}
+nav[aria-label="pagination"] li > * {
+	display: block;
+	padding: 0.25rem 0.625rem;
+	border: 1px solid transparent;
+	border-radius: var(--flow-radius);
+}
+nav[aria-label="pagination"] a:hover {
+	border-color: var(--flow-border);
+	text-decoration: none;
+}
+nav[aria-label="pagination"] [aria-disabled="true"] {
+	color: var(--flow-fg-muted);
+}
+nav[aria-label="pagination"] [aria-current="page"] {
+	color: var(--flow-fg);
+}
+
+body > footer {
+	margin-top: 2.5rem;
+	padding-block: 2.5rem;
+	border-top: 1px solid var(--flow-border-muted);
+	color: var(--flow-fg-muted);
+	font-size: 0.857rem;
+	text-align: center;
+}
+body > footer p {
+	margin-bottom: 0.5rem;
+}
+body > footer a {
+	color: var(--flow-fg-muted);
+}
+body > footer a:hover {
+	color: var(--flow-fg-accent);
+}
+
+/* Tables */
+
+table {
+	width: 100%;
+	border: 1px solid var(--flow-border);
+	border-collapse: separate;
+	border-spacing: 0;
+	border-radius: var(--flow-radius);
+	overflow: hidden;
+}
+th,
+td {
+	padding: 0.5rem 1rem;
+	border-bottom: 1px solid var(--flow-border-muted);
+	text-align: left;
+	vertical-align: middle;
+}
+thead th {
+	border-bottom-color: var(--flow-border);
+	background: var(--flow-bg-subtle);
+	color: var(--flow-fg-muted);
+}
+thead a {
+	color: var(--flow-fg-muted);
+}
+thead a:hover {
+	color: var(--flow-fg-accent);
+}
+tbody tr:last-child > * {
+	border-bottom: 0;
+}
+tbody tr:hover > * {
+	background: var(--flow-bg-subtle);
+}
+tbody tr:has(input[type="checkbox"]:checked) > * {
+	background: var(--flow-bg-accent);
+}
+
+/* Row header = object identifier: reads as text, turns blue on hover. */
+tbody th a {
+	color: var(--flow-fg);
+}
+tbody th a:hover {
+	color: var(--flow-fg-accent);
+}
+
+:is(th, td):has(> input[type="checkbox"]) {
+	width: 2.5rem;
+	text-align: center;
+}
+td input,
+td form {
+	margin-bottom: 0;
+}
+td input[type="checkbox"],
+th input[type="checkbox"] {
+	margin: 0;
+}
+
+/* Narrow screens: rows become cards, cells show their data-label. */
 @media (max-width: 768px) {
-    table.striped thead { display: none; }
-    table.striped tr {
-        display: block;
-        margin-bottom: 1rem;
-        border: 1px solid var(--pico-muted-border-color);
-        border-radius: var(--pico-border-radius);
-        padding: 0.5rem;
-        background-color: var(--pico-card-background-color);
-    }
-    table.striped td {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        padding: 0.5rem;
-        border-bottom: 1px solid var(--pico-muted-border-color);
-        text-align: right;
-    }
-    table.striped td:last-child { border-bottom: none; }
-    table.striped td::before {
-        content: attr(data-label);
-        font-weight: bold;
-        text-align: left;
-        color: var(--pico-muted-color);
-        margin-right: 1rem;
-    }
+	table {
+		border: 0;
+		overflow: visible;
+	}
+	thead {
+		display: none;
+	}
+	table,
+	tbody {
+		display: block;
+	}
+	tr {
+		display: block;
+		margin-bottom: 1rem;
+		padding: 0.25rem 0.5rem;
+		border: 1px solid var(--flow-border);
+		border-radius: var(--flow-radius);
+	}
+	tbody tr > * {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 1rem;
+		padding: 0.5rem;
+		text-align: right;
+	}
+	tbody tr > :last-child {
+		border-bottom: 0;
+	}
+	tbody tr > [data-label]::before {
+		content: attr(data-label);
+		color: var(--flow-fg-muted);
+		font-weight: 600;
+		text-align: left;
+	}
+	:is(th, td):has(> input[type="checkbox"]) {
+		width: auto;
+	}
 }
 
-/* Two-column layout with sidebar */
-.layout-with-sidebar {
-    display: grid;
-    grid-template-columns: 3fr 1fr;
-    gap: 1.5rem;
+/* Boxes: article, details, empty state */
+
+article {
+	padding: 1rem;
+	border: 1px solid var(--flow-border);
+	border-radius: var(--flow-radius);
+	background: var(--flow-bg);
+}
+article > header,
+article > footer {
+	margin-inline: -1rem;
+	padding: 0.75rem 1rem;
+}
+article > header {
+	margin-top: -1rem;
+	margin-bottom: 1rem;
+	border-bottom: 1px solid var(--flow-border-muted);
+}
+article > footer {
+	margin-top: 1rem;
+	margin-bottom: -1rem;
+	border-top: 1px solid var(--flow-border-muted);
+}
+article > header > * {
+	margin-bottom: 0;
+}
+article[data-empty] {
+	padding: 2rem;
+	color: var(--flow-fg-muted);
+	text-align: center;
+}
+article[data-empty] > :last-child {
+	margin-bottom: 0;
 }
 
-@media (max-width: 768px) {
-    .layout-with-sidebar { grid-template-columns: 1fr; }
+/* Collapsible filter panel. */
+main > details {
+	border: 1px solid var(--flow-border);
+	border-radius: var(--flow-radius);
+	overflow: hidden;
+}
+main > details > summary {
+	padding: 0.5rem 1rem;
+	background: var(--flow-bg-subtle);
+	font-weight: 600;
+	cursor: pointer;
+}
+main > details[open] > summary {
+	border-bottom: 1px solid var(--flow-border);
+}
+main > details > form {
+	margin: 0;
+	padding: 1rem;
 }
 
-.sidebar-section {
-    border-bottom: 1px solid var(--pico-muted-border-color);
-    padding-bottom: 0.75rem;
-    margin-bottom: 0.75rem;
+/* Dialog (opened with the open attribute, so no ::backdrop). */
+dialog[open] {
+	position: fixed;
+	inset: 0;
+	z-index: 100;
+	display: grid;
+	place-items: center;
+	align-content: center;
+	width: 100%;
+	height: 100%;
+	max-width: none;
+	max-height: none;
+	margin: 0;
+	padding: 1rem;
+	border: 0;
+	background: var(--flow-backdrop);
+	color: inherit;
+}
+dialog > article {
+	width: 100%;
+	max-width: 40rem;
+	max-height: 100%;
+	margin: 0;
+	overflow: auto;
+	border-radius: 12px;
+	box-shadow: var(--flow-shadow);
+}
+dialog > article > header h3 {
+	font-size: 1rem;
 }
 
-.sidebar-section:last-child {
-    border-bottom: none;
-    padding-bottom: 0;
-    margin-bottom: 0;
+/* Tabs */
+.tabs {
+	display: flex;
+	flex-wrap: wrap;
+}
+.tabs input[type="radio"] {
+	display: none;
+}
+.tabs label {
+	padding: 0.5rem 1rem;
+	cursor: pointer;
+	border-bottom: 2px solid transparent;
+	color: var(--flow-fg-muted);
+	font-weight: 500;
+}
+.tabs label:hover {
+	color: var(--flow-fg);
+}
+.tabs input[type="radio"]:checked + label {
+	color: var(--flow-fg);
+	border-bottom-color: var(--flow-fg-accent);
+}
+.tabs hr {
+	width: 100%;
+	margin: 0 0 1rem 0;
+	border: 0;
+	border-top: 1px solid var(--flow-border);
+}
+.tab-content {
+	display: none;
+	width: 100%;
+}
+.tabs > input[type="radio"]:nth-of-type(1):checked ~ .tab-content:nth-of-type(1),
+.tabs > input[type="radio"]:nth-of-type(2):checked ~ .tab-content:nth-of-type(2),
+.tabs > input[type="radio"]:nth-of-type(3):checked ~ .tab-content:nth-of-type(3) {
+	display: block;
+}
+/* Standalone action (e.g. SSO login): right-aligned like form footers. */
+.tab-content > a[role="button"],
+article > a[role="button"] {
+	display: block;
+	width: fit-content;
+	margin-left: auto;
+}
+article > form > footer {
+	display: flex;
+	flex-wrap: wrap;
+	justify-content: flex-end;
+	gap: 0.5rem;
+	margin-top: 1.5rem;
+	padding-top: 0.75rem;
+	border-top: 1px solid var(--flow-border-muted);
 }
 
-.sidebar-section h4 {
-    font-size: 0.8rem;
-    text-transform: uppercase;
-    color: var(--pico-muted-color);
-    margin-bottom: 0.25rem;
+/* Labels, counters, notices */
+
+/* State pill. Unknown states stay neutral. */
+mark {
+	display: inline-block;
+	padding: 0.25rem 0.75rem;
+	border-radius: 2em;
+	background: var(--flow-solid-neutral);
+	color: var(--flow-on-solid);
+	font-weight: 500;
+	line-height: 1.25;
+	white-space: nowrap;
+}
+td mark {
+	padding: 0 0.5rem;
+	font-size: 0.857rem;
+	line-height: 1.5;
+}
+mark:is(
+	[data-state="open"],
+	[data-state="in-progress/open"],
+	[data-state="accepted"]
+) {
+	background: var(--flow-solid-success);
+}
+mark:is([data-state="merged"], [data-state="merged/completed"]) {
+	background: var(--flow-solid-done);
+}
+mark:is([data-state="closed"], [data-state="failed"], [data-state="rejected"]) {
+	background: var(--flow-solid-danger);
+}
+mark:is([data-state="pending-release"], [data-state="pending"]) {
+	background: var(--flow-solid-attention);
+}
+mark[data-state="needinfo"] {
+	background: var(--flow-solid-accent);
 }
 
-/* CSS-only "select mode" toggle. The checkbox is never visible and never
-   submitted (no name attribute); it only drives sibling styles. */
-.select-mode-toggle { display: none; }
-.select-mode-label { width: auto; margin-bottom: 0; }
-.select-mode-label .select-mode-off { display: none; }
-.select-mode-toggle:checked ~ form .select-mode-label .select-mode-on { display: none; }
-.select-mode-toggle:checked ~ form .select-mode-label .select-mode-off { display: inline; }
-.checkbox-cell { width: 40px; text-align: center; }
-
-@media (max-width: 768px) {
-    .checkbox-cell { display: none; }
-    .select-mode-toggle:checked ~ form .checkbox-cell { display: flex; width: auto; }
-    .mobile-only { display: inline-block; }
+/* <data value="N">: counter pill. With data-variant: coloured text. */
+data {
+	display: inline-block;
+	min-width: 1.5em;
+	padding: 0 0.4rem;
+	border-radius: 2em;
+	background: var(--flow-bg-hover);
+	font-size: 0.857rem;
+	font-weight: 500;
+	line-height: 1.5;
+	text-align: center;
+	vertical-align: middle;
+}
+data[data-variant] {
+	min-width: 0;
+	padding: 0;
+	background: none;
+	color: var(--flow-c);
+	font-size: inherit;
+	font-weight: inherit;
+	line-height: inherit;
+	vertical-align: baseline;
 }
 
-@media (min-width: 769px) {
-    .mobile-only { display: none; }
+/* Inline notice. */
+div[role="status"] {
+	margin-bottom: 1rem;
+	padding: 1rem;
+	border: 1px solid var(--flow-border);
+	border-radius: var(--flow-radius);
+	background: var(--flow-c-bg, var(--flow-bg-accent));
+}
+div[role="status"] > :last-child {
+	margin-bottom: 0;
+}
+div[role="status"] > h3 {
+	margin-bottom: 0.5rem;
+	font-size: 1rem;
 }
 
-/* Toasts */
-#toast-container {
-    position: fixed;
-    bottom: 20px;
-    right: 20px;
-    z-index: 1000;
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
+/* Toasts: server-rendered, hide themselves after 5s. */
+body > div[aria-live] {
+	position: fixed;
+	right: 1.5rem;
+	bottom: 1.5rem;
+	z-index: 200;
+	display: flex;
+	flex-direction: column;
+	gap: 0.5rem;
+}
+output {
+	padding: 0.75rem 1rem;
+	border: 1px solid var(--flow-border);
+	border-left: 4px solid var(--flow-c, var(--flow-fg-accent));
+	border-radius: var(--flow-radius);
+	background: var(--flow-bg-subtle);
+	box-shadow: var(--flow-shadow);
+	animation: flow-hide 0.3s ease 5s forwards;
+}
+@keyframes flow-hide {
+	to {
+		opacity: 0;
+		visibility: hidden;
+	}
 }
 
-.toast {
-    background-color: #2e3440;
-    color: #eceff4;
-    padding: 12px 24px;
-    border-radius: 4px;
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.15);
-    font-size: 0.9rem;
-    opacity: 0;
-    transform: translateY(20px);
-    animation: toast-in 0.3s ease forwards, toast-out 0.3s ease 5s forwards;
-}
+/* htmx */
 
-@keyframes toast-in {
-    to { opacity: 1; transform: translateY(0); }
+form.htmx-request [type="submit"],
+button.htmx-request {
+	opacity: 0.5;
+	pointer-events: none;
+	cursor: progress;
 }
-
-@keyframes toast-out {
-    from { opacity: 1; transform: translateY(0); }
-    to { opacity: 0; transform: translateY(20px); visibility: hidden; }
+.htmx-indicator {
+	opacity: 0;
+	transition: opacity 150ms ease;
+}
+.htmx-request .htmx-indicator,
+.htmx-request.htmx-indicator {
+	opacity: 1;
 }
 
 @media (prefers-reduced-motion: reduce) {
-    .toast { animation: none; opacity: 1; transform: none; }
+	*,
+	*::before,
+	*::after {
+		transition: none;
+		animation: none;
+	}
 }
-
-.toast-success { border-left: 4px solid #a3be8c; }
-.toast-error { border-left: 4px solid #bf616a; }

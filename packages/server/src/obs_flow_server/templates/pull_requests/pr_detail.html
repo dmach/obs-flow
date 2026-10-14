@@ -11,101 +11,105 @@
     </ul>
 </nav>
 
-<h2>{{ pr.title }} <span class="muted">#{{ pr.number }}</span></h2>
+<h1>{{ pr.title }} <small>#{{ pr.number }}</small></h1>
+<p>
+    {% if pr.is_draft and pr.state == "open" %}
+        <mark data-state="draft">Draft</mark>
+    {% else %}
+        <mark data-state="{{ pr.state }}">{{ pr.get_state_display }}</mark>
+    {% endif %}
+    <small><strong>{{ pr.author.username }}</strong> wants to merge into <code>{{ pr.target.branch }}</code> from <code>{{ pr.source_owner }}/{{ pr.source_repo }}:{{ pr.source_branch }}</code></small>
+</p>
 
-<div class="layout-with-sidebar">
+<div>
     <div>
         <section id="pr-reviews-section">
-            <h3>Reviews (Latest Revision)</h3>
+            <h2>Reviews <small>(latest revision)</small></h2>
             {% include "pull_requests/partials/reviews_table.html" %}
         </section>
 
         <section>
-            <h3>Revisions History</h3>
+            <h2>Revisions History</h2>
             {% if revisions %}
-                <table class="striped">
+                <table>
                     <thead>
                         <tr>
                             <th>Rev</th>
-                            <th>Head SHA</th>
+                            <th>Fingerprint</th>
+                            <th>State</th>
                             <th>Created At</th>
                         </tr>
                     </thead>
                     <tbody>
                         {% for rev in revisions %}
                             <tr>
-                                <td data-label="Rev"><strong>#{{ rev.revision_number }}</strong></td>
-                                <td data-label="Head SHA"><code>{{ rev.head_sha|slice:":8" }}</code></td>
+                                <td data-label="Rev">#{{ rev.revision_number }}</td>
+                                <td data-label="Fingerprint"><code>{{ rev.fingerprint|slice:":12" }}</code></td>
+                                <td data-label="State"><mark data-state="{% if rev.is_draft %}draft{% else %}{{ pr.state }}{% endif %}">{% if rev.is_draft %}Draft{% else %}{{ pr.get_state_display }}{% endif %}</mark></td>
                                 <td data-label="Created At">{{ rev.created_at|date:"Y-m-d H:i" }}</td>
                             </tr>
                         {% endfor %}
                     </tbody>
                 </table>
             {% else %}
-                <p class="muted">No revisions found.</p>
+                <article data-empty><p>No revisions found.</p></article>
             {% endif %}
         </section>
     </div>
 
     <aside>
-        <article>
-            <div class="sidebar-section">
-                <h4>State</h4>
-                <p>{{ pr.state }}</p>
-            </div>
-            {% if pr.state == "open" %}
-                {% if pr.target_project.workflow_type == "direct" %}
-                    <div class="sidebar-section">
-                        <form hx-post="{% url 'pr_ui_modal_check_merge' %}" hx-target="#modal-container">
-                            {% csrf_token %}
-                            <input type="hidden" name="selected_prs" value="{{ pr.id }}">
-                            <button type="submit" class="primary" style="width: 100%;">Merge Pull Request</button>
-                        </form>
-                    </div>
-                {% elif pr.target_project.workflow_type == "staging" %}
-                    <div class="sidebar-section">
-                        <small class="muted" style="display: block; padding: 0.5rem; background: var(--pico-card-background-color); border-radius: var(--pico-border-radius); border-left: 3px solid var(--pico-primary);">
-                            <strong>Staging Workflow:</strong> Direct merges are disabled for this project. This pull request must be integrated and merged via a Staging Batch.
-                        </small>
-                    </div>
+        {% if pr.state == "open" %}
+            {% if pr.target_project.workflow_type == "direct" %}
+                <section>
+                    <form hx-post="{% url 'pr_ui_modal_check_merge' %}" hx-target="#modal-container">
+                        {% csrf_token %}
+                        <input type="hidden" name="selected_prs" value="{{ pr.id }}">
+                        <button type="submit" data-variant="primary" style="width: 100%;">Merge Pull Request</button>
+                    </form>
+                </section>
+            {% elif pr.target_project.workflow_type == "staging" %}
+                <section>
+                    <small>
+                        <strong>Staging Workflow:</strong> Direct merges are disabled for this project. This pull request must be integrated and merged via a Staging Batch.
+                    </small>
+                </section>
+            {% endif %}
+        {% endif %}
+        {% include "pull_requests/partials/draft_section.html" %}
+        <section>
+            <h4>Mergeable</h4>
+            <p>{% if pr.is_mergeable %}<data data-variant="success" value="success">yes</data>{% else %}<data data-variant="danger" value="danger">no</data>{% endif %}</p>
+        </section>
+        <section>
+            <h4>Target Project</h4>
+            <p>
+                {% if pr.target.project %}
+                    {{ pr.target.project.name }}
+                {% elif pr.target.package %}
+                    {{ pr.target.package.project.name }}
+                {% else %}
+                    <small>(None)</small>
                 {% endif %}
-            {% endif %}
-            {% include "pull_requests/partials/draft_section.html" %}
-            <div class="sidebar-section">
-                <h4>Mergeable</h4>
-                <p>{% if pr.is_mergeable %}yes{% else %}no{% endif %}</p>
-            </div>
-            <div class="sidebar-section">
-                <h4>Target Project</h4>
-                <p>
-                    {% if pr.target.project %}
-                        {{ pr.target.project.name }}
-                    {% elif pr.target.package %}
-                        {{ pr.target.package.project.name }}
-                    {% else %}
-                        (None)
-                    {% endif %}
-                </p>
-            </div>
-            {% if pr.target.package %}
-            <div class="sidebar-section">
-                <h4>Target Package</h4>
-                <p>{{ pr.target.package.name }}</p>
-            </div>
-            {% endif %}
-            <div class="sidebar-section">
-                <h4>Target Branch</h4>
-                <p>{{ pr.target.branch }}</p>
-            </div>
-            <div class="sidebar-section">
-                <h4>Source Branch</h4>
-                <p>{{ pr.source_owner }}/{{ pr.source_repo }}:{{ pr.source_branch }}</p>
-            </div>
-            <div class="sidebar-section">
-                <h4>Author</h4>
-                <p>{{ pr.author.username }}</p>
-            </div>
-        </article>
+            </p>
+        </section>
+        {% if pr.target.package %}
+        <section>
+            <h4>Target Package</h4>
+            <p>{{ pr.target.package.name }}</p>
+        </section>
+        {% endif %}
+        <section>
+            <h4>Target Branch</h4>
+            <p><code>{{ pr.target.branch }}</code></p>
+        </section>
+        <section>
+            <h4>Source Branch</h4>
+            <p><code>{{ pr.source_owner }}/{{ pr.source_repo }}:{{ pr.source_branch }}</code></p>
+        </section>
+        <section>
+            <h4>Author</h4>
+            <p>{{ pr.author.username }}</p>
+        </section>
     </aside>
 </div>
 {% endblock %}

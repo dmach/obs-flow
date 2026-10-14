@@ -2,34 +2,34 @@ from django import forms
 
 class StagingBatchFilterForm(forms.Form):
     target_owner = forms.CharField(required=False, max_length=255)
-    target_owner_exact = forms.BooleanField(required=False)
+    target_owner_exact = forms.BooleanField(required=False, label="Exact")
 
     target_branch = forms.CharField(required=False, max_length=255)
-    target_branch_exact = forms.BooleanField(required=False)
+    target_branch_exact = forms.BooleanField(required=False, label="Exact")
 
     pr_title = forms.CharField(required=False, max_length=255)
-    pr_title_exact = forms.BooleanField(required=False)
+    pr_title_exact = forms.BooleanField(required=False, label="Exact")
 
     pr_author = forms.CharField(required=False, max_length=255)
-    pr_author_exact = forms.BooleanField(required=False)
+    pr_author_exact = forms.BooleanField(required=False, label="Exact")
 
     pr_source_owner = forms.CharField(required=False, max_length=255)
-    pr_source_owner_exact = forms.BooleanField(required=False)
+    pr_source_owner_exact = forms.BooleanField(required=False, label="Exact")
 
     pr_source_repo = forms.CharField(required=False, max_length=255)
-    pr_source_repo_exact = forms.BooleanField(required=False)
+    pr_source_repo_exact = forms.BooleanField(required=False, label="Exact")
 
     pr_source_branch = forms.CharField(required=False, max_length=255)
-    pr_source_branch_exact = forms.BooleanField(required=False)
+    pr_source_branch_exact = forms.BooleanField(required=False, label="Exact")
 
     pr_target_owner = forms.CharField(required=False, max_length=255)
-    pr_target_owner_exact = forms.BooleanField(required=False)
+    pr_target_owner_exact = forms.BooleanField(required=False, label="Exact")
 
     pr_target_repo = forms.CharField(required=False, max_length=255)
-    pr_target_repo_exact = forms.BooleanField(required=False)
+    pr_target_repo_exact = forms.BooleanField(required=False, label="Exact")
 
     pr_target_branch = forms.CharField(required=False, max_length=255)
-    pr_target_branch_exact = forms.BooleanField(required=False)
+    pr_target_branch_exact = forms.BooleanField(required=False, label="Exact")
 
     def target_fields(self):
         return [

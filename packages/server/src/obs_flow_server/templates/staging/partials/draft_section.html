@@ -1,46 +1,44 @@
-<div id="staging-draft-section" class="sidebar-section">
+<section id="staging-draft-section">
     <h4>Draft</h4>
     <p>
         {% if batch.is_draft %}
-            yes
-            {% if latest_revision and latest_revision.draft_expires_at %}
-                <span class="debounce-countdown"
-                      data-expires="{{ latest_revision.draft_expires_at|date:'c' }}"
-                      hx-get="{% url 'staging_draft_status' batch.id %}"
-                      hx-trigger="countdown-expired"
-                      hx-target="#staging-draft-section"
-                      hx-swap="outerHTML">
-                    (debouncing: <span class="countdown-timer">...</span>)
-                </span>
-            {% endif %}
-        {% else %}
-            no
+        yes
+        {% if latest_revision and latest_revision.draft_expires_at %}
+            <span class="debounce-countdown"
+                  data-expires="{{ latest_revision.draft_expires_at|date:'c' }}"
+                  hx-get="{% url 'staging_draft_status' batch.id %}"
+                  hx-trigger="countdown-expired"
+                  hx-target="#staging-draft-section"
+                  hx-swap="outerHTML">
+                (debouncing: <span class="countdown-timer">...</span>)
+            </span>
         {% endif %}
-    </p>
-    {% if batch.is_draft %}
-        <div style="display: flex; gap: 0.5rem; margin-top: 0.5rem;">
-            <form method="post" action="{% url 'staging_ready_for_review' batch.id %}" hx-post="{% url 'staging_ready_for_review' batch.id %}" hx-target="#staging-draft-section" hx-swap="outerHTML" style="flex: 1; margin: 0;">
-                {% csrf_token %}
-                <button type="submit" class="outline" style="width: 100%; margin: 0;">Ready for Review</button>
-            </form>
-            {% if latest_revision and latest_revision.draft_expires_at %}
-                <form method="post" action="{% url 'staging_cancel_timeout' batch.id %}" hx-post="{% url 'staging_cancel_timeout' batch.id %}" hx-target="#staging-draft-section" hx-swap="outerHTML" style="flex: 1; margin: 0;">
-                    {% csrf_token %}
-                    <button type="submit" class="outline secondary" style="width: 100%; margin: 0;">Cancel Timeout</button>
-                </form>
-            {% endif %}
-        </div>
     {% else %}
-        <form method="post" action="{% url 'staging_convert_to_draft' batch.id %}" hx-post="{% url 'staging_convert_to_draft' batch.id %}" hx-target="#staging-draft-section" hx-swap="outerHTML" style="margin-top: 0.5rem;">
+        no
+    {% endif %}
+</p>
+{% if batch.is_draft %}
+        <form method="post" action="{% url 'staging_ready_for_review' batch.id %}" hx-post="{% url 'staging_ready_for_review' batch.id %}" hx-target="#staging-draft-section" hx-swap="outerHTML">
             {% csrf_token %}
-            <button type="submit" class="outline secondary" style="width: 100%; margin: 0;">Convert to Draft</button>
+            <button type="submit">Ready for Review</button>
+        </form>
+        {% if latest_revision and latest_revision.draft_expires_at %}
+            <form method="post" action="{% url 'staging_cancel_timeout' batch.id %}" hx-post="{% url 'staging_cancel_timeout' batch.id %}" hx-target="#staging-draft-section" hx-swap="outerHTML">
+                {% csrf_token %}
+                <button type="submit">Cancel Timeout</button>
+            </form>
+        {% endif %}
+    {% else %}
+        <form method="post" action="{% url 'staging_convert_to_draft' batch.id %}" hx-post="{% url 'staging_convert_to_draft' batch.id %}" hx-target="#staging-draft-section" hx-swap="outerHTML">
+            {% csrf_token %}
+            <button type="submit">Convert to Draft</button>
         </form>
     {% endif %}
-</div>
+</section>
 
-{% if request.headers.HX_Request %}
+{% if request.headers.hx_request or request.headers.HX_Request %}
 <section id="staging-reviews-section" hx-swap-oob="true">
-    <h3>Staging Reviews (Latest Revision)</h3>
+    <h3>Reviews (Latest Revision)</h3>
     {% include "staging/partials/reviews_table.html" %}
 </section>
 {% endif %}
