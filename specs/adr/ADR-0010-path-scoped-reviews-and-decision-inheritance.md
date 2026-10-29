@@ -54,3 +54,4 @@ Implement path scoping and decision inheritance:
 
 ## Assumptions
 Git backend provides reliable APIs to detect changed files across revisions.
+TODO: Verify Decision #4 with stakeholders. We expect that the globs don't change much and if they change, they won't trigger any re-reviews and we're fine with inheriting old review results made with old globs.
