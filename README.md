@@ -67,5 +67,6 @@
 - consider if we should be able to override git username and email on server; we want people to use their official identity, but in general they can set arbitrary values locally and push a commit
 - alternative to `osc mr -m ... prj pac1 pac2 pac3 ... release-project` that will automatically group the related pull requests; maybe some form of staging that groups PRs from a devel project automatically?
 - create PR during push? use push options to specify PR attributes; probably wouldn't have all features, but doable.
-- PR - have a flag indicating, that rebuild is required? 
+- PR - have a flag indicating, that rebuild is required?
+- Make source validator available by default, be able to opt-out on project level? (review check? githook? can we define specialized reviewers == bot users to provide such functionality out of the box?)
 
