@@ -549,3 +549,103 @@ class TestReviewScopeModelGuard(TestCase):
         self.assertEqual(scope.include_globs, ["lib/*.py"])
         scope.delete()
         self.assertFalse(ReviewScope.objects.filter(name="code").exists())
+
+
+class TestReviewScopeAPI(TransactionTestCase):
+    """API endpoints for managing review scopes (identified by name)."""
+
+    def _post(self, path, payload):
+        with TestClient(api) as client:
+            return client.post(path, content=json.dumps(payload))
+
+    def test_list_scopes_empty(self):
+        response = self._post("/api/v1/review-scope/list", {})
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["scopes"], [])
+
+    def test_list_scopes_populated_ordered_by_name(self):
+        ReviewScope.objects.create(name="zeta", include_globs=["z/*"], exclude_globs=[])
+        ReviewScope.objects.create(name="alpha", include_globs=["a/*"], exclude_globs=[])
+        response = self._post("/api/v1/review-scope/list", {})
+        self.assertEqual(response.status_code, 200)
+        scopes = response.json()["scopes"]
+        self.assertEqual([s["name"] for s in scopes], ["alpha", "zeta"])
+        self.assertEqual(scopes[0]["include_globs"], ["a/*"])
+
+    def test_add_scope(self):
+        payload = {"name": "code", "include_globs": ["src/*.py"], "exclude_globs": ["src/test/*"]}
+        response = self._post("/api/v1/review-scope/add", payload)
+        self.assertEqual(response.status_code, 200)
+        scope = response.json()["scope"]
+        self.assertEqual(scope["name"], "code")
+        self.assertEqual(scope["include_globs"], ["src/*.py"])
+        self.assertEqual(scope["exclude_globs"], ["src/test/*"])
+        self.assertTrue(ReviewScope.objects.filter(name="code").exists())
+
+    def test_add_scope_duplicate_fails(self):
+        ReviewScope.objects.create(name="code", include_globs=["src/*.py"], exclude_globs=[])
+        payload = {"name": "code", "include_globs": ["lib/*.py"]}
+        response = self._post("/api/v1/review-scope/add", payload)
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("already exists", response.text)
+
+    def test_add_scope_reserved_global_fails(self):
+        payload = {"name": "global", "include_globs": ["**/*"]}
+        response = self._post("/api/v1/review-scope/add", payload)
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("reserved", response.text)
+
+    def test_add_scope_empty_include_fails(self):
+        payload = {"name": "code", "include_globs": []}
+        response = self._post("/api/v1/review-scope/add", payload)
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("at least one include glob", response.text)
+
+    def test_remove_scope(self):
+        ReviewScope.objects.create(name="code", include_globs=["src/*.py"], exclude_globs=[])
+        response = self._post("/api/v1/review-scope/remove", {"name": "code"})
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.json()["success"])
+        self.assertFalse(ReviewScope.objects.filter(name="code").exists())
+
+    def test_remove_scope_not_found(self):
+        response = self._post("/api/v1/review-scope/remove", {"name": "nonexistent"})
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(response.json()["success"])
+
+    def test_remove_global_fails(self):
+        ReviewScope.objects.create(name="global", include_globs=["**/*"], exclude_globs=[])
+        response = self._post("/api/v1/review-scope/remove", {"name": "global"})
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("reserved", response.text)
+        self.assertTrue(ReviewScope.objects.filter(name="global").exists())
+
+    def test_update_scope(self):
+        ReviewScope.objects.create(name="code", include_globs=["src/*.py"], exclude_globs=[])
+        payload = {"name": "code", "include_globs": ["lib/*.py"], "exclude_globs": ["lib/test/*"]}
+        response = self._post("/api/v1/review-scope/update", payload)
+        self.assertEqual(response.status_code, 200)
+        scope = response.json()["scope"]
+        self.assertEqual(scope["include_globs"], ["lib/*.py"])
+        self.assertEqual(scope["exclude_globs"], ["lib/test/*"])
+        self.assertEqual(ReviewScope.objects.get(name="code").include_globs, ["lib/*.py"])
+        self.assertEqual(ReviewScope.objects.get(name="code").exclude_globs, ["lib/test/*"])
+
+    def test_update_scope_not_found(self):
+        payload = {"name": "nonexistent", "include_globs": ["x/*"]}
+        response = self._post("/api/v1/review-scope/update", payload)
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("does not exist", response.text)
+
+    def test_update_scope_nothing_to_update(self):
+        ReviewScope.objects.create(name="code", include_globs=["src/*.py"], exclude_globs=[])
+        response = self._post("/api/v1/review-scope/update", {"name": "code"})
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("at least one", response.text)
+
+    def test_update_global_fails(self):
+        ReviewScope.objects.create(name="global", include_globs=["**/*"], exclude_globs=[])
+        payload = {"name": "global", "include_globs": ["**/*", "x/*"]}
+        response = self._post("/api/v1/review-scope/update", payload)
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("reserved", response.text)
