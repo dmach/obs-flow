@@ -37,6 +37,11 @@ class ReviewConfigBase(models.Model):
         MAINTAINER = "maintainer", "Maintainer"
 
     type = models.CharField(max_length=10, choices=ConfigType.choices)
+    scope = models.ForeignKey(
+        ReviewScope,
+        on_delete=models.PROTECT,
+        related_name="%(class)s_configs",
+    )
     reviewer_user = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,

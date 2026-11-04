@@ -112,12 +112,14 @@ class ReviewConfigDTO(msgspec.Struct):
         type: The type of configuration (project, package, staging).
         reviewer: The reviewer details.
         depends_on: List of reviewer details this configuration depends on.
+        scope: The name of the review scope.
     """
     id: int
     project: str
     type: str
     reviewer: ReviewerDTO
     depends_on: list[ReviewerDTO]
+    scope: str = "global"
 
 
 class ReviewConfigAddRequest(msgspec.Struct):
@@ -129,11 +131,13 @@ class ReviewConfigAddRequest(msgspec.Struct):
         type: The type of configuration (project, package, staging).
         reviewer: The reviewer identifier (e.g., username, @group, role:role_name).
         depends_on: List of reviewer identifiers this configuration depends on.
+        scope: The name of the review scope (required; callers must always specify it).
     """
     project: str
     type: str
     reviewer: str
     depends_on: list[str]
+    scope: str
 
 
 class ReviewConfigRemoveRequest(msgspec.Struct):

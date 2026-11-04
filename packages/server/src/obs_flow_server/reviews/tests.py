@@ -40,7 +40,8 @@ class TestReviewConfigEndpoints(TransactionTestCase):
             "project": "openSUSE:Factory",
             "type": "project",
             "reviewer": "darix",
-            "depends_on": []
+            "depends_on": [],
+            "scope": "global",
         }
         with TestClient(api) as client:
             response = client.post(
@@ -68,13 +69,35 @@ class TestReviewConfigEndpoints(TransactionTestCase):
             reviewer_user__username="darix"
         ).exists())
 
+    def test_review_config_add_requires_scope(self):
+        """Verify that scope is mandatory in the API; only the CLI may default it."""
+        payload = {
+            "project": "openSUSE:Factory",
+            "type": "project",
+            "reviewer": "darix",
+            "depends_on": [],
+        }
+        with TestClient(api) as client:
+            response = client.post(
+                "/api/v1/review-config/add",
+                content=json.dumps(payload),
+            )
+        self.assertGreaterEqual(response.status_code, 400)
+        self.assertLess(response.status_code, 500)
+        self.assertFalse(ReviewConfig.objects.filter(
+            project__name="openSUSE:Factory",
+            type="project",
+            reviewer_user__username="darix",
+        ).exists())
+
     def test_review_config_add_group(self):
         """Verify adding a review configuration for a group."""
         payload = {
             "project": "openSUSE:Factory",
             "type": "staging",
             "reviewer": "@opensuse-review-team",
-            "depends_on": []
+            "depends_on": [],
+            "scope": "global",
         }
         with TestClient(api) as client:
             response = client.post(
@@ -97,7 +120,8 @@ class TestReviewConfigEndpoints(TransactionTestCase):
             "project": "openSUSE:Factory",
             "type": "package",
             "reviewer": "role:maintainer",
-            "depends_on": []
+            "depends_on": [],
+            "scope": "global",
         }
         with TestClient(api) as client:
             response = client.post(
@@ -119,13 +143,15 @@ class TestReviewConfigEndpoints(TransactionTestCase):
             "project": "openSUSE:Factory",
             "type": "project",
             "reviewer": "darix",
-            "depends_on": []
+            "depends_on": [],
+            "scope": "global",
         }
         payload2 = {
             "project": "openSUSE:Factory",
             "type": "staging",
             "reviewer": "darix",
-            "depends_on": []
+            "depends_on": [],
+            "scope": "global",
         }
         with TestClient(api) as client:
             response1 = client.post(
@@ -155,7 +181,8 @@ class TestReviewConfigEndpoints(TransactionTestCase):
             "project": "openSUSE:Factory",
             "type": "project",
             "reviewer": "darix",
-            "depends_on": []
+            "depends_on": [],
+            "scope": "global",
         }
         with TestClient(api) as client:
             response1 = client.post(
@@ -177,12 +204,14 @@ class TestReviewConfigEndpoints(TransactionTestCase):
         dep1 = ReviewConfig.objects.create(
             project=project,
             type="project",
-            reviewer_user=User.objects.get(username="darix")
+            reviewer_user=User.objects.get(username="darix"),
+            scope=ReviewScope.objects.get(name="global"),
         )
         dep2 = ReviewConfig.objects.create(
             project=project,
             type="project",
-            reviewer_group=Group.objects.get(name="opensuse-review-team")
+            reviewer_group=Group.objects.get(name="opensuse-review-team"),
+            scope=ReviewScope.objects.get(name="global"),
         )
 
         # Add a configuration that depends on dep1 and dep2
@@ -190,7 +219,8 @@ class TestReviewConfigEndpoints(TransactionTestCase):
             "project": "openSUSE:Factory",
             "type": "project",
             "reviewer": "dimstar",
-            "depends_on": ["darix", "@opensuse-review-team"]
+            "depends_on": ["darix", "@opensuse-review-team"],
+            "scope": "global",
         }
         with TestClient(api) as client:
             response = client.post(
@@ -232,7 +262,8 @@ class TestReviewConfigEndpoints(TransactionTestCase):
             "project": "openSUSE:Factory",
             "type": "project",
             "reviewer": "dimstar",
-            "depends_on": ["nonexistent_user"]
+            "depends_on": ["nonexistent_user"],
+            "scope": "global",
         }
         with TestClient(api) as client:
             response = client.post(
@@ -248,7 +279,8 @@ class TestReviewConfigEndpoints(TransactionTestCase):
             "project": "openSUSE:Factory",
             "type": "project",
             "reviewer": "admin",
-            "depends_on": ["admin"]
+            "depends_on": ["admin"],
+            "scope": "global",
         }
         with TestClient(api) as client:
             response = client.post(
@@ -267,9 +299,9 @@ class TestReviewConfigEndpoints(TransactionTestCase):
         u2 = User.objects.create(username="u2", username_lower="u2", account_type=User.AccountType.HUMAN)
         u3 = User.objects.create(username="u3", username_lower="u3", account_type=User.AccountType.HUMAN)
 
-        c1 = ReviewConfig.objects.create(project=project, type=ReviewConfig.ConfigType.PROJECT, reviewer_user=u1)
-        c2 = ReviewConfig.objects.create(project=project, type=ReviewConfig.ConfigType.PROJECT, reviewer_user=u2)
-        c3 = ReviewConfig.objects.create(project=project, type=ReviewConfig.ConfigType.PROJECT, reviewer_user=u3)
+        c1 = ReviewConfig.objects.create(project=project, type=ReviewConfig.ConfigType.PROJECT, reviewer_user=u1, scope=ReviewScope.objects.get(name="global"))
+        c2 = ReviewConfig.objects.create(project=project, type=ReviewConfig.ConfigType.PROJECT, reviewer_user=u2, scope=ReviewScope.objects.get(name="global"))
+        c3 = ReviewConfig.objects.create(project=project, type=ReviewConfig.ConfigType.PROJECT, reviewer_user=u3, scope=ReviewScope.objects.get(name="global"))
 
         # c2 depends on c1
         c2.depends_on.add(c1)
@@ -287,12 +319,14 @@ class TestReviewConfigEndpoints(TransactionTestCase):
         ReviewConfig.objects.create(
             project=project,
             type="project",
-            reviewer_user=User.objects.get(username="darix")
+            reviewer_user=User.objects.get(username="darix"),
+            scope=ReviewScope.objects.get(name="global"),
         )
         ReviewConfig.objects.create(
             project=project,
             type="package",
-            reviewer_group=Group.objects.get(name="opensuse-review-team")
+            reviewer_group=Group.objects.get(name="opensuse-review-team"),
+            scope=ReviewScope.objects.get(name="global"),
         )
 
         # List all
@@ -335,7 +369,8 @@ class TestReviewConfigEndpoints(TransactionTestCase):
         config = ReviewConfig.objects.create(
             project=project,
             type="project",
-            reviewer_user=User.objects.get(username="darix")
+            reviewer_user=User.objects.get(username="darix"),
+            scope=ReviewScope.objects.get(name="global"),
         )
 
         payload = {
@@ -385,7 +420,8 @@ class TestClientLibrary(TransactionTestCase):
             project="openSUSE:Factory",
             type="project",
             reviewer="darix",
-            depends_on=[]
+            depends_on=[],
+            scope="global",
         )
         res = review_config_add(conn, req)
         self.assertEqual(res.data.id, 1)
@@ -612,6 +648,18 @@ class TestReviewScopeAPI(TransactionTestCase):
         response = self._post("/api/v1/review-scope/remove", {"name": "nonexistent"})
         self.assertEqual(response.status_code, 200)
         self.assertFalse(response.json()["success"])
+
+    def test_remove_scope_in_use_fails(self):
+        project = Project.objects.create(name="test:scope-inuse")
+        user = User.objects.create(
+            username="rev_inuse", username_lower="rev_inuse", account_type=User.AccountType.HUMAN
+        )
+        scope = ReviewScope.objects.create(name="code", include_globs=["src/*.py"], exclude_globs=[])
+        ReviewConfig.objects.create(project=project, type="project", reviewer_user=user, scope=scope)
+        response = self._post("/api/v1/review-scope/remove", {"name": "code"})
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("referenced", response.text)
+        self.assertTrue(ReviewScope.objects.filter(name="code").exists())
 
     def test_remove_global_fails(self):
         ReviewScope.objects.create(name="global", include_globs=["**/*"], exclude_globs=[])

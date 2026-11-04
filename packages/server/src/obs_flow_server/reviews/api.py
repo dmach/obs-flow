@@ -115,12 +115,14 @@ def build_review_config_dto(config: ReviewConfig) -> ReviewConfigDTO:
     Converts a ReviewConfig instance to a ReviewConfigDTO message struct.
     """
     depends_on_list = [build_reviewer_dto(dep) for dep in config.depends_on.all()]
+    scope_name = config.scope.name
     return ReviewConfigDTO(
         id=config.id,
         project=config.project.name,
         type=config.type,
         reviewer=build_reviewer_dto(config),
         depends_on=depends_on_list,
+        scope=scope_name,
     )
 
 
@@ -139,6 +141,9 @@ def add_review_config_endpoint(payload: ReviewConfigAddRequest):
     # Parse reviewer
     user, group, dynamic_role = parse_reviewer(payload.reviewer)
 
+    scope_name = payload.scope
+    scope = ReviewScope.objects.get(name=scope_name)
+
     with transaction.atomic():
         config, created = ReviewConfig.objects.get_or_create(
             project=project,
@@ -146,6 +151,7 @@ def add_review_config_endpoint(payload: ReviewConfigAddRequest):
             reviewer_user=user,
             reviewer_group=group,
             dynamic_role=dynamic_role,
+            defaults={"scope": scope},
         )
 
         if not created:
@@ -204,7 +210,7 @@ def list_review_configs_endpoint(payload: ReviewConfigListRequest):
             raise ValueError(f"Invalid configuration type: {payload.type}")
         qs = qs.filter(type=payload.type)
 
-    qs = qs.prefetch_related("depends_on")
+    qs = qs.select_related("scope").prefetch_related("depends_on")
 
     dtos = [build_review_config_dto(config) for config in qs]
     res = ReviewConfigListResponse(data=dtos)

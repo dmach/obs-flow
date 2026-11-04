@@ -203,7 +203,8 @@
       "reviewer_user": 3,
       "reviewer_group": null,
       "dynamic_role": null,
-      "depends_on": []
+      "depends_on": [],
+      "scope": 1
     }
   },
   {
@@ -215,7 +216,8 @@
       "reviewer_user": null,
       "reviewer_group": 1,
       "dynamic_role": null,
-      "depends_on": []
+      "depends_on": [],
+      "scope": 1
     }
   },
   {
@@ -227,7 +229,8 @@
       "reviewer_user": 2,
       "reviewer_group": null,
       "dynamic_role": null,
-      "depends_on": []
+      "depends_on": [],
+      "scope": 1
     }
   },
   {
@@ -239,7 +242,8 @@
       "reviewer_user": null,
       "reviewer_group": null,
       "dynamic_role": "maintainer",
-      "depends_on": []
+      "depends_on": [],
+      "scope": 1
     }
   },
   {
@@ -251,7 +255,8 @@
       "reviewer_user": 3,
       "reviewer_group": null,
       "dynamic_role": null,
-      "depends_on": []
+      "depends_on": [],
+      "scope": 1
     }
   },
   {
@@ -263,7 +268,8 @@
       "reviewer_user": null,
       "reviewer_group": 1,
       "dynamic_role": null,
-      "depends_on": []
+      "depends_on": [],
+      "scope": 1
     }
   },
   {
@@ -275,7 +281,8 @@
       "reviewer_user": 2,
       "reviewer_group": null,
       "dynamic_role": null,
-      "depends_on": []
+      "depends_on": [],
+      "scope": 1
     }
   },
   {
@@ -287,7 +294,8 @@
       "reviewer_user": null,
       "reviewer_group": null,
       "dynamic_role": "maintainer",
-      "depends_on": []
+      "depends_on": [],
+      "scope": 1
     }
   },
   {
@@ -299,7 +307,8 @@
       "reviewer_user": null,
       "reviewer_group": 2,
       "dynamic_role": null,
-      "depends_on": []
+      "depends_on": [],
+      "scope": 1
     }
   },
   {
@@ -313,7 +322,8 @@
       "dynamic_role": null,
       "depends_on": [
         9
-      ]
+      ],
+      "scope": 1
     }
   },
   {
