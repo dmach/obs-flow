@@ -5,6 +5,28 @@ from django.conf import settings
 from core.models import Project, Package
 
 
+class ReviewScope(models.Model):
+    # Names of reserved/built-in scopes that cannot be modified or deleted.
+    RESERVED_NAMES = frozenset({"global"})
+
+    name = models.CharField(max_length=100, unique=True)
+    include_globs = models.JSONField(default=list)
+    exclude_globs = models.JSONField(default=list)
+
+    def __str__(self):
+        return self.name
+
+    def save(self, *args, **kwargs):
+        if self.name in self.RESERVED_NAMES and not self._state.adding:
+            raise ValueError(f"The '{self.name}' scope is reserved and cannot be modified.")
+        super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        if self.name in self.RESERVED_NAMES:
+            raise ValueError(f"The '{self.name}' scope is reserved and cannot be deleted.")
+        return super().delete(*args, **kwargs)
+
+
 class ReviewConfigBase(models.Model):
     class ConfigType(models.TextChoices):
         PROJECT = "project", "Project"

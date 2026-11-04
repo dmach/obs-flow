@@ -2,12 +2,12 @@ import os
 import json
 import msgspec
 from unittest.mock import MagicMock, patch
-from django.test import TransactionTestCase
+from django.test import TestCase, TransactionTestCase
 from django_bolt.testing import TestClient
 
 from accounts.models import User, Group
 from core.models import Project
-from reviews.models import ReviewConfig
+from reviews.models import ReviewConfig, ReviewScope
 from obs_flow_server.api import api
 
 # Client and CLI imports for testing
@@ -524,3 +524,28 @@ class TestCLIManagement(TransactionTestCase):
         self.assertIn("1", result.output)
         self.assertIn("Reviewer", result.output)
         self.assertIn("darix", result.output)
+
+
+class TestReviewScopeModelGuard(TestCase):
+    """Model-level protection of the reserved 'global' scope."""
+    fixtures = ["global_scope.json"]
+
+    def test_global_scope_cannot_be_modified(self):
+        scope = ReviewScope.objects.get(name="global")
+        scope.include_globs = ["x/*.py"]
+        with self.assertRaises(ValueError):
+            scope.save()
+
+    def test_global_scope_cannot_be_deleted(self):
+        scope = ReviewScope.objects.get(name="global")
+        with self.assertRaises(ValueError):
+            scope.delete()
+
+    def test_non_global_scope_can_be_modified_and_deleted(self):
+        scope = ReviewScope.objects.create(name="code", include_globs=["src/*.py"], exclude_globs=[])
+        scope.include_globs = ["lib/*.py"]
+        scope.save()
+        scope.refresh_from_db()
+        self.assertEqual(scope.include_globs, ["lib/*.py"])
+        scope.delete()
+        self.assertFalse(ReviewScope.objects.filter(name="code").exists())
