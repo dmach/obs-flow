@@ -1,0 +1,11 @@
+[
+  {
+    "model": "reviews.reviewscope",
+    "pk": 1,
+    "fields": {
+      "name": "global",
+      "include_globs": ["**/*"],
+      "exclude_globs": []
+    }
+  }
+]

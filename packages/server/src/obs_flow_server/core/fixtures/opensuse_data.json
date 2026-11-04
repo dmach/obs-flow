@@ -186,6 +186,15 @@
     }
   },
   {
+    "model": "reviews.reviewscope",
+    "pk": 1,
+    "fields": {
+      "name": "global",
+      "include_globs": ["**/*"],
+      "exclude_globs": []
+    }
+  },
+  {
     "model": "reviews.reviewconfig",
     "pk": 1,
     "fields": {
@@ -194,7 +203,8 @@
       "reviewer_user": 3,
       "reviewer_group": null,
       "dynamic_role": null,
-      "depends_on": []
+      "depends_on": [],
+      "scope": 1
     }
   },
   {
@@ -206,7 +216,8 @@
       "reviewer_user": null,
       "reviewer_group": 1,
       "dynamic_role": null,
-      "depends_on": []
+      "depends_on": [],
+      "scope": 1
     }
   },
   {
@@ -218,7 +229,8 @@
       "reviewer_user": 2,
       "reviewer_group": null,
       "dynamic_role": null,
-      "depends_on": []
+      "depends_on": [],
+      "scope": 1
     }
   },
   {
@@ -230,7 +242,8 @@
       "reviewer_user": null,
       "reviewer_group": null,
       "dynamic_role": "maintainer",
-      "depends_on": []
+      "depends_on": [],
+      "scope": 1
     }
   },
   {
@@ -242,7 +255,8 @@
       "reviewer_user": 3,
       "reviewer_group": null,
       "dynamic_role": null,
-      "depends_on": []
+      "depends_on": [],
+      "scope": 1
     }
   },
   {
@@ -254,7 +268,8 @@
       "reviewer_user": null,
       "reviewer_group": 1,
       "dynamic_role": null,
-      "depends_on": []
+      "depends_on": [],
+      "scope": 1
     }
   },
   {
@@ -266,7 +281,8 @@
       "reviewer_user": 2,
       "reviewer_group": null,
       "dynamic_role": null,
-      "depends_on": []
+      "depends_on": [],
+      "scope": 1
     }
   },
   {
@@ -278,7 +294,8 @@
       "reviewer_user": null,
       "reviewer_group": null,
       "dynamic_role": "maintainer",
-      "depends_on": []
+      "depends_on": [],
+      "scope": 1
     }
   },
   {
@@ -290,7 +307,8 @@
       "reviewer_user": null,
       "reviewer_group": 2,
       "dynamic_role": null,
-      "depends_on": []
+      "depends_on": [],
+      "scope": 1
     }
   },
   {
@@ -304,7 +322,8 @@
       "dynamic_role": null,
       "depends_on": [
         9
-      ]
+      ],
+      "scope": 1
     }
   },
   {
@@ -376,7 +395,8 @@
       "external_review_url": null,
       "locked_by": null,
       "locked_until": null,
-      "updated_at": "2026-08-12T12:00:00Z"
+      "updated_at": "2026-08-12T12:00:00Z",
+      "scope": 1
     }
   },
   {
@@ -394,7 +414,8 @@
       "external_review_url": "https://github.com/openSUSE/osc/pull/1234#pullrequestreview-123456",
       "locked_by": null,
       "locked_until": null,
-      "updated_at": "2026-08-12T12:00:00Z"
+      "updated_at": "2026-08-12T12:00:00Z",
+      "scope": 1
     }
   },
   {
@@ -412,7 +433,8 @@
       "external_review_url": null,
       "locked_by": null,
       "locked_until": null,
-      "updated_at": "2026-08-12T12:00:00Z"
+      "updated_at": "2026-08-12T12:00:00Z",
+      "scope": 1
     }
   },
   {
@@ -476,7 +498,8 @@
       "external_review_url": null,
       "locked_by": null,
       "locked_until": null,
-      "updated_at": "2026-08-12T12:00:00Z"
+      "updated_at": "2026-08-12T12:00:00Z",
+      "scope": 1
     }
   },
   {

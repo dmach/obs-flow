@@ -6,6 +6,7 @@ from django_bolt.testing import TestClient
 
 from accounts.models import User
 from core.models import Project, GitMapping
+from reviews.models import ReviewScope
 from pull_requests.models import PullRequest, PullRequestRevision, PullRequestReview
 from obs_flow_server.api import api
 
@@ -154,7 +155,8 @@ class TestPRSyncEndpoint(TransactionTestCase):
         ReviewConfig.objects.create(
             project=project,
             type=ReviewConfig.ConfigType.PROJECT,
-            reviewer_user=reviewer_user
+            reviewer_user=reviewer_user,
+            scope=ReviewScope.objects.get(name="global"),
         )
 
         # Mock Gitea response with updated title, mergeable, and new head SHA
@@ -270,14 +272,16 @@ class TestPRSyncEndpoint(TransactionTestCase):
         ReviewConfig.objects.create(
             project=project,
             type=ReviewConfig.ConfigType.PACKAGE,
-            reviewer_user=reviewer_user
+            reviewer_user=reviewer_user,
+            scope=ReviewScope.objects.get(name="global"),
         )
         # Create a config for project type (should NOT be used)
         reviewer_user_project = User.objects.create(username="reviewer_project", username_lower="reviewer_project", account_type=User.AccountType.HUMAN)
         ReviewConfig.objects.create(
             project=project,
             type=ReviewConfig.ConfigType.PROJECT,
-            reviewer_user=reviewer_user_project
+            reviewer_user=reviewer_user_project,
+            scope=ReviewScope.objects.get(name="global"),
         )
 
         # Mock Gitea response with updated title, mergeable, and new head SHA
@@ -552,6 +556,7 @@ class TestPullRequestRevisionModel(TestCase):
 
 
 class TestPullRequestReviewProvisioning(TestCase):
+    fixtures = ["global_scope.json"]
     def test_provision_reviews_and_mark_ready_for_review(self):
         from reviews.models import ReviewConfig
         from pull_requests.api import provision_reviews_for_revision, mark_ready_for_review
@@ -564,6 +569,7 @@ class TestPullRequestReviewProvisioning(TestCase):
             project=project,
             type=ReviewConfig.ConfigType.PROJECT,
             reviewer_user=reviewer,
+            scope=ReviewScope.objects.get(name="global"),
         )
 
         pr = PullRequest.objects.create(
@@ -613,11 +619,13 @@ class TestPullRequestReviewProvisioning(TestCase):
             project=project,
             type=ReviewConfig.ConfigType.PROJECT,
             reviewer_user=rev1,
+            scope=ReviewScope.objects.get(name="global"),
         )
         cfg2 = ReviewConfig.objects.create(
             project=project,
             type=ReviewConfig.ConfigType.PROJECT,
             reviewer_user=rev2,
+            scope=ReviewScope.objects.get(name="global"),
         )
         cfg2.depends_on.add(cfg1)
 
@@ -661,9 +669,9 @@ class TestPullRequestReviewProvisioning(TestCase):
         u2 = User.objects.create(username="rev_2", username_lower="rev_2", account_type=User.AccountType.HUMAN)
         u3 = User.objects.create(username="rev_3", username_lower="rev_3", account_type=User.AccountType.HUMAN)
 
-        cfg1 = ReviewConfig.objects.create(project=project, type=ReviewConfig.ConfigType.PROJECT, reviewer_user=u1)
-        cfg2 = ReviewConfig.objects.create(project=project, type=ReviewConfig.ConfigType.PROJECT, reviewer_user=u2)
-        cfg3 = ReviewConfig.objects.create(project=project, type=ReviewConfig.ConfigType.PROJECT, reviewer_user=u3)
+        cfg1 = ReviewConfig.objects.create(project=project, type=ReviewConfig.ConfigType.PROJECT, reviewer_user=u1, scope=ReviewScope.objects.get(name="global"))
+        cfg2 = ReviewConfig.objects.create(project=project, type=ReviewConfig.ConfigType.PROJECT, reviewer_user=u2, scope=ReviewScope.objects.get(name="global"))
+        cfg3 = ReviewConfig.objects.create(project=project, type=ReviewConfig.ConfigType.PROJECT, reviewer_user=u3, scope=ReviewScope.objects.get(name="global"))
 
         # cfg3 depends on BOTH cfg1 and cfg2
         cfg3.depends_on.add(cfg1, cfg2)
@@ -738,8 +746,8 @@ class TestPullRequestReviewProvisioning(TestCase):
         u1 = User.objects.create(username="rev_early_1", username_lower="rev_early_1", account_type=User.AccountType.HUMAN)
         u2 = User.objects.create(username="rev_early_2", username_lower="rev_early_2", account_type=User.AccountType.HUMAN)
 
-        cfg1 = ReviewConfig.objects.create(project=project, type=ReviewConfig.ConfigType.PROJECT, reviewer_user=u1)
-        cfg2 = ReviewConfig.objects.create(project=project, type=ReviewConfig.ConfigType.PROJECT, reviewer_user=u2)
+        cfg1 = ReviewConfig.objects.create(project=project, type=ReviewConfig.ConfigType.PROJECT, reviewer_user=u1, scope=ReviewScope.objects.get(name="global"))
+        cfg2 = ReviewConfig.objects.create(project=project, type=ReviewConfig.ConfigType.PROJECT, reviewer_user=u2, scope=ReviewScope.objects.get(name="global"))
         cfg2.depends_on.add(cfg1)
 
         pr = PullRequest.objects.create(
@@ -786,6 +794,7 @@ class TestPullRequestReviewProvisioning(TestCase):
 
 
 class TestPRSyncDebounceLifecycle(TransactionTestCase):
+    fixtures = ["global_scope.json"]
     @override_settings(GITEA_URL="https://gitea.example.com", GITEA_TOKEN="secret-token", DEBOUNCE_TIMEOUT_MINUTES=15)
     @patch("urllib.request.urlopen")
     def test_sync_manual_draft_pr_sets_no_expiry(self, mock_urlopen):
@@ -822,7 +831,7 @@ class TestPRSyncDebounceLifecycle(TransactionTestCase):
         author = User.objects.create(username="dev", username_lower="dev", account_type=User.AccountType.HUMAN)
         reviewer = User.objects.create(username="rev", username_lower="rev", account_type=User.AccountType.HUMAN)
         from reviews.models import ReviewConfig
-        ReviewConfig.objects.create(project=project, type=ReviewConfig.ConfigType.PROJECT, reviewer_user=reviewer)
+        ReviewConfig.objects.create(project=project, type=ReviewConfig.ConfigType.PROJECT, reviewer_user=reviewer, scope=ReviewScope.objects.get(name="global"))
 
         pr = PullRequest.objects.create(
             target=git_mapping,
@@ -873,7 +882,7 @@ class TestPRSyncDebounceLifecycle(TransactionTestCase):
         git_mapping = GitMapping.objects.create(owner="suse", repo="obs-flow", branch="main", project=project)
         reviewer = User.objects.create(username="rev", username_lower="rev", account_type=User.AccountType.HUMAN)
         from reviews.models import ReviewConfig
-        ReviewConfig.objects.create(project=project, type=ReviewConfig.ConfigType.PROJECT, reviewer_user=reviewer)
+        ReviewConfig.objects.create(project=project, type=ReviewConfig.ConfigType.PROJECT, reviewer_user=reviewer, scope=ReviewScope.objects.get(name="global"))
 
         mock_response = MagicMock()
         mock_response.read.return_value = json.dumps({
@@ -900,13 +909,14 @@ class TestPRSyncDebounceLifecycle(TransactionTestCase):
 
 
 class TestPRReadyForReviewEndpoint(TestCase):
+    fixtures = ["global_scope.json"]
     def setUp(self):
         self.project = Project.objects.create(name="test:project")
         self.git_mapping = GitMapping.objects.create(owner="suse", repo="obs-flow", branch="main", project=self.project)
         self.author = User.objects.create(username="dev", username_lower="dev", account_type=User.AccountType.HUMAN)
         self.reviewer = User.objects.create(username="rev", username_lower="rev", account_type=User.AccountType.HUMAN)
         from reviews.models import ReviewConfig
-        ReviewConfig.objects.create(project=self.project, type=ReviewConfig.ConfigType.PROJECT, reviewer_user=self.reviewer)
+        ReviewConfig.objects.create(project=self.project, type=ReviewConfig.ConfigType.PROJECT, reviewer_user=self.reviewer, scope=ReviewScope.objects.get(name="global"))
 
         self.pr1 = PullRequest.objects.create(
             target=self.git_mapping,
@@ -984,13 +994,14 @@ class TestPRReadyForReviewEndpoint(TestCase):
 
 
 class TestPRDraftWebViews(TestCase):
+    fixtures = ["global_scope.json"]
     def setUp(self):
         self.project = Project.objects.create(name="test:project")
         self.git_mapping = GitMapping.objects.create(owner="suse", repo="obs-flow", branch="main", project=self.project)
         self.author = User.objects.create(username="dev", username_lower="dev", account_type=User.AccountType.HUMAN)
         self.reviewer = User.objects.create(username="rev", username_lower="rev", account_type=User.AccountType.HUMAN)
         from reviews.models import ReviewConfig
-        ReviewConfig.objects.create(project=self.project, type=ReviewConfig.ConfigType.PROJECT, reviewer_user=self.reviewer)
+        ReviewConfig.objects.create(project=self.project, type=ReviewConfig.ConfigType.PROJECT, reviewer_user=self.reviewer, scope=ReviewScope.objects.get(name="global"))
 
         self.pr = PullRequest.objects.create(
             target=self.git_mapping,
@@ -1131,14 +1142,15 @@ class TestPRConvertToDraftEndpoint(TestCase):
 
 
 class TestMarkExpiredDraftsReadyCommand(TestCase):
+    fixtures = ["global_scope.json"]
     def setUp(self):
         self.project = Project.objects.create(name="test:project")
         self.git_mapping = GitMapping.objects.create(owner="suse", repo="obs-flow", branch="main", project=self.project)
         self.author = User.objects.create(username="dev", username_lower="dev", account_type=User.AccountType.HUMAN)
         self.reviewer = User.objects.create(username="rev", username_lower="rev", account_type=User.AccountType.HUMAN)
         from reviews.models import ReviewConfig
-        ReviewConfig.objects.create(project=self.project, type=ReviewConfig.ConfigType.PROJECT, reviewer_user=self.reviewer)
-        ReviewConfig.objects.create(project=self.project, type="staging", reviewer_user=self.reviewer)
+        ReviewConfig.objects.create(project=self.project, type=ReviewConfig.ConfigType.PROJECT, reviewer_user=self.reviewer, scope=ReviewScope.objects.get(name="global"))
+        ReviewConfig.objects.create(project=self.project, type="staging", reviewer_user=self.reviewer, scope=ReviewScope.objects.get(name="global"))
 
         # 1. Expired PR revision
         self.pr_expired = PullRequest.objects.create(

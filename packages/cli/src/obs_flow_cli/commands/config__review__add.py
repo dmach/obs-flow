@@ -7,8 +7,9 @@ import click
 @click.option("--user", help="The reviewer username.")
 @click.option("--group", help="The reviewer group name.")
 @click.option("--role", help="The dynamic reviewer role.")
+@click.option("--scope", default="global", show_default=True, help="The review scope name.")
 @click.option("--depends-on", multiple=True, help="Reviewer identifier this configuration depends on (can be specified multiple times).")
-def cli(project: str, type: str, user: str | None, group: str | None, role: str | None, depends_on: tuple[str, ...]) -> None:
+def cli(project: str, type: str, user: str | None, group: str | None, role: str | None, scope: str, depends_on: tuple[str, ...]) -> None:
     """Add or update a review configuration."""
 
     from obs_flow_client import review_config_add
@@ -34,6 +35,7 @@ def cli(project: str, type: str, user: str | None, group: str | None, role: str 
         type=type,
         reviewer=reviewer,
         depends_on=list(depends_on),
+        scope=scope,
     )
     with get_connection() as conn:
         res = review_config_add(conn, req)
