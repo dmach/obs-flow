@@ -6,7 +6,8 @@ from django.test import TestCase, TransactionTestCase
 from django_bolt.testing import TestClient
 
 from accounts.models import User, Group
-from core.models import Project
+from core.models import Project, GitMapping
+from pull_requests.models import PullRequest, PullRequestRevision, PullRequestReview
 from reviews.models import ReviewConfig, ReviewScope
 from obs_flow_server.api import api
 
@@ -740,3 +741,248 @@ class TestScopeMatching(TestCase):
     def test_evaluate_scope_false_when_no_file_in_scope(self):
         scope = ReviewScope.objects.create(name="code", include_globs=["src/*.py"], exclude_globs=[])
         self.assertFalse(scope.evaluate({"docs/readme.md"}))
+
+
+class TestScopeProvisioningPR(TestCase):
+    def setUp(self):
+        self.project = Project.objects.create(name="test:scope-pr")
+        self.git_mapping = GitMapping.objects.create(
+            owner="test", repo="repo", branch="main", project=self.project
+        )
+        self.author = User.objects.create(
+            username="author_scope", username_lower="author_scope", account_type=User.AccountType.HUMAN
+        )
+        self.reviewer = User.objects.create(
+            username="reviewer_scope", username_lower="reviewer_scope", account_type=User.AccountType.HUMAN
+        )
+
+    def _make_pr(self, number=1):
+        return PullRequest.objects.create(
+            target=self.git_mapping,
+            number=number,
+            author=self.author,
+            source_owner="dev",
+            source_repo="repo",
+            source_branch="feat",
+        )
+
+    def _make_config(self, scope):
+        return ReviewConfig.objects.create(
+            project=self.project,
+            type=ReviewConfig.ConfigType.PROJECT,
+            reviewer_user=self.reviewer,
+            scope=scope,
+        )
+
+    def test_skipped_when_no_file_in_scope(self):
+        from pull_requests.api import provision_reviews_for_revision
+
+        scope = ReviewScope.objects.create(name="code", include_globs=["src/*.py"], exclude_globs=[])
+        self._make_config(scope)
+        pr = self._make_pr()
+        rev = PullRequestRevision.objects.create(
+            pull_request=pr, revision_number=1, head_sha="1111", base_sha="0000", fingerprint="fp1", is_draft=False
+        )
+        with patch("pull_requests.models.PullRequestRevision.get_changed_files", return_value={"docs/readme.md"}):
+            reviews = provision_reviews_for_revision(rev)
+        self.assertEqual(len(reviews), 1)
+        self.assertEqual(reviews[0].state, PullRequestReview.State.SKIPPED)
+        self.assertFalse(reviews[0].is_inherited)
+        self.assertEqual(reviews[0].scope, scope)
+
+    def test_pending_on_first_touch_in_scope(self):
+        from pull_requests.api import provision_reviews_for_revision
+
+        scope = ReviewScope.objects.create(name="code", include_globs=["src/*.py"], exclude_globs=[])
+        self._make_config(scope)
+        pr = self._make_pr()
+        rev = PullRequestRevision.objects.create(
+            pull_request=pr, revision_number=1, head_sha="1111", base_sha="0000", fingerprint="fp1", is_draft=False
+        )
+        with patch("pull_requests.models.PullRequestRevision.get_changed_files", return_value={"src/main.py"}):
+            reviews = provision_reviews_for_revision(rev)
+        self.assertEqual(len(reviews), 1)
+        self.assertEqual(reviews[0].state, PullRequestReview.State.PENDING)
+        self.assertFalse(reviews[0].is_inherited)
+
+    def test_inherited_when_scoped_files_unchanged(self):
+        from pull_requests.api import provision_reviews_for_revision
+
+        scope = ReviewScope.objects.create(name="code", include_globs=["src/*.py"], exclude_globs=[])
+        self._make_config(scope)
+        pr = self._make_pr()
+
+        rev1 = PullRequestRevision.objects.create(
+            pull_request=pr, revision_number=1, head_sha="1111", base_sha="0000", fingerprint="fp1", is_draft=False
+        )
+        with patch("pull_requests.models.PullRequestRevision.get_changed_files", return_value={"src/main.py"}):
+            provision_reviews_for_revision(rev1)
+        rev1_review = rev1.reviews.first()
+        self.assertEqual(rev1_review.state, PullRequestReview.State.PENDING)
+
+        # rev2 still touches src/main.py cumulatively, but only docs changed between rev1 and rev2.
+        rev2 = PullRequestRevision.objects.create(
+            pull_request=pr, revision_number=2, head_sha="2222", base_sha="0000", fingerprint="fp2", is_draft=False
+        )
+        with patch("pull_requests.models.PullRequestRevision.get_changed_files", return_value={"src/main.py", "docs/readme.md"}), \
+             patch("pull_requests.models.PullRequestRevision.get_inter_revision_changed_files", return_value={"docs/readme.md"}):
+            provision_reviews_for_revision(rev2)
+        rev2_review = rev2.reviews.first()
+        self.assertTrue(rev2_review.is_inherited)
+        self.assertEqual(rev2_review.state, rev1_review.state)
+        self.assertEqual(rev2_review.scope, scope)
+
+    def test_pending_when_scoped_file_changed(self):
+        from pull_requests.api import provision_reviews_for_revision
+
+        scope = ReviewScope.objects.create(name="code", include_globs=["src/*.py"], exclude_globs=[])
+        self._make_config(scope)
+        pr = self._make_pr()
+
+        rev1 = PullRequestRevision.objects.create(
+            pull_request=pr, revision_number=1, head_sha="1111", base_sha="0000", fingerprint="fp1", is_draft=False
+        )
+        with patch("pull_requests.models.PullRequestRevision.get_changed_files", return_value={"src/main.py"}):
+            provision_reviews_for_revision(rev1)
+
+        # A new src file changed between rev1 and rev2 -> scoped file changed -> fresh PENDING.
+        rev2 = PullRequestRevision.objects.create(
+            pull_request=pr, revision_number=2, head_sha="2222", base_sha="0000", fingerprint="fp2", is_draft=False
+        )
+        with patch("pull_requests.models.PullRequestRevision.get_changed_files", return_value={"src/main.py", "src/new.py"}), \
+             patch("pull_requests.models.PullRequestRevision.get_inter_revision_changed_files", return_value={"src/new.py"}):
+            provision_reviews_for_revision(rev2)
+        rev2_review = rev2.reviews.first()
+        self.assertFalse(rev2_review.is_inherited)
+        self.assertEqual(rev2_review.state, PullRequestReview.State.PENDING)
+
+    def test_pending_when_scope_identity_changed(self):
+        from pull_requests.api import provision_reviews_for_revision
+
+        scope_a = ReviewScope.objects.create(name="code", include_globs=["src/*.py"], exclude_globs=[])
+        scope_b = ReviewScope.objects.create(name="docs", include_globs=["docs/*.md"], exclude_globs=[])
+        config = self._make_config(scope_a)
+        pr = self._make_pr()
+
+        rev1 = PullRequestRevision.objects.create(
+            pull_request=pr, revision_number=1, head_sha="1111", base_sha="0000", fingerprint="fp1", is_draft=False
+        )
+        with patch("pull_requests.models.PullRequestRevision.get_changed_files", return_value={"src/main.py"}):
+            provision_reviews_for_revision(rev1)
+        rev1_review = rev1.reviews.first()
+        self.assertEqual(rev1_review.scope, scope_a)
+
+        # The config's scope identity changes to scope_b before rev2 is provisioned.
+        config.scope = scope_b
+        config.save()
+
+        rev2 = PullRequestRevision.objects.create(
+            pull_request=pr, revision_number=2, head_sha="2222", base_sha="0000", fingerprint="fp2", is_draft=False
+        )
+        with patch("pull_requests.models.PullRequestRevision.get_changed_files", return_value={"docs/readme.md"}), \
+             patch("pull_requests.models.PullRequestRevision.get_inter_revision_changed_files", return_value=set()):
+            provision_reviews_for_revision(rev2)
+        rev2_review = rev2.reviews.first()
+        # Different scope identity -> no inheritance, fresh PENDING under the new scope.
+        self.assertFalse(rev2_review.is_inherited)
+        self.assertEqual(rev2_review.state, PullRequestReview.State.PENDING)
+        self.assertEqual(rev2_review.scope, scope_b)
+
+
+class TestForwardPropagation(TestCase):
+    def setUp(self):
+        self.project = Project.objects.create(name="test:propagation")
+        self.git_mapping = GitMapping.objects.create(
+            owner="test", repo="repo", branch="main", project=self.project
+        )
+        self.author = User.objects.create(
+            username="author_prop", username_lower="author_prop", account_type=User.AccountType.HUMAN
+        )
+        self.reviewer = User.objects.create(
+            username="reviewer_prop", username_lower="reviewer_prop", account_type=User.AccountType.HUMAN
+        )
+        self.scope = ReviewScope.objects.create(name="code", include_globs=["src/*.py"], exclude_globs=[])
+        self.pr = PullRequest.objects.create(
+            target=self.git_mapping,
+            number=1,
+            author=self.author,
+            source_owner="dev",
+            source_repo="repo",
+            source_branch="feat",
+        )
+
+    def _make_rev(self, number):
+        return PullRequestRevision.objects.create(
+            pull_request=self.pr,
+            revision_number=number,
+            head_sha=f"head{number}",
+            base_sha="0000",
+            fingerprint=f"fp{number}",
+            is_draft=False,
+        )
+
+    def _make_review(self, rev, state, is_inherited, justification=None):
+        return PullRequestReview.objects.create(
+            revision=rev,
+            reviewer_user=self.reviewer,
+            scope=self.scope,
+            state=state,
+            is_inherited=is_inherited,
+            justification=justification,
+        )
+
+    def test_propagation_cascades_and_stops_at_non_inherited(self):
+        rev1 = self._make_rev(1)
+        rev2 = self._make_rev(2)
+        rev3 = self._make_rev(3)
+
+        r1 = self._make_review(rev1, PullRequestReview.State.ACCEPTED, is_inherited=False)
+        r2 = self._make_review(rev2, PullRequestReview.State.PENDING, is_inherited=True)
+        r3 = self._make_review(rev3, PullRequestReview.State.PENDING, is_inherited=False)
+
+        propagated = r1.propagate_decision()
+
+        r2.refresh_from_db()
+        r3.refresh_from_db()
+        self.assertEqual(r2.state, PullRequestReview.State.ACCEPTED)  # propagated
+        self.assertEqual(r3.state, PullRequestReview.State.PENDING)   # stopped at non-inherited
+        self.assertEqual([r.revision_id for r in propagated], [rev2.id])
+
+    def test_propagation_stops_at_first_non_inherited(self):
+        rev1 = self._make_rev(1)
+        rev2 = self._make_rev(2)
+        rev3 = self._make_rev(3)
+
+        r1 = self._make_review(
+            rev1, PullRequestReview.State.REJECTED, is_inherited=False, justification="not acceptable"
+        )
+        r2 = self._make_review(rev2, PullRequestReview.State.PENDING, is_inherited=False)
+        r3 = self._make_review(rev3, PullRequestReview.State.PENDING, is_inherited=True)
+
+        propagated = r1.propagate_decision()
+
+        r2.refresh_from_db()
+        r3.refresh_from_db()
+        # rev2 is not inherited -> propagation stops before it; rev3 never reached.
+        self.assertEqual(r2.state, PullRequestReview.State.PENDING)
+        self.assertEqual(r3.state, PullRequestReview.State.PENDING)
+        self.assertEqual(propagated, [])
+
+    def test_propagation_copies_actor_and_justification(self):
+        actor = User.objects.create(
+            username="actor_prop", username_lower="actor_prop", account_type=User.AccountType.HUMAN
+        )
+        rev1 = self._make_rev(1)
+        rev2 = self._make_rev(2)
+
+        r1 = self._make_review(rev1, PullRequestReview.State.REJECTED, is_inherited=False, justification="broken")
+        r1.actor = actor
+        r1.save()
+        r2 = self._make_review(rev2, PullRequestReview.State.PENDING, is_inherited=True)
+
+        r1.propagate_decision()
+
+        r2.refresh_from_db()
+        self.assertEqual(r2.state, PullRequestReview.State.REJECTED)
+        self.assertEqual(r2.actor, actor)
+        self.assertEqual(r2.justification, "broken")

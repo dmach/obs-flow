@@ -142,7 +142,9 @@ async def approve_review_endpoint(payload: PRReviewApproveRequest, request):
         user = get_authenticated_user(request)
         review.actor = user
         review.justification = None
+        review.is_inherited = False
         review.save()
+        review.propagate_decision()
 
         res = PRReviewActionResponse(pull_request_id=payload.pull_request_id, review=review_to_detail(review))
         return msgspec.structs.asdict(res)
@@ -160,7 +162,9 @@ async def decline_review_endpoint(payload: PRReviewDeclineRequest, request):
         user = get_authenticated_user(request)
         review.actor = user
         review.justification = payload.message
+        review.is_inherited = False
         review.save()
+        review.propagate_decision()
 
         res = PRReviewActionResponse(pull_request_id=payload.pull_request_id, review=review_to_detail(review))
         return msgspec.structs.asdict(res)
@@ -178,7 +182,9 @@ async def needinfo_review_endpoint(payload: PRReviewNeedInfoRequest, request):
         user = get_authenticated_user(request)
         review.actor = user
         review.justification = payload.message
+        review.is_inherited = False
         review.save()
+        review.propagate_decision()
 
         res = PRReviewActionResponse(pull_request_id=payload.pull_request_id, review=review_to_detail(review))
         return msgspec.structs.asdict(res)
@@ -200,7 +206,9 @@ async def clear_needinfo_review_endpoint(payload: PRReviewClearNeedInfoRequest, 
             review.state = PullRequestReview.State.PENDING
             review.actor = user
             review.justification = payload.message
+            review.is_inherited = False
             review.save()
+            review.propagate_decision()
             last_review = review
 
         if not last_review:
@@ -223,7 +231,9 @@ async def reopen_review_endpoint(payload: PRReviewReopenRequest, request):
         user = get_authenticated_user(request)
         review.actor = user
         review.justification = payload.message
+        review.is_inherited = False
         review.save()
+        review.propagate_decision()
 
         res = PRReviewActionResponse(pull_request_id=payload.pull_request_id, review=review_to_detail(review))
         return msgspec.structs.asdict(res)
@@ -266,15 +276,67 @@ def provision_reviews_for_revision(revision: PullRequestRevision) -> list[PullRe
     if project and config_type:
         configs = ReviewConfig.objects.filter(project=project, type=config_type).select_related("scope")
         config_to_review = {}
+
+        changed_files = rev.get_changed_files()
+        prev_rev = (
+            pr.revisions.filter(revision_number__lt=rev.revision_number)
+            .order_by("-revision_number")
+            .first()
+        )
+        inter_files = rev.get_inter_revision_changed_files(prev_rev) if prev_rev else changed_files
+
         for config in configs:
-            review = PullRequestReview.objects.create(
-                revision=rev,
-                reviewer_user=config.reviewer_user,
-                reviewer_group=config.reviewer_group,
-                dynamic_role=config.dynamic_role,
-                scope=config.scope,
-                state=PullRequestReview.State.WAITING,
-            )
+            scope = config.scope
+            is_in_scope = scope.evaluate(changed_files)
+
+            if not is_in_scope:
+                review = PullRequestReview.objects.create(
+                    revision=rev,
+                    reviewer_user=config.reviewer_user,
+                    reviewer_group=config.reviewer_group,
+                    dynamic_role=config.dynamic_role,
+                    scope=scope,
+                    state=PullRequestReview.State.SKIPPED,
+                    is_inherited=False,
+                )
+            else:
+                prev_review = None
+                if prev_rev:
+                    prev_review = PullRequestReview.objects.filter(
+                        revision=prev_rev,
+                        reviewer_user=config.reviewer_user,
+                        reviewer_group=config.reviewer_group,
+                        dynamic_role=config.dynamic_role,
+                    ).first()
+
+                if (
+                    prev_review
+                    and prev_review.scope_id == scope.id
+                    and prev_review.state != PullRequestReview.State.SKIPPED
+                    and not scope.evaluate(inter_files)
+                ):
+                    review = PullRequestReview.objects.create(
+                        revision=rev,
+                        reviewer_user=config.reviewer_user,
+                        reviewer_group=config.reviewer_group,
+                        dynamic_role=config.dynamic_role,
+                        scope=scope,
+                        state=prev_review.state,
+                        actor=prev_review.actor,
+                        justification=prev_review.justification,
+                        is_inherited=True,
+                    )
+                else:
+                    review = PullRequestReview.objects.create(
+                        revision=rev,
+                        reviewer_user=config.reviewer_user,
+                        reviewer_group=config.reviewer_group,
+                        dynamic_role=config.dynamic_role,
+                        scope=scope,
+                        state=PullRequestReview.State.WAITING,
+                        is_inherited=False,
+                    )
+
             config_to_review[config] = review
             created_reviews.append(review)
 
@@ -284,11 +346,16 @@ def provision_reviews_for_revision(revision: PullRequestRevision) -> list[PullRe
                 if dep_config in config_to_review:
                     review.depends_on.add(config_to_review[dep_config])
 
-        # Reviews with no dependencies start as PENDING, others remain WAITING
+        # Reviews with no unresolved dependencies start as PENDING, others remain WAITING
         for review in created_reviews:
-            if not review.depends_on.exists():
-                review.state = PullRequestReview.State.PENDING
-                review.save(update_fields=["state"])
+            if review.state == PullRequestReview.State.WAITING:
+                prereqs = review.depends_on.all()
+                if not prereqs.exists() or all(
+                    p.state in (PullRequestReview.State.ACCEPTED, PullRequestReview.State.OVERRIDDEN, PullRequestReview.State.SKIPPED)
+                    for p in prereqs
+                ):
+                    review.state = PullRequestReview.State.PENDING
+                    review.save(update_fields=["state"])
 
     return created_reviews
 
