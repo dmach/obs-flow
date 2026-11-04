@@ -31,6 +31,10 @@ from obs_flow_client.reviews import (
     review_config_add,
     review_config_list,
     review_config_remove,
+    review_scope_add,
+    review_scope_list,
+    review_scope_remove,
+    review_scope_update,
 )
 from obs_flow_client.staging import (
     staging_add,
@@ -71,6 +75,10 @@ __all__ = [
     "review_config_add",
     "review_config_list",
     "review_config_remove",
+    "review_scope_add",
+    "review_scope_list",
+    "review_scope_remove",
+    "review_scope_update",
     "staging_add",
     "staging_create",
     "staging_edit",
