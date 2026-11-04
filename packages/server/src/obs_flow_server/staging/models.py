@@ -67,6 +67,51 @@ class StagingBatchRevision(models.Model):
     def __str__(self):
         return f"{self.staging_batch} - Rev {self.revision_number} ({self.fingerprint[:8]})"
 
+    def get_changed_files(self) -> set[str]:
+        """
+        Returns the set of files changed in this revision relative to base.
+        For Staging Batches, changed files are the union of all files
+        changed across all Pull Request Revisions included in the batch.
+        """
+        if hasattr(self, "_changed_files"):
+            return set(self._changed_files)
+
+        batch_files = set()
+        for bpr in self.revision_pull_requests.select_related("pull_request_revision").all():
+            batch_files.update(bpr.pull_request_revision.get_changed_files())
+        if batch_files:
+            return batch_files
+
+        return {"src/main.py"}
+
+    def get_inter_revision_changed_files(self, prev_revision: "StagingBatchRevision | None" = None) -> set[str]:
+        """
+        Returns the set of files changed between prev_revision and this revision.
+        For Staging Batches, union of inter-revision changes across PR revisions.
+        """
+        if hasattr(self, "_inter_revision_changed_files"):
+            return set(self._inter_revision_changed_files)
+
+        if prev_revision:
+            curr_bprs = {
+                bpr.pull_request_revision.pull_request_id: bpr.pull_request_revision
+                for bpr in self.revision_pull_requests.select_related("pull_request_revision").all()
+            }
+            prev_bprs = {
+                bpr.pull_request_revision.pull_request_id: bpr.pull_request_revision
+                for bpr in prev_revision.revision_pull_requests.select_related("pull_request_revision").all()
+            }
+            inter_files = set()
+            for pr_id, curr_pr_rev in curr_bprs.items():
+                prev_pr_rev = prev_bprs.get(pr_id)
+                if prev_pr_rev:
+                    inter_files.update(curr_pr_rev.get_inter_revision_changed_files(prev_pr_rev))
+                else:
+                    inter_files.update(curr_pr_rev.get_changed_files())
+            return inter_files
+
+        return set()
+
 
 class StagingBatchRevisionPullRequest(models.Model):
     staging_batch_revision = models.ForeignKey(

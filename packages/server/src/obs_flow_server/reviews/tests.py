@@ -697,3 +697,46 @@ class TestReviewScopeAPI(TransactionTestCase):
         response = self._post("/api/v1/review-scope/update", payload)
         self.assertEqual(response.status_code, 400)
         self.assertIn("reserved", response.text)
+
+
+class TestScopeMatching(TestCase):
+    def test_file_matches_glob_exact(self):
+        self.assertTrue(ReviewScope.matches_glob("src/main.py", "src/main.py"))
+
+    def test_file_matches_glob_wildcard(self):
+        self.assertTrue(ReviewScope.matches_glob("src/main.py", "src/*.py"))
+        self.assertFalse(ReviewScope.matches_glob("src/main.py", "src/*.md"))
+
+    def test_file_matches_glob_recursive(self):
+        self.assertTrue(ReviewScope.matches_glob("a/b/c.py", "**/*.py"))
+        self.assertTrue(ReviewScope.matches_glob("src/main.py", "**/*"))
+        self.assertFalse(ReviewScope.matches_glob("a/b/c.md", "**/*.py"))
+
+    def test_file_matches_glob_basename(self):
+        # A pattern without a slash matches against the basename.
+        self.assertTrue(ReviewScope.matches_glob("docs/CHANGELOG.md", "CHANGELOG.md"))
+        self.assertTrue(ReviewScope.matches_glob("a/b/CHANGELOG.md", "CHANGELOG.md"))
+        self.assertFalse(ReviewScope.matches_glob("docs/README.md", "CHANGELOG.md"))
+
+    def test_file_matches_glob_no_match(self):
+        self.assertFalse(ReviewScope.matches_glob("src/main.py", "docs/*.md"))
+
+    def test_is_file_in_scope_include_only(self):
+        scope = ReviewScope.objects.create(name="code", include_globs=["src/*.py"], exclude_globs=[])
+        self.assertTrue(scope.is_file_in_scope("src/main.py"))
+        self.assertFalse(scope.is_file_in_scope("docs/readme.md"))
+
+    def test_is_file_in_scope_exclude_wins(self):
+        scope = ReviewScope.objects.create(
+            name="all-but-docs", include_globs=["**/*"], exclude_globs=["docs/*.md"]
+        )
+        self.assertTrue(scope.is_file_in_scope("src/main.py"))
+        self.assertFalse(scope.is_file_in_scope("docs/readme.md"))
+
+    def test_evaluate_scope_true_when_any_file_in_scope(self):
+        scope = ReviewScope.objects.create(name="code", include_globs=["src/*.py"], exclude_globs=[])
+        self.assertTrue(scope.evaluate({"src/main.py", "docs/readme.md"}))
+
+    def test_evaluate_scope_false_when_no_file_in_scope(self):
+        scope = ReviewScope.objects.create(name="code", include_globs=["src/*.py"], exclude_globs=[])
+        self.assertFalse(scope.evaluate({"docs/readme.md"}))

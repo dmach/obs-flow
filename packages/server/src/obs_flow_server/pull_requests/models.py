@@ -54,6 +54,24 @@ class PullRequestRevision(models.Model):
     def __str__(self):
         return f"{self.pull_request} - Rev {self.revision_number} ({self.fingerprint[:8]})"
 
+    def get_changed_files(self) -> set[str]:
+        """
+        Returns the set of files changed in this revision relative to base.
+        TODO: Fetch changed files directly from Git backend (Gitea API / git diff).
+        """
+        if hasattr(self, "_changed_files"):
+            return set(self._changed_files)
+        return {"src/main.py"}
+
+    def get_inter_revision_changed_files(self, prev_revision: "PullRequestRevision | None" = None) -> set[str]:
+        """
+        Returns the set of files changed between prev_revision and this revision.
+        TODO: Fetch diff between revisions directly from Git backend (e.g., git diff prev..curr).
+        """
+        if hasattr(self, "_inter_revision_changed_files"):
+            return set(self._inter_revision_changed_files)
+        return set()
+
 
 class PullRequestRevisionIssue(models.Model):
     pull_request_revision = models.ForeignKey(

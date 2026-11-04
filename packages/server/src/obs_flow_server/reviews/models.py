@@ -1,3 +1,4 @@
+import fnmatch
 from django.db import models
 from django.db.models import Q
 from django.conf import settings
@@ -25,6 +26,45 @@ class ReviewScope(models.Model):
         if self.name in self.RESERVED_NAMES:
             raise ValueError(f"The '{self.name}' scope is reserved and cannot be deleted.")
         return super().delete(*args, **kwargs)
+
+    @staticmethod
+    def matches_glob(filepath: str, pattern: str) -> bool:
+        """
+        Checks if a filepath matches a glob pattern.
+        Handles recursive matching ('**/*'), basename matching, and directory prefixes.
+        """
+        if fnmatch.fnmatch(filepath, pattern):
+            return True
+        if "/" not in pattern and fnmatch.fnmatch(filepath.split("/")[-1], pattern):
+            return True
+        return False
+
+    def is_file_in_scope(self, filepath: str) -> bool:
+        """
+        Determines if a file is in review scope:
+        A file is considered in-scope if it matches at least one include glob
+        AND does not match any exclude glob.
+        """
+        included = any(self.matches_glob(filepath, pat) for pat in self.include_globs)
+        if not included:
+            return False
+        excluded = any(self.matches_glob(filepath, pat) for pat in self.exclude_globs)
+        if excluded:
+            return False
+        return True
+
+    def get_files_in_scope(self, files: set[str] | list[str]) -> set[str]:
+        """
+        Filters the given files and returns only those that fall within the specified scope.
+        """
+        return {f for f in files if self.is_file_in_scope(f)}
+
+    def evaluate(self, files: set[str] | list[str]) -> bool:
+        """
+        Evaluates whether the scope is triggered by any file in the given set of files.
+        Returns True if at least one file is in-scope.
+        """
+        return len(self.get_files_in_scope(files)) > 0
 
 
 class ReviewConfigBase(models.Model):
@@ -289,6 +329,50 @@ class BaseReview(models.Model):
                     unblocked.append(dep)
 
         return unblocked
+
+    def propagate_decision(self) -> list["BaseReview"]:
+        """
+        Propagates a decision on a review forward:
+        When a review is decided at revision N, the decision propagates forward
+        to every later revision with is_inherited = True, storing it on each,
+        and stops at the first revision where is_inherited = False.
+        """
+        propagated = []
+        rev = self.revision
+        model_class = self.__class__
+        rev_model_class = rev.__class__
+
+        if hasattr(rev, "pull_request"):
+            parent_filter = {"pull_request": rev.pull_request}
+        elif hasattr(rev, "staging_batch"):
+            parent_filter = {"staging_batch": rev.staging_batch}
+        else:
+            return propagated
+
+        later_revs = rev_model_class.objects.filter(
+            **parent_filter,
+            revision_number__gt=rev.revision_number,
+        ).order_by("revision_number")
+
+        for later_rev in later_revs:
+            later_review = model_class.objects.filter(
+                revision=later_rev,
+                reviewer_user=self.reviewer_user,
+                reviewer_group=self.reviewer_group,
+                dynamic_role=self.dynamic_role,
+                scope=self.scope,
+            ).first()
+
+            if not later_review or not later_review.is_inherited:
+                break
+
+            later_review.state = self.state
+            later_review.actor = self.actor
+            later_review.justification = self.justification
+            later_review.save()
+            propagated.append(later_review)
+
+        return propagated
 
     def save(self, *args, **kwargs):
         is_resolved = self.state in (self.State.ACCEPTED, self.State.OVERRIDDEN)
