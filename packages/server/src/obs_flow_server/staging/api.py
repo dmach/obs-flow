@@ -42,12 +42,6 @@ from core.models import Project
 from pull_requests.models import PullRequest
 from reviews.api import build_reviewer_dto_from_fields
 from reviews.models import ReviewScope
-from reviews.services import (
-    evaluate_scope,
-    get_changed_files,
-    get_inter_revision_changed_files,
-    propagate_review_decision,
-)
 from staging.models import StagingBatch, StagingBatchRevision, StagingBatchRevisionPullRequest, StagingReview
 from staging.views import update_staging_batch
 
@@ -138,17 +132,17 @@ def provision_reviews_for_staging_revision(revision: StagingBatchRevision) -> li
         config_to_review = {}
 
         batch = rev.staging_batch
-        changed_files = get_changed_files(rev)
+        changed_files = rev.get_changed_files()
         prev_rev = (
             batch.revisions.filter(revision_number__lt=rev.revision_number)
             .order_by("-revision_number")
             .first()
         )
-        inter_files = get_inter_revision_changed_files(prev_rev, rev) if prev_rev else changed_files
+        inter_files = rev.get_inter_revision_changed_files(prev_rev) if prev_rev else changed_files
 
         for config in configs:
             scope = config.scope
-            is_in_scope = evaluate_scope(scope, changed_files)
+            is_in_scope = scope.evaluate(changed_files)
 
             if not is_in_scope:
                 review = StagingReview.objects.create(
@@ -174,7 +168,7 @@ def provision_reviews_for_staging_revision(revision: StagingBatchRevision) -> li
                     prev_review
                     and prev_review.scope_id == scope.id
                     and prev_review.state != StagingReview.State.SKIPPED
-                    and not evaluate_scope(scope, inter_files)
+                    and not scope.evaluate(inter_files)
                 ):
                     review = StagingReview.objects.create(
                         revision=rev,
@@ -499,7 +493,7 @@ def approve_staging_review_endpoint(payload: StagingReviewApproveRequest, reques
     review.justification = None
     review.is_inherited = False
     review.save()
-    propagate_review_decision(review)
+    review.propagate_decision()
 
     res = StagingReviewActionResponse(staging_id=payload.staging_id, review=review_to_detail(review))
     return msgspec.structs.asdict(res)
@@ -517,7 +511,7 @@ def decline_staging_review_endpoint(payload: StagingReviewDeclineRequest, reques
     review.justification = payload.message
     review.is_inherited = False
     review.save()
-    propagate_review_decision(review)
+    review.propagate_decision()
 
     res = StagingReviewActionResponse(staging_id=payload.staging_id, review=review_to_detail(review))
     return msgspec.structs.asdict(res)
@@ -535,7 +529,7 @@ def needinfo_staging_review_endpoint(payload: StagingReviewNeedInfoRequest, requ
     review.justification = payload.message
     review.is_inherited = False
     review.save()
-    propagate_review_decision(review)
+    review.propagate_decision()
 
     res = StagingReviewActionResponse(staging_id=payload.staging_id, review=review_to_detail(review))
     return msgspec.structs.asdict(res)
@@ -560,7 +554,7 @@ def clear_needinfo_staging_review_endpoint(payload: StagingReviewClearNeedInfoRe
         review.justification = payload.message
         review.is_inherited = False
         review.save()
-        propagate_review_decision(review)
+        review.propagate_decision()
         last_review = review
 
     if not last_review:
@@ -582,7 +576,7 @@ def reopen_staging_review_endpoint(payload: StagingReviewReopenRequest, request)
     review.justification = payload.message
     review.is_inherited = False
     review.save()
-    propagate_review_decision(review)
+    review.propagate_decision()
 
     res = StagingReviewActionResponse(staging_id=payload.staging_id, review=review_to_detail(review))
     return msgspec.structs.asdict(res)

@@ -92,17 +92,17 @@ class PullRequestReview(BaseReview):
     class Meta(BaseReview.Meta):
         constraints = BaseReview.Meta.constraints + [
             models.UniqueConstraint(
-                fields=["revision", "reviewer_user", "scope"],
+                fields=["revision", "reviewer_user"],
                 condition=Q(reviewer_user__isnull=False),
                 name="unique_pr_review_user",
             ),
             models.UniqueConstraint(
-                fields=["revision", "reviewer_group", "scope"],
+                fields=["revision", "reviewer_group"],
                 condition=Q(reviewer_group__isnull=False),
                 name="unique_pr_review_group",
             ),
             models.UniqueConstraint(
-                fields=["revision", "dynamic_role", "scope"],
+                fields=["revision", "dynamic_role"],
                 condition=Q(dynamic_role__isnull=False),
                 name="unique_pr_review_dynamic_role",
             ),

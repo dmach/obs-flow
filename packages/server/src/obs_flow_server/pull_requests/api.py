@@ -118,7 +118,7 @@ def show_review_endpoint(payload: PRReviewShowRequest):
     pr = get_pull_request(payload.pull_request_id)
     latest_revision = pr.revisions.order_by("-revision_number").first()
 
-    reviews = latest_revision.reviews.all()
+    reviews = latest_revision.reviews.select_related("scope", "actor", "reviewer_user", "reviewer_group").all()
     if payload.reviewer:
         user, group = parse_reviewer(payload.reviewer)
         if user:
@@ -253,6 +253,7 @@ def provision_reviews_for_revision(revision: PullRequestRevision) -> list[PullRe
     Provisions reviews for a PullRequestRevision based on ReviewConfig if no reviews exist.
     While a revision is in draft mode, no review records are created.
     Existing reviews are never re-provisioned.
+    Evaluates scopes against changed files and supports decision inheritance.
     """
     rev = PullRequestRevision.objects.select_for_update().get(pk=revision.pk)
     if rev.is_draft:

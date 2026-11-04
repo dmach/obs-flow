@@ -1016,7 +1016,7 @@ class TestScopeProvisioningStaging(TestCase):
             fingerprint="fp1",
             is_draft=False,
         )
-        with patch("staging.api.get_changed_files", return_value={"docs/readme.md"}):
+        with patch("staging.models.StagingBatchRevision.get_changed_files", return_value={"docs/readme.md"}):
             reviews = provision_reviews_for_staging_revision(rev)
         self.assertEqual(len(reviews), 1)
         self.assertEqual(reviews[0].state, StagingReview.State.SKIPPED)
@@ -1038,7 +1038,7 @@ class TestScopeProvisioningStaging(TestCase):
             fingerprint="fp1",
             is_draft=False,
         )
-        with patch("staging.api.get_changed_files", return_value={"src/main.py"}):
+        with patch("staging.models.StagingBatchRevision.get_changed_files", return_value={"src/main.py"}):
             reviews = provision_reviews_for_staging_revision(rev)
         self.assertEqual(len(reviews), 1)
         self.assertEqual(reviews[0].state, StagingReview.State.PENDING)
