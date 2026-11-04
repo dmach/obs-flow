@@ -212,9 +212,17 @@ class BaseReview(models.Model):
         ACCEPTED = "accepted", "Accepted"
         REJECTED = "rejected", "Rejected"
         OVERRIDDEN = "overridden", "Overridden"
+        SKIPPED = "skipped", "Skipped"
 
     class DynamicRole(models.TextChoices):
         MAINTAINER = "maintainer", "Maintainer"
+
+    scope = models.ForeignKey(
+        ReviewScope,
+        on_delete=models.PROTECT,
+        related_name="%(class)s_reviews",
+    )
+    is_inherited = models.BooleanField(default=False)
 
     reviewer_user = models.ForeignKey(
         settings.AUTH_USER_MODEL,
@@ -310,7 +318,7 @@ class BaseReview(models.Model):
 
     def unblock_downstream_reviews(self) -> list["BaseReview"]:
         """
-        When this review is resolved (ACCEPTED or OVERRIDDEN), inspects downstream
+        When this review is resolved (ACCEPTED, OVERRIDDEN, or SKIPPED), inspects downstream
         reviews that depend on it. If all their prerequisites are resolved,
         transitions them from WAITING to PENDING.
         """
@@ -323,7 +331,7 @@ class BaseReview(models.Model):
         for dep in dependents:
             if dep.state == self.State.WAITING:
                 prereqs = dep.depends_on.all()
-                if prereqs.exists() and all(p.state in (self.State.ACCEPTED, self.State.OVERRIDDEN) for p in prereqs):
+                if prereqs.exists() and all(p.state in (self.State.ACCEPTED, self.State.OVERRIDDEN, self.State.SKIPPED) for p in prereqs):
                     dep.state = self.State.PENDING
                     dep.save(update_fields=["state"])
                     unblocked.append(dep)
@@ -375,7 +383,7 @@ class BaseReview(models.Model):
         return propagated
 
     def save(self, *args, **kwargs):
-        is_resolved = self.state in (self.State.ACCEPTED, self.State.OVERRIDDEN)
+        is_resolved = self.state in (self.State.ACCEPTED, self.State.OVERRIDDEN, self.State.SKIPPED)
         is_raw = kwargs.get("raw", False)
         super().save(*args, **kwargs)
         if is_resolved and self.pk and not is_raw:

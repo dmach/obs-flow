@@ -1055,6 +1055,7 @@ class TestStagingMergeEndpoint(TestCase):
             revision=self.batch_rev,
             reviewer_user=self.reviewer,
             state=StagingReview.State.ACCEPTED,
+            scope=ReviewScope.objects.get(name="global"),
         )
 
     @override_settings(GITEA_URL="https://gitea.example.com", GITEA_TOKEN="secret-token")
@@ -1131,6 +1132,7 @@ class TestStagingMergeEndpoint(TestCase):
             revision=batch2_rev,
             reviewer_user=self.reviewer,
             state=StagingReview.State.PENDING,
+            scope=ReviewScope.objects.get(name="global"),
         )
 
         # Make batch 1 already merged
@@ -1152,6 +1154,7 @@ class TestStagingMergeEndpoint(TestCase):
 
 
 class TestStagingWebMergeActions(TestCase):
+    fixtures = ["global_scope.json"]
     def setUp(self):
         self.project = Project.objects.create(name="test:staging-web-merge", workflow_type=Project.WorkflowType.STAGING)
         self.mapping = GitMapping.objects.create(owner="suse", repo="web-staging-repo", branch="main", project=self.project)
@@ -1189,6 +1192,7 @@ class TestStagingWebMergeActions(TestCase):
             revision=self.batch_rev,
             reviewer_user=self.reviewer,
             state=StagingReview.State.PENDING,
+            scope=ReviewScope.objects.get(name="global"),
         )
 
     def test_staging_detail_renders_merge_button_and_hides_when_merged(self):

@@ -395,7 +395,8 @@
       "external_review_url": null,
       "locked_by": null,
       "locked_until": null,
-      "updated_at": "2026-08-12T12:00:00Z"
+      "updated_at": "2026-08-12T12:00:00Z",
+      "scope": 1
     }
   },
   {
@@ -413,7 +414,8 @@
       "external_review_url": "https://github.com/openSUSE/osc/pull/1234#pullrequestreview-123456",
       "locked_by": null,
       "locked_until": null,
-      "updated_at": "2026-08-12T12:00:00Z"
+      "updated_at": "2026-08-12T12:00:00Z",
+      "scope": 1
     }
   },
   {
@@ -431,7 +433,8 @@
       "external_review_url": null,
       "locked_by": null,
       "locked_until": null,
-      "updated_at": "2026-08-12T12:00:00Z"
+      "updated_at": "2026-08-12T12:00:00Z",
+      "scope": 1
     }
   },
   {
@@ -495,7 +498,8 @@
       "external_review_url": null,
       "locked_by": null,
       "locked_until": null,
-      "updated_at": "2026-08-12T12:00:00Z"
+      "updated_at": "2026-08-12T12:00:00Z",
+      "scope": 1
     }
   },
   {

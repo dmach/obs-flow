@@ -41,6 +41,7 @@ from accounts.models import User, Group
 from core.models import Project
 from pull_requests.models import PullRequest
 from reviews.api import build_reviewer_dto_from_fields
+from reviews.models import ReviewScope
 from staging.models import StagingBatch, StagingBatchRevision, StagingBatchRevisionPullRequest, StagingReview
 from staging.views import update_staging_batch
 
@@ -124,7 +125,7 @@ def provision_reviews_for_staging_revision(revision: StagingBatchRevision) -> li
         return list(rev.reviews.all())
 
     from reviews.models import ReviewConfig
-    configs = ReviewConfig.objects.filter(project=rev.staging_batch.project, type="staging")
+    configs = ReviewConfig.objects.filter(project=rev.staging_batch.project, type="staging").select_related("scope")
     created_reviews = []
     if configs.exists():
         config_to_review = {}
@@ -134,6 +135,7 @@ def provision_reviews_for_staging_revision(revision: StagingBatchRevision) -> li
                 reviewer_user=config.reviewer_user,
                 reviewer_group=config.reviewer_group,
                 dynamic_role=config.dynamic_role,
+                scope=config.scope,
                 state=StagingReview.State.WAITING,
             )
             config_to_review[config] = review
@@ -223,6 +225,7 @@ def review_to_detail(review: StagingReview) -> ReviewDetail:
         review.dynamic_role,
     )
     actor_dto = build_user_dto(review.actor) if review.actor else None
+    scope_name = review.scope.name
 
     return ReviewDetail(
         reviewer=reviewer_dto,
@@ -230,6 +233,8 @@ def review_to_detail(review: StagingReview) -> ReviewDetail:
         actor=actor_dto,
         when=review.updated_at.isoformat(),
         why=review.justification,
+        scope=scope_name,
+        is_inherited=review.is_inherited,
     )
 
 
@@ -241,13 +246,23 @@ def get_review_for_request(batch: StagingBatch, reviewer_str: str | None) -> Sta
         raise ValueError(f"Staging batch #{batch.id} has no revisions.")
     user, group = parse_reviewer(reviewer_str)
     if user:
-        review, _ = StagingReview.objects.get_or_create(
-            revision=latest_rev, reviewer_user=user, defaults={"state": StagingReview.State.PENDING}
-        )
+        review = StagingReview.objects.filter(revision=latest_rev, reviewer_user=user).first()
+        if review is None:
+            review = StagingReview.objects.create(
+                revision=latest_rev,
+                reviewer_user=user,
+                state=StagingReview.State.PENDING,
+                scope=ReviewScope.objects.get(name="global"),
+            )
     else:
-        review, _ = StagingReview.objects.get_or_create(
-            revision=latest_rev, reviewer_group=group, defaults={"state": StagingReview.State.PENDING}
-        )
+        review = StagingReview.objects.filter(revision=latest_rev, reviewer_group=group).first()
+        if review is None:
+            review = StagingReview.objects.create(
+                revision=latest_rev,
+                reviewer_group=group,
+                state=StagingReview.State.PENDING,
+                scope=ReviewScope.objects.get(name="global"),
+            )
     return review
 
 

@@ -34,6 +34,7 @@ from accounts.models import User, Group
 from core.models import GitMapping, Project
 from pull_requests.models import PullRequest, PullRequestRevision, PullRequestReview
 from reviews.api import build_reviewer_dto_from_fields
+from reviews.models import ReviewScope
 
 
 PR_ID_REGEX = re.compile(r"^([^/]+)/([^#]+)#(\d+)$")
@@ -75,6 +76,7 @@ def review_to_detail(review: PullRequestReview) -> ReviewDetail:
         review.dynamic_role,
     )
     actor_dto = build_user_dto(review.actor) if review.actor else None
+    scope_name = review.scope.name
 
     return ReviewDetail(
         reviewer=reviewer_dto,
@@ -82,19 +84,31 @@ def review_to_detail(review: PullRequestReview) -> ReviewDetail:
         actor=actor_dto,
         when=review.updated_at.isoformat(),
         why=review.justification,
+        scope=scope_name,
+        is_inherited=review.is_inherited,
     )
 
 
 def get_review_for_request(revision: PullRequestRevision, reviewer_str: str | None) -> PullRequestReview:
     user, group = parse_reviewer(reviewer_str)
     if user:
-        review, _ = PullRequestReview.objects.get_or_create(
-            revision=revision, reviewer_user=user, defaults={"state": PullRequestReview.State.PENDING}
-        )
+        review = PullRequestReview.objects.filter(revision=revision, reviewer_user=user).first()
+        if review is None:
+            review = PullRequestReview.objects.create(
+                revision=revision,
+                reviewer_user=user,
+                state=PullRequestReview.State.PENDING,
+                scope=ReviewScope.objects.get(name="global"),
+            )
     else:
-        review, _ = PullRequestReview.objects.get_or_create(
-            revision=revision, reviewer_group=group, defaults={"state": PullRequestReview.State.PENDING}
-        )
+        review = PullRequestReview.objects.filter(revision=revision, reviewer_group=group).first()
+        if review is None:
+            review = PullRequestReview.objects.create(
+                revision=revision,
+                reviewer_group=group,
+                state=PullRequestReview.State.PENDING,
+                scope=ReviewScope.objects.get(name="global"),
+            )
     return review
 
 
@@ -250,7 +264,7 @@ def provision_reviews_for_revision(revision: PullRequestRevision) -> list[PullRe
 
     created_reviews = []
     if project and config_type:
-        configs = ReviewConfig.objects.filter(project=project, type=config_type)
+        configs = ReviewConfig.objects.filter(project=project, type=config_type).select_related("scope")
         config_to_review = {}
         for config in configs:
             review = PullRequestReview.objects.create(
@@ -258,6 +272,7 @@ def provision_reviews_for_revision(revision: PullRequestRevision) -> list[PullRe
                 reviewer_user=config.reviewer_user,
                 reviewer_group=config.reviewer_group,
                 dynamic_role=config.dynamic_role,
+                scope=config.scope,
                 state=PullRequestReview.State.WAITING,
             )
             config_to_review[config] = review

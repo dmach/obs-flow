@@ -30,6 +30,8 @@ class ReviewDetail(msgspec.Struct):
     actor: UserDTO | None = None
     when: str | None = None
     why: str | None = None
+    scope: str = "global"
+    is_inherited: bool = False
 
 
 class ReviewScopeDTO(msgspec.Struct):

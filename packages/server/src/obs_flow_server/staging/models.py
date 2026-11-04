@@ -134,17 +134,17 @@ class StagingReview(BaseReview):
     class Meta(BaseReview.Meta):
         constraints = BaseReview.Meta.constraints + [
             models.UniqueConstraint(
-                fields=["revision", "reviewer_user"],
+                fields=["revision", "reviewer_user", "scope"],
                 condition=Q(reviewer_user__isnull=False),
                 name="unique_staging_review_user",
             ),
             models.UniqueConstraint(
-                fields=["revision", "reviewer_group"],
+                fields=["revision", "reviewer_group", "scope"],
                 condition=Q(reviewer_group__isnull=False),
                 name="unique_staging_review_group",
             ),
             models.UniqueConstraint(
-                fields=["revision", "dynamic_role"],
+                fields=["revision", "dynamic_role", "scope"],
                 condition=Q(dynamic_role__isnull=False),
                 name="unique_staging_review_dynamic_role",
             ),

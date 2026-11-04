@@ -203,11 +203,38 @@ def test_review_renderer():
     renderer = ReviewRenderer(detail)
     with patch("click.echo") as mock_echo:
         renderer.render(fmt="text")
-        mock_echo.assert_any_call("Reviewer : \x1b[1mdarix (Marcus Rueckert <mrueckert@suse.com>)\x1b[0m")
-        mock_echo.assert_any_call("State    : \x1b[32mACCEPTED\x1b[0m")
-        mock_echo.assert_any_call("Actor    : dimstar (Dominique Leuenberger <dimstar@opensuse.org>)")
-        mock_echo.assert_any_call("Date     : 2023-01-01 12:00:00")
-        mock_echo.assert_any_call("Reason   : Looks good")
+        mock_echo.assert_any_call("Reviewer  : \x1b[1mdarix (Marcus Rueckert <mrueckert@suse.com>)\x1b[0m")
+        mock_echo.assert_any_call("State     : \x1b[32mACCEPTED\x1b[0m")
+        mock_echo.assert_any_call("Actor     : dimstar (Dominique Leuenberger <dimstar@opensuse.org>)")
+        mock_echo.assert_any_call("Date      : 2023-01-01 12:00:00")
+        mock_echo.assert_any_call("Reason    : Looks good")
+
+    # Inherited and skipped review
+    detail_inherited = ReviewDetail(
+        reviewer=PersonReviewerDTO(username="darix", full_name="Marcus Rueckert", email="mrueckert@suse.com", is_active=True),
+        state="accepted",
+        scope="code",
+        is_inherited=True,
+    )
+    renderer_inherited = ReviewRenderer(detail_inherited)
+    with patch("click.echo") as mock_echo:
+        renderer_inherited.render(fmt="text")
+        mock_echo.assert_any_call("Reviewer  : \x1b[1mdarix (Marcus Rueckert <mrueckert@suse.com>)\x1b[0m")
+        mock_echo.assert_any_call("Scope     : code")
+        mock_echo.assert_any_call("State     : \x1b[32mACCEPTED\x1b[0m")
+        mock_echo.assert_any_call("Inherited : yes")
+
+    detail_skipped = ReviewDetail(
+        reviewer=PersonReviewerDTO(username="darix", full_name="Marcus Rueckert", email="mrueckert@suse.com", is_active=True),
+        state="skipped",
+        scope="docs",
+        is_inherited=False,
+    )
+    renderer_skipped = ReviewRenderer(detail_skipped)
+    with patch("click.echo") as mock_echo:
+        renderer_skipped.render(fmt="text")
+        mock_echo.assert_any_call("Scope     : docs")
+        mock_echo.assert_any_call("State     : \x1b[33mSKIPPED\x1b[0m")
 
 
 def test_staging_renderer():
