@@ -8,6 +8,7 @@ from django_bolt.testing import TestClient
 from accounts.models import User, Group
 from core.models import Project, GitMapping
 from pull_requests.models import PullRequest, PullRequestRevision, PullRequestReview
+from staging.models import StagingBatch, StagingBatchRevision, StagingReview
 from reviews.models import ReviewConfig, ReviewScope
 from obs_flow_server.api import api
 
@@ -986,3 +987,59 @@ class TestForwardPropagation(TestCase):
         self.assertEqual(r2.state, PullRequestReview.State.REJECTED)
         self.assertEqual(r2.actor, actor)
         self.assertEqual(r2.justification, "broken")
+
+
+class TestScopeProvisioningStaging(TestCase):
+    def setUp(self):
+        self.project = Project.objects.create(name="test:scope-staging")
+        self.user = User.objects.create(
+            username="stg_user", username_lower="stg_user", account_type=User.AccountType.HUMAN
+        )
+        self.reviewer = User.objects.create(
+            username="stg_reviewer", username_lower="stg_reviewer", account_type=User.AccountType.HUMAN
+        )
+        self.batch = StagingBatch.objects.create(project=self.project, author=self.user)
+
+    def test_skipped_when_no_file_in_scope(self):
+        from staging.api import provision_reviews_for_staging_revision
+
+        scope = ReviewScope.objects.create(name="code", include_globs=["src/*.py"], exclude_globs=[])
+        ReviewConfig.objects.create(
+            project=self.project,
+            type="staging",
+            reviewer_user=self.reviewer,
+            scope=scope,
+        )
+        rev = StagingBatchRevision.objects.create(
+            staging_batch=self.batch,
+            revision_number=1,
+            fingerprint="fp1",
+            is_draft=False,
+        )
+        with patch("staging.api.get_changed_files", return_value={"docs/readme.md"}):
+            reviews = provision_reviews_for_staging_revision(rev)
+        self.assertEqual(len(reviews), 1)
+        self.assertEqual(reviews[0].state, StagingReview.State.SKIPPED)
+        self.assertFalse(reviews[0].is_inherited)
+
+    def test_pending_when_in_scope(self):
+        from staging.api import provision_reviews_for_staging_revision
+
+        scope = ReviewScope.objects.create(name="code", include_globs=["src/*.py"], exclude_globs=[])
+        ReviewConfig.objects.create(
+            project=self.project,
+            type="staging",
+            reviewer_user=self.reviewer,
+            scope=scope,
+        )
+        rev = StagingBatchRevision.objects.create(
+            staging_batch=self.batch,
+            revision_number=1,
+            fingerprint="fp1",
+            is_draft=False,
+        )
+        with patch("staging.api.get_changed_files", return_value={"src/main.py"}):
+            reviews = provision_reviews_for_staging_revision(rev)
+        self.assertEqual(len(reviews), 1)
+        self.assertEqual(reviews[0].state, StagingReview.State.PENDING)
+        self.assertFalse(reviews[0].is_inherited)

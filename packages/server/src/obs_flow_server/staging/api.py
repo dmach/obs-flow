@@ -42,6 +42,12 @@ from core.models import Project
 from pull_requests.models import PullRequest
 from reviews.api import build_reviewer_dto_from_fields
 from reviews.models import ReviewScope
+from reviews.services import (
+    evaluate_scope,
+    get_changed_files,
+    get_inter_revision_changed_files,
+    propagate_review_decision,
+)
 from staging.models import StagingBatch, StagingBatchRevision, StagingBatchRevisionPullRequest, StagingReview
 from staging.views import update_staging_batch
 
@@ -117,6 +123,7 @@ def provision_reviews_for_staging_revision(revision: StagingBatchRevision) -> li
     Provisions reviews for a StagingBatchRevision based on ReviewConfig if no reviews exist.
     While a revision is in draft mode, no review records are created.
     Existing reviews are never re-provisioned.
+    Evaluates scopes against changed files and supports decision inheritance.
     """
     rev = StagingBatchRevision.objects.select_for_update().get(pk=revision.pk)
     if rev.is_draft:
@@ -129,15 +136,68 @@ def provision_reviews_for_staging_revision(revision: StagingBatchRevision) -> li
     created_reviews = []
     if configs.exists():
         config_to_review = {}
+
+        batch = rev.staging_batch
+        changed_files = get_changed_files(rev)
+        prev_rev = (
+            batch.revisions.filter(revision_number__lt=rev.revision_number)
+            .order_by("-revision_number")
+            .first()
+        )
+        inter_files = get_inter_revision_changed_files(prev_rev, rev) if prev_rev else changed_files
+
         for config in configs:
-            review = StagingReview.objects.create(
-                revision=rev,
-                reviewer_user=config.reviewer_user,
-                reviewer_group=config.reviewer_group,
-                dynamic_role=config.dynamic_role,
-                scope=config.scope,
-                state=StagingReview.State.WAITING,
-            )
+            scope = config.scope
+            is_in_scope = evaluate_scope(scope, changed_files)
+
+            if not is_in_scope:
+                review = StagingReview.objects.create(
+                    revision=rev,
+                    reviewer_user=config.reviewer_user,
+                    reviewer_group=config.reviewer_group,
+                    dynamic_role=config.dynamic_role,
+                    scope=scope,
+                    state=StagingReview.State.SKIPPED,
+                    is_inherited=False,
+                )
+            else:
+                prev_review = None
+                if prev_rev:
+                    prev_review = StagingReview.objects.filter(
+                        revision=prev_rev,
+                        reviewer_user=config.reviewer_user,
+                        reviewer_group=config.reviewer_group,
+                        dynamic_role=config.dynamic_role,
+                    ).first()
+
+                if (
+                    prev_review
+                    and prev_review.scope_id == scope.id
+                    and prev_review.state != StagingReview.State.SKIPPED
+                    and not evaluate_scope(scope, inter_files)
+                ):
+                    review = StagingReview.objects.create(
+                        revision=rev,
+                        reviewer_user=config.reviewer_user,
+                        reviewer_group=config.reviewer_group,
+                        dynamic_role=config.dynamic_role,
+                        scope=scope,
+                        state=prev_review.state,
+                        actor=prev_review.actor,
+                        justification=prev_review.justification,
+                        is_inherited=True,
+                    )
+                else:
+                    review = StagingReview.objects.create(
+                        revision=rev,
+                        reviewer_user=config.reviewer_user,
+                        reviewer_group=config.reviewer_group,
+                        dynamic_role=config.dynamic_role,
+                        scope=scope,
+                        state=StagingReview.State.WAITING,
+                        is_inherited=False,
+                    )
+
             config_to_review[config] = review
             created_reviews.append(review)
 
@@ -147,11 +207,16 @@ def provision_reviews_for_staging_revision(revision: StagingBatchRevision) -> li
                 if dep_config in config_to_review:
                     review.depends_on.add(config_to_review[dep_config])
 
-        # Reviews with no dependencies start as PENDING, others remain WAITING
+        # Reviews with no unresolved dependencies start as PENDING, others remain WAITING
         for review in created_reviews:
-            if not review.depends_on.exists():
-                review.state = StagingReview.State.PENDING
-                review.save(update_fields=["state"])
+            if review.state == StagingReview.State.WAITING:
+                prereqs = review.depends_on.all()
+                if not prereqs.exists() or all(
+                    p.state in (StagingReview.State.ACCEPTED, StagingReview.State.OVERRIDDEN, StagingReview.State.SKIPPED)
+                    for p in prereqs
+                ):
+                    review.state = StagingReview.State.PENDING
+                    review.save(update_fields=["state"])
 
     return created_reviews
 
@@ -407,7 +472,7 @@ def show_staging_review_endpoint(payload: StagingReviewShowRequest):
         res = StagingReviewShowResponse(staging_id=payload.staging_id, reviews=[])
         return msgspec.structs.asdict(res)
 
-    reviews = latest_rev.reviews.all()
+    reviews = latest_rev.reviews.select_related("scope", "actor", "reviewer_user", "reviewer_group").all()
 
     if payload.reviewer:
         from pull_requests.api import parse_reviewer
@@ -432,7 +497,9 @@ def approve_staging_review_endpoint(payload: StagingReviewApproveRequest, reques
     user = get_authenticated_user(request)
     review.actor = user
     review.justification = None
+    review.is_inherited = False
     review.save()
+    propagate_review_decision(review)
 
     res = StagingReviewActionResponse(staging_id=payload.staging_id, review=review_to_detail(review))
     return msgspec.structs.asdict(res)
@@ -448,7 +515,9 @@ def decline_staging_review_endpoint(payload: StagingReviewDeclineRequest, reques
     user = get_authenticated_user(request)
     review.actor = user
     review.justification = payload.message
+    review.is_inherited = False
     review.save()
+    propagate_review_decision(review)
 
     res = StagingReviewActionResponse(staging_id=payload.staging_id, review=review_to_detail(review))
     return msgspec.structs.asdict(res)
@@ -464,7 +533,9 @@ def needinfo_staging_review_endpoint(payload: StagingReviewNeedInfoRequest, requ
     user = get_authenticated_user(request)
     review.actor = user
     review.justification = payload.message
+    review.is_inherited = False
     review.save()
+    propagate_review_decision(review)
 
     res = StagingReviewActionResponse(staging_id=payload.staging_id, review=review_to_detail(review))
     return msgspec.structs.asdict(res)
@@ -487,7 +558,9 @@ def clear_needinfo_staging_review_endpoint(payload: StagingReviewClearNeedInfoRe
         review.state = StagingReview.State.PENDING
         review.actor = user
         review.justification = payload.message
+        review.is_inherited = False
         review.save()
+        propagate_review_decision(review)
         last_review = review
 
     if not last_review:
@@ -507,7 +580,9 @@ def reopen_staging_review_endpoint(payload: StagingReviewReopenRequest, request)
     user = get_authenticated_user(request)
     review.actor = user
     review.justification = payload.message
+    review.is_inherited = False
     review.save()
+    propagate_review_decision(review)
 
     res = StagingReviewActionResponse(staging_id=payload.staging_id, review=review_to_detail(review))
     return msgspec.structs.asdict(res)
