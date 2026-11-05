@@ -94,10 +94,20 @@
     }
   },
   {
+    "model": "core.org",
+    "pk": 1,
+    "fields": {
+      "name": "openSUSE",
+      "user": null
+    }
+  },
+  {
     "model": "core.project",
     "pk": 1,
     "fields": {
-      "name": "openSUSE:Factory"
+      "name": "openSUSE:Factory",
+      "org": 1,
+      "branch_name": "factory"
     }
   },
   {
@@ -115,14 +125,18 @@
     "model": "core.project",
     "pk": 2,
     "fields": {
-      "name": "openSUSE:Leap:16.1"
+      "name": "openSUSE:Leap:16.1",
+      "org": 1,
+      "branch_name": "leap-16.1"
     }
   },
   {
     "model": "core.project",
     "pk": 3,
     "fields": {
-      "name": "openSUSE:Leap:16.0"
+      "name": "openSUSE:Leap:16.0",
+      "org": 1,
+      "branch_name": "leap-16.0"
     }
   },
   {
