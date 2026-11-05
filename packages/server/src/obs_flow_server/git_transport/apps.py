@@ -6,5 +6,10 @@ class GitTransportConfig(AppConfig):
     name = "git_transport"
 
     def ready(self):
-        # We will initialize the Unix socket server in Iteration 2
-        pass
+        import sys
+        # Only start the server when running commands, serving requests, or testing
+        from .hook_server import start_hook_server
+        try:
+            start_hook_server()
+        except Exception:
+            pass
