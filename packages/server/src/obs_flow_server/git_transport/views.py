@@ -105,7 +105,7 @@ def _receive_pack_handler(request: HttpRequest, project_param: str, package_para
 
     project, package_name, repo_path = _resolve_repo(project_param, package_param)
 
-    env = os.environ.copy()
+    env = {k: v for k, v in os.environ.items() if not k.startswith("GIT_CONFIG_")}
     env["OBS_FLOW_USER"] = user.username
     env["OBS_FLOW_PROJECT"] = project.name
     if package_name:
@@ -114,9 +114,10 @@ def _receive_pack_handler(request: HttpRequest, project_param: str, package_para
     if socket_path:
         env["OBS_FLOW_HOOKS_SOCKET"] = str(socket_path)
 
+    hooks_path = repo_path / "hooks"
     try:
         proc = subprocess.Popen(
-            ["git", "receive-pack", "--stateless-rpc", str(repo_path)],
+            ["git", "-c", f"core.hooksPath={hooks_path}", "receive-pack", "--stateless-rpc", str(repo_path)],
             stdin=subprocess.PIPE,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
