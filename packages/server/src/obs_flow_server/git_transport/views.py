@@ -146,6 +146,11 @@ def _receive_pack_handler(request: HttpRequest, project_param: str, package_para
 
 
 # --- Package-level views ---
+def package_repo_root(request: HttpRequest, project: str, package: str) -> HttpResponse:
+    _project, _pkg_name, _repo_path = _resolve_repo(project, package)
+    return HttpResponse("Git repository\n", content_type="text/plain")
+
+
 def package_info_refs(request: HttpRequest, project: str, package: str) -> HttpResponse:
     return _info_refs_handler(request, project, package)
 
@@ -161,6 +166,11 @@ def package_receive_pack(request: HttpRequest, project: str, package: str) -> Ht
 
 
 # --- Project-level views ---
+def project_repo_root(request: HttpRequest, project: str) -> HttpResponse:
+    _project, _pkg_name, _repo_path = _resolve_repo(project, None)
+    return HttpResponse("Git repository\n", content_type="text/plain")
+
+
 def project_info_refs(request: HttpRequest, project: str) -> HttpResponse:
     return _info_refs_handler(request, project, None)
 
