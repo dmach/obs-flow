@@ -424,3 +424,132 @@ class TestProjectDebounceSetting(TestCase):
             errors = check_review_debounce_setting(None)
             self.assertEqual(len(errors), 1)
             self.assertEqual(errors[0].id, "core.E002")
+
+
+class TestNativeGitForgeDomainModels(TransactionTestCase):
+    def test_org_creation_and_properties(self):
+        from accounts.models import User
+        from core.models import Org
+
+        # Shared org
+        shared = Org.objects.create(name="openSUSE")
+        self.assertFalse(shared.is_personal)
+        self.assertEqual(str(shared), "openSUSE")
+
+        # Personal org linked to user
+        user = User.objects.create(username="tux", username_lower="tux", account_type=User.AccountType.HUMAN)
+        personal = user.implicit_personal_org
+        self.assertTrue(personal.is_personal)
+        self.assertEqual(personal.name, "~tux")
+        self.assertEqual(personal.user, user)
+
+    def test_org_name_validations(self):
+        from core.models import Org
+        from django.core.exceptions import ValidationError
+
+        # Invalid characters or formats
+        invalid_names = [".hidden", "bad..name", "invalid.git", "", "-starts-with-dash"]
+        for bad_name in invalid_names:
+            with self.subTest(bad_name=bad_name):
+                with self.assertRaises(ValidationError):
+                    Org.objects.create(name=bad_name)
+
+    def test_org_immutability(self):
+        from core.models import Org
+        from django.core.exceptions import ValidationError
+
+        org = Org.objects.create(name="suse-org")
+        org.name = "suse-renamed"
+        with self.assertRaises(ValidationError):
+            org.save()
+
+    def test_org_case_insensitive_uniqueness(self):
+        from core.models import Org
+        from django.db import IntegrityError
+
+        Org.objects.create(name="MyOrg")
+        with self.assertRaises(IntegrityError):
+            Org.objects.create(name="myorg")
+
+    def test_project_with_org_and_branch(self):
+        from core.models import Org, Project
+        from django.core.exceptions import ValidationError
+
+        org = Org.objects.create(name="opensuse-distro")
+        proj = Project.objects.create(name="openSUSE:Factory", org=org, branch_name="factory")
+        self.assertEqual(proj.org, org)
+        self.assertEqual(proj.branch_name, "factory")
+
+        # Branch name cannot contain '/'
+        with self.assertRaises(ValidationError):
+            Project.objects.create(name="proj2", org=org, branch_name="feature/foo")
+
+        # Branch name cannot contain '..'
+        with self.assertRaises(ValidationError):
+            Project.objects.create(name="proj3", org=org, branch_name="foo..bar")
+
+    def test_project_branch_unique_per_org(self):
+        from core.models import Org, Project
+        from django.db import IntegrityError
+
+        org1 = Org.objects.create(name="org1")
+        org2 = Org.objects.create(name="org2")
+
+        Project.objects.create(name="p1", org=org1, branch_name="master")
+
+        # Same branch in different org is allowed
+        Project.objects.create(name="p2", org=org2, branch_name="master")
+
+        # Same branch in same org is forbidden
+        with self.assertRaises(IntegrityError):
+            Project.objects.create(name="p3", org=org1, branch_name="master")
+
+    def test_project_immutability(self):
+        from core.models import Org, Project
+        from django.core.exceptions import ValidationError
+
+        org = Org.objects.create(name="myorg")
+        proj = Project.objects.create(name="myproject", org=org, branch_name="main")
+
+        # Cannot rename project
+        proj.name = "renamed"
+        with self.assertRaises(ValidationError):
+            proj.save()
+
+        proj.refresh_from_db()
+
+        # Cannot change branch name
+        proj.branch_name = "devel"
+        with self.assertRaises(ValidationError):
+            proj.save()
+
+    def test_package_validations_and_forks(self):
+        from accounts.models import User
+        from core.models import Org, Project, Package
+        from django.core.exceptions import ValidationError
+
+        org = Org.objects.create(name="distro")
+        proj = Project.objects.create(name="Factory", org=org, branch_name="factory")
+
+        pkg = Package.objects.create(project=proj, name="bash")
+        self.assertEqual(str(pkg), "Factory/bash")
+
+        # Package name validation
+        with self.assertRaises(ValidationError):
+            Package.objects.create(project=proj, name="bash.git")
+
+        # Package renaming forbidden
+        pkg.name = "zsh"
+        with self.assertRaises(ValidationError):
+            pkg.save()
+
+        pkg.refresh_from_db()
+
+        # Fork relationship
+        dev_user = User.objects.create(username="developer", username_lower="developer", account_type=User.AccountType.HUMAN)
+        user_org = dev_user.implicit_personal_org
+        devel_proj = Project.objects.create(name="home:developer", org=user_org, branch_name="dev")
+        forked_pkg = Package.objects.create(project=devel_proj, name="bash", forked_from=pkg)
+        self.assertEqual(forked_pkg.forked_from, pkg)
+        self.assertIn(forked_pkg, pkg.forks.all())
+

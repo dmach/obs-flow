@@ -12,7 +12,9 @@ class PullRequest(models.Model):
         CLOSED = "closed", "Closed"
         MERGED = "merged", "Merged"
 
-    target = models.ForeignKey(GitMapping, on_delete=models.CASCADE, related_name="pull_requests")
+    target = models.ForeignKey(GitMapping, on_delete=models.CASCADE, related_name="pull_requests", null=True, blank=True)
+    project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name="native_pull_requests", null=True, blank=True)
+    package = models.ForeignKey("core.Package", on_delete=models.CASCADE, related_name="native_pull_requests", null=True, blank=True)
     number = models.IntegerField()
     author = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="pull_requests")
     state = models.CharField(max_length=10, choices=State.choices, default=State.OPEN)
@@ -31,11 +33,26 @@ class PullRequest(models.Model):
         return latest.is_draft if latest else False
 
     @property
-    def target_project(self) -> Project:
-        return self.target.target_project
+    def target_project(self) -> Project | None:
+        if self.project:
+            return self.project
+        if self.package:
+            return self.package.project
+        if self.target:
+            return self.target.target_project
+        return None
+
+    @property
+    def target_package(self):
+        if self.package:
+            return self.package
+        if self.target and self.target.package:
+            return self.target.package
+        return None
 
     def __str__(self):
-        return f"PR #{self.number} ({self.state}) on {self.target}"
+        target_repr = self.target or (f"{self.target_project}/{self.package.name if self.package else '_project'}")
+        return f"PR #{self.number} ({self.state}) on {target_repr}"
 
 
 class PullRequestRevision(models.Model):

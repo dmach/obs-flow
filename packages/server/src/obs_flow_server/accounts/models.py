@@ -62,6 +62,15 @@ class User(AbstractBaseUser):
             return False
         return super().check_password(raw_password)
 
+    @property
+    def implicit_personal_org(self):
+        from core.models import Org
+        org, _ = Org.objects.get_or_create(
+            user=self,
+            defaults={"name": f"~{self.username}"},
+        )
+        return org
+
     def save(self, *args, **kwargs):
         self.username_lower = self.username.lower()
         super().save(*args, **kwargs)
@@ -140,4 +149,19 @@ class UserPreferences(models.Model):
 
     def __str__(self):
         return f"Preferences for {self.user.username}"
+
+
+from django.db.models.signals import post_save
+from django.dispatch import receiver
+
+
+@receiver(post_save, sender=User)
+def create_user_personal_org(sender, instance, created, raw=False, **kwargs):
+    if created and not raw:
+        from core.models import Org
+        Org.objects.get_or_create(
+            user=instance,
+            defaults={"name": f"~{instance.username}"},
+        )
+
 
