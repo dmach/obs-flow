@@ -8,6 +8,8 @@ import msgspec
 from obs_flow_common.messages import (
     ProjectListRequest,
     ProjectListResponse,
+    ProjectCreateRequest,
+    ProjectCreateResponse,
     ProjectUpdateRequest,
     ProjectUpdateResponse,
 )
@@ -28,6 +30,21 @@ def project_list(conn: Connection, req: ProjectListRequest) -> ProjectListRespon
     serialized_data = msgspec.json.encode(req)
     response_bytes = conn.post("/api/v1/project/list", data=serialized_data)
     return msgspec.json.decode(response_bytes, type=ProjectListResponse)
+
+
+def project_create(conn: Connection, req: ProjectCreateRequest) -> ProjectCreateResponse:
+    """Creates a new project.
+
+    Args:
+        conn: The Connection instance to the OBS Flow server.
+        req: The ProjectCreateRequest payload.
+
+    Returns:
+        A ProjectCreateResponse containing the created project details.
+    """
+    serialized_data = msgspec.json.encode(req)
+    response_bytes = conn.post("/api/v1/project/create", data=serialized_data)
+    return msgspec.json.decode(response_bytes, type=ProjectCreateResponse)
 
 
 def project_update(conn: Connection, req: ProjectUpdateRequest) -> ProjectUpdateResponse:

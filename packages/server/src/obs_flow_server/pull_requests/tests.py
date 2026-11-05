@@ -1519,3 +1519,65 @@ class TestPRWebMergeActions(TestCase):
         self.assertContains(res, "Cannot merge")
         self.assertContains(res, "in draft mode")
         self.assertNotContains(res, "Confirm Merge")
+
+
+class TestNativePRCreation(TransactionTestCase):
+    def test_native_pr_create_and_review_provisioning(self):
+        import json
+        from django_bolt.testing import TestClient
+        from obs_flow_server.api import api
+        from core.models import Org, Project, Package
+        from reviews.models import ReviewConfig
+
+        org = Org.objects.create(name="openSUSE")
+        proj = Project.objects.create(name="openSUSE:Factory", org=org, branch_name="factory", review_debounce_minutes=0)
+        pkg = Package.objects.create(project=proj, name="kernel-source")
+
+        admin_user = User.objects.create(username="admin", username_lower="admin", account_type=User.AccountType.HUMAN)
+        reviewer_user = User.objects.create(username="reviewer1", username_lower="reviewer1", account_type=User.AccountType.HUMAN)
+
+        # Review config on package
+        ReviewConfig.objects.create(
+            project=proj,
+            type=ReviewConfig.ConfigType.PACKAGE,
+            reviewer_user=reviewer_user,
+        )
+
+        with TestClient(api) as client:
+            res = client.post(
+                "/api/v1/pr/create",
+                content=json.dumps({
+                    "target_project": "openSUSE:Factory",
+                    "target_package": "kernel-source",
+                    "author": "developer",
+                    "title": "Upgrade kernel to 6.12",
+                    "source_owner": "~developer",
+                    "source_repo": "kernel-source",
+                    "source_branch": "update",
+                    "is_draft": False,
+                }),
+            )
+            self.assertEqual(res.status_code, 200)
+            pr_data = res.json()["pull_request"]
+            self.assertEqual(pr_data["id"], "openSUSE/kernel-source#1")
+            self.assertEqual(pr_data["title"], "Upgrade kernel to 6.12")
+            self.assertEqual(pr_data["state"], "open")
+
+            # Check that review was provisioned
+            pr = PullRequest.objects.get(project=proj, package=pkg, number=1)
+            rev = pr.revisions.first()
+            self.assertIsNotNone(rev)
+            self.assertEqual(rev.reviews.count(), 1)
+            self.assertEqual(rev.reviews.first().reviewer_user, reviewer_user)
+
+            # Direct merge native PR
+            res_merge = client.post(
+                "/api/v1/pr/merge",
+                content=json.dumps({
+                    "pull_request_ids": ["openSUSE/kernel-source#1"],
+                }),
+            )
+            self.assertEqual(res_merge.status_code, 200)
+            pr.refresh_from_db()
+            self.assertEqual(pr.state, PullRequest.State.MERGED)
+

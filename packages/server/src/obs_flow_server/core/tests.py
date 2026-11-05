@@ -246,3 +246,82 @@ class TestNativeGitForgeDomainModels(TransactionTestCase):
         self.assertEqual(forked_pkg.forked_from, pkg)
         self.assertIn(forked_pkg, pkg.forks.all())
 
+
+class TestNativeGitForgeAPIs(TransactionTestCase):
+    def test_org_api_create_and_list(self):
+        import json
+        with TestClient(api) as client:
+            # Create shared org
+            res = client.post("/api/v1/org/create", content=json.dumps({"name": "openSUSE"}))
+            self.assertEqual(res.status_code, 200)
+            data = res.json()["org"]
+            self.assertEqual(data["name"], "openSUSE")
+            self.assertFalse(data["is_personal"])
+
+            # List orgs
+            res = client.post("/api/v1/org/list", content="{}")
+            self.assertEqual(res.status_code, 200)
+            org_names = [o["name"] for o in res.json()["orgs"]]
+            self.assertIn("openSUSE", org_names)
+
+    def test_project_api_create_and_list(self):
+        import json
+        from core.models import Org
+        org = Org.objects.create(name="distro")
+
+        with TestClient(api) as client:
+            res = client.post(
+                "/api/v1/project/create",
+                content=json.dumps({
+                    "name": "openSUSE:Factory",
+                    "org": "distro",
+                    "branch_name": "factory",
+                    "workflow_type": "staging",
+                }),
+            )
+            self.assertEqual(res.status_code, 200)
+            proj = res.json()["project"]
+            self.assertEqual(proj["name"], "openSUSE:Factory")
+            self.assertEqual(proj["org"], "distro")
+            self.assertEqual(proj["branch_name"], "factory")
+            self.assertEqual(proj["workflow_type"], "staging")
+
+            # Check list includes org and branch_name
+            res = client.post("/api/v1/project/list", content="{}")
+            self.assertEqual(res.status_code, 200)
+            matching = [p for p in res.json()["projects"] if p["name"] == "openSUSE:Factory"]
+            self.assertEqual(len(matching), 1)
+            self.assertEqual(matching[0]["org"], "distro")
+            self.assertEqual(matching[0]["branch_name"], "factory")
+
+    def test_package_api_create_and_list(self):
+        import json
+        from core.models import Org, Project
+
+        org = Org.objects.create(name="distro")
+        proj = Project.objects.create(name="Factory", org=org, branch_name="factory")
+
+        with TestClient(api) as client:
+            # Create package
+            res = client.post(
+                "/api/v1/package/create",
+                content=json.dumps({
+                    "project": "Factory",
+                    "name": "bash",
+                }),
+            )
+            self.assertEqual(res.status_code, 200)
+            pkg = res.json()["package"]
+            self.assertEqual(pkg["name"], "bash")
+            self.assertEqual(pkg["project"], "Factory")
+
+            # List packages
+            res = client.post(
+                "/api/v1/package/list",
+                content=json.dumps({"project": "Factory"}),
+            )
+            self.assertEqual(res.status_code, 200)
+            self.assertEqual(len(res.json()["packages"]), 1)
+            self.assertEqual(res.json()["packages"][0]["name"], "bash")
+
+

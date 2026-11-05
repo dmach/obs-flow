@@ -17,9 +17,24 @@ from obs_flow_client.git_mapping import (
     git_mapping_list,
     git_mapping_remove,
 )
+from obs_flow_client.org import (
+    org_list,
+    org_create,
+)
+from obs_flow_client.package import (
+    package_list,
+    package_create,
+)
 from obs_flow_client.project import (
     project_list,
+    project_create,
     project_update,
+)
+from obs_flow_client.pull_requests import (
+    pr_create,
+    pr_ready_for_review,
+    pr_convert_to_draft,
+    pr_merge,
 )
 from obs_flow_client.reviews import (
     pr_review_approve,
@@ -60,8 +75,17 @@ __all__ = [
     "git_mapping_edit",
     "git_mapping_list",
     "git_mapping_remove",
+    "org_list",
+    "org_create",
+    "package_list",
+    "package_create",
+    "project_create",
     "project_list",
     "project_update",
+    "pr_create",
+    "pr_ready_for_review",
+    "pr_convert_to_draft",
+    "pr_merge",
     "pr_review_approve",
     "pr_review_clear_needinfo",
     "pr_review_decline",
