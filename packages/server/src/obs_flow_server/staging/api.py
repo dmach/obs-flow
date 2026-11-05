@@ -46,7 +46,7 @@ from staging.views import update_staging_batch
 
 
 def pr_to_id(pr: PullRequest) -> str:
-    return f"{pr.target.owner}/{pr.target.repo}#{pr.number}"
+    return pr.formatted_id
 
 
 def compute_staging_fingerprint(batch: StagingBatch, pr_revisions) -> str:
@@ -613,7 +613,7 @@ def staging_merge_endpoint(payload: StagingMergeRequest):
             for pr in batch_prs:
                 if pr.state != PullRequest.State.MERGED:
                     try:
-                        _do_gitea_merge(pr.target.owner, pr.target.repo, pr.number)
+                        _do_gitea_merge(pr.target_owner, pr.target_repo, pr.number)
                     except ValueError as e:
                         return HttpResponseBadRequest(str(e))
                     pr.state = PullRequest.State.MERGED

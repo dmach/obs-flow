@@ -17,7 +17,7 @@ from pull_requests.forms import PullRequestFilterForm
 @ensure_csrf_cookie
 def pr_list(request):
     form = PullRequestFilterForm(request.GET)
-    qs = PullRequest.objects.select_related("target", "author").all().order_by("-id")
+    qs = PullRequest.objects.select_related("project", "project__org", "package", "author").all().order_by("-id")
 
     if form.is_valid():
         title = form.cleaned_data.get("title")
@@ -71,19 +71,25 @@ def pr_list(request):
                 qs = qs.filter(source_branch__icontains=source_branch)
         if target_owner:
             if target_owner_exact:
-                qs = qs.filter(target__owner__iexact=target_owner)
+                qs = qs.filter(project__org__name__iexact=target_owner)
             else:
-                qs = qs.filter(target__owner__icontains=target_owner)
+                qs = qs.filter(project__org__name__icontains=target_owner)
         if target_repo:
             if target_repo_exact:
-                qs = qs.filter(target__repo__iexact=target_repo)
+                if target_repo.lower() == "_project":
+                    qs = qs.filter(package__isnull=True)
+                else:
+                    qs = qs.filter(package__name__iexact=target_repo)
             else:
-                qs = qs.filter(target__repo__icontains=target_repo)
+                if "_project".startswith(target_repo.lower()):
+                    qs = qs.filter(Q(package__name__icontains=target_repo) | Q(package__isnull=True))
+                else:
+                    qs = qs.filter(package__name__icontains=target_repo)
         if target_branch:
             if target_branch_exact:
-                qs = qs.filter(target__branch__iexact=target_branch)
+                qs = qs.filter(project__branch_name__iexact=target_branch)
             else:
-                qs = qs.filter(target__branch__icontains=target_branch)
+                qs = qs.filter(project__branch_name__icontains=target_branch)
 
         if reviewer_person:
             if reviewer_person_include_groups:
@@ -97,12 +103,13 @@ def pr_list(request):
         if reviewer_group:
             qs = qs.filter(revisions__reviews__reviewer_group__name__iexact=reviewer_group).distinct()
 
-    allowed_sorts = ['id', 'title', 'author__username', 'target__branch', 'is_mergeable', 'state']
+    allowed_sorts = ['id', 'title', 'author__username', 'target__branch', 'project__branch_name', 'is_mergeable', 'state']
     sort_param = request.GET.get('sort', '-id')
     if sort_param.lstrip('-') not in allowed_sorts:
         sort_param = '-id'
 
-    qs = qs.order_by(sort_param)
+    sort_field = sort_param.replace('target__branch', 'project__branch_name')
+    qs = qs.order_by(sort_field)
 
     page_size = request.user.page_size if request.user.is_authenticated else 100
     paginator = Paginator(qs, page_size)
@@ -234,7 +241,7 @@ def pr_merge_action(request, pr_id):
 
     from pull_requests.api import _do_gitea_merge
     try:
-        _do_gitea_merge(pr.target.owner, pr.target.repo, pr.number)
+        _do_gitea_merge(pr.target_owner, pr.target_repo, pr.number)
         pr.state = PullRequest.State.MERGED
         pr.save(update_fields=["state"])
         messages.success(request, f"Pull request #{pr.number} merged successfully.")
@@ -265,7 +272,7 @@ def pr_bulk_merge(request):
                 errors.append(f"PR #{pr.number}: Already merged.")
                 continue
 
-            _do_gitea_merge(pr.target.owner, pr.target.repo, pr.number)
+            _do_gitea_merge(pr.target_owner, pr.target_repo, pr.number)
             pr.state = PullRequest.State.MERGED
             pr.save(update_fields=["state"])
             merged_count += 1
@@ -366,7 +373,7 @@ def pr_ui_modal_execute_merge(request):
                 errors.append(f"PR #{pr.number}: {error}")
                 continue
 
-            _do_gitea_merge(pr.target.owner, pr.target.repo, pr.number)
+            _do_gitea_merge(pr.target_owner, pr.target_repo, pr.number)
             pr.state = PullRequest.State.MERGED
             pr.save(update_fields=["state"])
             merged_count += 1

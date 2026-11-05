@@ -33,7 +33,7 @@ from obs_flow_server.api import api
 
 from accounts.helpers import build_user_dto, get_authenticated_user, get_auth_header
 from accounts.models import User, Group
-from core.models import GitMapping, Project, Package
+from core.models import Org, Project, Package
 from pull_requests.models import PullRequest, PullRequestRevision, PullRequestReview
 from reviews.api import build_reviewer_dto_from_fields
 
@@ -48,25 +48,18 @@ def get_pull_request(pull_request_id: str) -> PullRequest:
     owner, repo, number = match.groups()
     number = int(number)
 
-    try:
+    if repo == "_project":
         return PullRequest.objects.get(
-            target__owner=owner,
-            target__repo=repo,
+            project__org__name__iexact=owner,
+            package__isnull=True,
             number=number,
         )
-    except PullRequest.DoesNotExist:
-        if repo == "_project":
-            return PullRequest.objects.get(
-                project__org__name=owner,
-                package__isnull=True,
-                number=number,
-            )
-        else:
-            return PullRequest.objects.get(
-                project__org__name=owner,
-                package__name=repo,
-                number=number,
-            )
+    else:
+        return PullRequest.objects.get(
+            project__org__name__iexact=owner,
+            package__name__iexact=repo,
+            number=number,
+        )
 
 
 def parse_reviewer(reviewer_str: str | None):
@@ -256,9 +249,9 @@ def provision_reviews_for_revision(revision: PullRequestRevision) -> list[PullRe
 
     pr = rev.pull_request
     project = pr.target_project
-    if pr.package or (pr.target and pr.target.package_id):
+    if pr.package:
         config_type = ReviewConfig.ConfigType.PACKAGE
-    elif pr.project or (pr.target and pr.target.project_id):
+    elif pr.project:
         config_type = ReviewConfig.ConfigType.PROJECT
     else:
         config_type = None
@@ -367,31 +360,53 @@ def _do_sync_pull_request(req: PRSyncRequest) -> PRSyncResponse:
         }
     )
 
-    # Find GitMapping
-    base_branch = data.get("base", {}).get("ref", "main")
-    try:
-        git_mapping = GitMapping.objects.get(
-            owner__iexact=req.owner,
-            repo__iexact=req.repo,
-            branch=base_branch
-        )
-    except GitMapping.DoesNotExist:
-        raise Exception(f"No GitMapping found for {req.owner}/{req.repo}:{base_branch}")
-
-    # Get or create PR
-    pr, created = PullRequest.objects.get_or_create(
-        target=git_mapping,
+    # Find existing PR or lookup Org, Project, Package
+    existing_pr = PullRequest.objects.filter(
         number=req.number,
-        defaults={
-            "author": author,
-            "title": title,
-            "is_mergeable": mergeable,
-            "state": pr_state,
-            "source_owner": data.get("head", {}).get("repo", {}).get("owner", {}).get("login", req.owner),
-            "source_repo": data.get("head", {}).get("repo", {}).get("name", req.repo),
-            "source_branch": data.get("head", {}).get("ref", "unknown"),
-        }
-    )
+        project__org__name__iexact=req.owner,
+        package__name__iexact=req.repo,
+    ).first()
+    if not existing_pr and req.repo.lower() == "_project":
+        existing_pr = PullRequest.objects.filter(
+            number=req.number,
+            project__org__name__iexact=req.owner,
+            package__isnull=True,
+        ).first()
+
+    if existing_pr:
+        pr = existing_pr
+        project = pr.project
+        package = pr.package
+        created = False
+    else:
+        base_branch = data.get("base", {}).get("ref", "main")
+        try:
+            org = Org.objects.get(name__iexact=req.owner)
+            project = Project.objects.get(org=org, branch_name=base_branch)
+        except (Org.DoesNotExist, Project.DoesNotExist):
+            raise Exception(f"No project found for {req.owner}:{base_branch}")
+
+        if req.repo.lower() == "_project":
+            package = None
+        else:
+            try:
+                package = Package.objects.get(project=project, name__iexact=req.repo)
+            except Package.DoesNotExist:
+                package = None
+
+        pr = PullRequest.objects.create(
+            project=project,
+            package=package,
+            number=req.number,
+            author=author,
+            title=title,
+            is_mergeable=mergeable,
+            state=pr_state,
+            source_owner=data.get("head", {}).get("repo", {}).get("owner", {}).get("login", req.owner),
+            source_repo=data.get("head", {}).get("repo", {}).get("name", req.repo),
+            source_branch=data.get("head", {}).get("ref", "unknown"),
+        )
+        created = True
 
     if not created:
         # Update fields
@@ -403,7 +418,7 @@ def _do_sync_pull_request(req: PRSyncRequest) -> PRSyncResponse:
     # Check revisions
     from pull_requests.fingerprint import PRRevisionPayload
 
-    target_branch = pr.target.branch if pr.target else (pr.target_project.branch_name if pr.target_project else "main")
+    target_branch = pr.target_branch or "main"
     pr_payload = PRRevisionPayload(
         head_sha=head_sha,
         base_sha=base_sha,
@@ -492,15 +507,8 @@ def _do_sync_pull_request(req: PRSyncRequest) -> PRSyncResponse:
 
 def build_pr_detail(pr: PullRequest) -> PRDetail:
     latest_revision = pr.revisions.order_by("-revision_number").first()
-    if pr.target:
-        pr_id = f"{pr.target.owner}/{pr.target.repo}#{pr.number}"
-    else:
-        org_name = pr.target_project.org.name if pr.target_project and pr.target_project.org else "obs"
-        repo_name = pr.package.name if pr.package else "_project"
-        pr_id = f"{org_name}/{repo_name}#{pr.number}"
-
     return PRDetail(
-        id=pr_id,
+        id=pr.formatted_id,
         title=pr.title,
         state=pr.state,
         is_draft=pr.is_draft,
@@ -568,11 +576,21 @@ def create_pull_request_endpoint(payload: PRCreateRequest):
         rev_is_draft = True
         rev_draft_expires_at = timezone.now() + timedelta(minutes=timeout_minutes)
 
+    target_branch = target_project.branch_name or "main"
+    from pull_requests.fingerprint import PRRevisionPayload
+    pr_payload = PRRevisionPayload(
+        head_sha=payload.head_sha or "0" * 40,
+        base_sha=payload.base_sha or "0" * 40,
+        target_branch=target_branch,
+    )
+    computed_fingerprint = pr_payload.compute_fingerprint()
+
     rev = PullRequestRevision.objects.create(
         pull_request=pr,
         revision_number=1,
-        head_sha=payload.head_sha,
-        base_sha=payload.base_sha,
+        head_sha=payload.head_sha or "0" * 40,
+        base_sha=payload.base_sha or "0" * 40,
+        fingerprint=computed_fingerprint,
         is_draft=rev_is_draft,
         draft_expires_at=rev_draft_expires_at,
     )
@@ -747,9 +765,9 @@ def pr_merge_endpoint(payload: PRMergeRequest):
         # All valid, execute merges
         updated_prs = []
         for pr_id, pr in prs_to_merge:
-            if pr.target:
+            if getattr(settings, "GITEA_URL", None) and getattr(settings, "GITEA_TOKEN", None):
                 try:
-                    _do_gitea_merge(pr.target.owner, pr.target.repo, pr.number)
+                    _do_gitea_merge(pr.target_owner, pr.target_repo, pr.number)
                 except ValueError as e:
                     return HttpResponseBadRequest(str(e))
 

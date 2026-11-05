@@ -40,7 +40,7 @@
                                 <strong>Included PRs ({{ item.prs|length }}):</strong>
                                 <ul>
                                     {% for pr in item.prs %}
-                                        <li><small>#{{ pr.number }} {{ pr.title|default:"" }} ({{ pr.target.owner }}/{{ pr.target.repo }})</small></li>
+                                        <li><small>#{{ pr.number }} {{ pr.title|default:"" }} ({{ pr.target_owner }}/{{ pr.target_repo }})</small></li>
                                     {% endfor %}
                                 </ul>
                             </div>

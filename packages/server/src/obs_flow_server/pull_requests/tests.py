@@ -5,7 +5,7 @@ from django.utils import timezone
 from django_bolt.testing import TestClient
 
 from accounts.models import User
-from core.models import Project, GitMapping
+from core.models import Project, Package, Org
 from pull_requests.models import PullRequest, PullRequestRevision, PullRequestReview
 from obs_flow_server.api import api
 
@@ -51,9 +51,10 @@ class TestPRSyncEndpoint(TransactionTestCase):
     @patch("urllib.request.urlopen")
     def test_sync_creates_new_pr(self, mock_urlopen):
         """Verify that syncing a non-existent PR creates it and its author/revision."""
-        # Create Project and GitMapping first
-        project = Project.objects.create(name="suse:obs-flow")
-        GitMapping.objects.create(owner="suse", repo="obs-flow", branch="main", project=project)
+        # Create Project and Package first
+        org = Org.objects.get_or_create(name="suse")[0]
+        project = Project.objects.create(name="suse:obs-flow", org=org, branch_name="main")
+        package = Package.objects.create(project=project, name="obs-flow")
 
         # Mock Gitea response
         mock_response = MagicMock()
@@ -112,7 +113,7 @@ class TestPRSyncEndpoint(TransactionTestCase):
         # Verify DB state
         self.assertTrue(User.objects.filter(username="john_doe").exists())
         self.assertTrue(Project.objects.filter(name="suse:obs-flow").exists())
-        self.assertTrue(GitMapping.objects.filter(owner="suse", repo="obs-flow").exists())
+        self.assertTrue(Package.objects.filter(project=project, name="obs-flow").exists())
         pr = PullRequest.objects.get(number=123)
         self.assertTrue(pr.is_draft)
         latest_rev = pr.revisions.first()
@@ -127,11 +128,13 @@ class TestPRSyncEndpoint(TransactionTestCase):
     def test_sync_updates_existing_pr_and_creates_revision(self, mock_urlopen):
         """Verify that syncing an existing PR updates it and creates a new revision if SHA changed."""
         # Create initial DB state
-        project = Project.objects.create(name="suse:obs-flow")
-        git_mapping = GitMapping.objects.create(owner="suse", repo="obs-flow", branch="main", project=project)
+        org = Org.objects.get_or_create(name="suse")[0]
+        project = Project.objects.create(name="suse:obs-flow", org=org, branch_name="main")
+        package = Package.objects.create(project=project, name="obs-flow")
         author = User.objects.create(username="john_doe", username_lower="john_doe", account_type=User.AccountType.HUMAN)
         pr = PullRequest.objects.create(
-            target=git_mapping,
+            project=project,
+            package=package,
             number=123,
             author=author,
             title="Old Title",
@@ -153,7 +156,7 @@ class TestPRSyncEndpoint(TransactionTestCase):
         reviewer_user = User.objects.create(username="reviewer1", username_lower="reviewer1", account_type=User.AccountType.HUMAN)
         ReviewConfig.objects.create(
             project=project,
-            type=ReviewConfig.ConfigType.PROJECT,
+            type=ReviewConfig.ConfigType.PACKAGE,
             reviewer_user=reviewer_user
         )
 
@@ -240,13 +243,13 @@ class TestPRSyncEndpoint(TransactionTestCase):
     @patch("urllib.request.urlopen")
     def test_sync_creates_revision_for_package_pr_and_creates_reviews(self, mock_urlopen):
         """Verify that syncing a package PR creates reviews based on ReviewConfig for package type."""
-        from core.models import Package
-        project = Project.objects.create(name="suse:obs-flow")
-        package = Package.objects.create(project=project, name="my-package")
-        git_mapping = GitMapping.objects.create(owner="suse", repo="obs-flow", branch="main", package=package)
+        org = Org.objects.get_or_create(name="suse")[0]
+        project = Project.objects.create(name="suse:obs-flow", org=org, branch_name="main")
+        package = Package.objects.create(project=project, name="obs-flow")
         author = User.objects.create(username="john_doe", username_lower="john_doe", account_type=User.AccountType.HUMAN)
         pr = PullRequest.objects.create(
-            target=git_mapping,
+            project=project,
+            package=package,
             number=123,
             author=author,
             title="Old Title",
@@ -334,11 +337,13 @@ class TestPRSyncEndpoint(TransactionTestCase):
     @patch("urllib.request.urlopen")
     def test_sync_rebase_creates_new_revision(self, mock_urlopen):
         """Verify that rebasing (head SHA unchanged, but base SHA changed) creates a new revision."""
-        project = Project.objects.create(name="suse:rebase-test")
-        git_mapping = GitMapping.objects.create(owner="suse", repo="rebase-repo", branch="main", project=project)
+        org = Org.objects.get_or_create(name="suse")[0]
+        project = Project.objects.create(name="suse:rebase-test", org=org, branch_name="main")
+        package = Package.objects.create(project=project, name="rebase-repo")
         author = User.objects.create(username="rebase_user", username_lower="rebase_user", account_type=User.AccountType.HUMAN)
         pr = PullRequest.objects.create(
-            target=git_mapping,
+            project=project,
+            package=package,
             number=999,
             author=author,
             title="Rebase PR",
@@ -416,14 +421,14 @@ class TestPRViews(TransactionTestCase):
     def test_pr_detail_view_with_package(self):
         """Verify that the PR detail page correctly renders the project name and package name when the target is a package."""
         from django.test import Client
-        from core.models import Package
 
-        project = Project.objects.create(name="suse:obs-flow")
+        org = Org.objects.get_or_create(name="suse")[0]
+        project = Project.objects.create(name="suse:obs-flow", org=org, branch_name="main")
         package = Package.objects.create(project=project, name="my-package")
-        git_mapping = GitMapping.objects.create(owner="suse", repo="obs-flow", branch="main", package=package)
         author = User.objects.create(username="john_doe", username_lower="john_doe", account_type=User.AccountType.HUMAN)
         pr = PullRequest.objects.create(
-            target=git_mapping,
+            project=project,
+            package=package,
             number=123,
             author=author,
             title="My PR",
@@ -449,15 +454,17 @@ class TestPRViews(TransactionTestCase):
         user = User.objects.create_user(username="testuser", password="password123", is_local_account=True)
         UserPreferences.objects.create(user=user, page_size=200)
 
-        project = Project.objects.create(name="suse:obs-flow")
-        git_mapping = GitMapping.objects.create(owner="suse", repo="obs-flow", branch="main", project=project)
+        org = Org.objects.get_or_create(name="suse")[0]
+        project = Project.objects.create(name="suse:obs-flow", org=org, branch_name="main")
+        package = Package.objects.create(project=project, name="obs-flow")
         author1 = User.objects.create(username="john_doe", username_lower="john_doe", account_type=User.AccountType.HUMAN)
         author2 = User.objects.create(username="jane_doe", username_lower="jane_doe", account_type=User.AccountType.HUMAN)
 
         # Create 205 PRs to test pagination (page size is 200)
         for i in range(1, 206):
             PullRequest.objects.create(
-                target=git_mapping,
+                project=project,
+                package=package,
                 number=i,
                 author=author1 if i % 2 == 0 else author2,
                 title=f"PR {i}",
@@ -513,11 +520,13 @@ class TestPRRevisionPayload(TestCase):
 
 class TestPullRequestRevisionModel(TestCase):
     def test_revision_draft_fields_default_and_assignment(self):
-        project = Project.objects.create(name="test:project")
-        git_mapping = GitMapping.objects.create(owner="test", repo="repo", branch="main", project=project)
+        org = Org.objects.get_or_create(name="test")[0]
+        project = Project.objects.create(name="test:project", org=org, branch_name="main")
+        package = Package.objects.create(project=project, name="repo")
         author = User.objects.create(username="author1", username_lower="author1", account_type=User.AccountType.HUMAN)
         pr = PullRequest.objects.create(
-            target=git_mapping,
+            project=project,
+            package=package,
             number=1,
             author=author,
             source_owner="author1",
@@ -556,18 +565,20 @@ class TestPullRequestReviewProvisioning(TestCase):
         from reviews.models import ReviewConfig
         from pull_requests.api import provision_reviews_for_revision, mark_ready_for_review
 
-        project = Project.objects.create(name="test:project")
-        git_mapping = GitMapping.objects.create(owner="test", repo="repo", branch="main", project=project)
+        org = Org.objects.get_or_create(name="test")[0]
+        project = Project.objects.create(name="test:project", org=org, branch_name="main")
+        package = Package.objects.create(project=project, name="repo")
         author = User.objects.create(username="author1", username_lower="author1", account_type=User.AccountType.HUMAN)
         reviewer = User.objects.create(username="reviewer1", username_lower="reviewer1", account_type=User.AccountType.HUMAN)
         ReviewConfig.objects.create(
             project=project,
-            type=ReviewConfig.ConfigType.PROJECT,
+            type=ReviewConfig.ConfigType.PACKAGE,
             reviewer_user=reviewer,
         )
 
         pr = PullRequest.objects.create(
-            target=git_mapping,
+            project=project,
+            package=package,
             number=1,
             author=author,
             source_owner="author1",
@@ -603,26 +614,28 @@ class TestPullRequestReviewProvisioning(TestCase):
         from reviews.models import ReviewConfig
         from pull_requests.api import provision_reviews_for_revision
 
-        project = Project.objects.create(name="test:deps-project")
-        git_mapping = GitMapping.objects.create(owner="test", repo="repo", branch="main", project=project)
+        org = Org.objects.get_or_create(name="test")[0]
+        project = Project.objects.create(name="test:deps-project", org=org, branch_name="main")
+        package = Package.objects.create(project=project, name="repo")
         author = User.objects.create(username="author_dep", username_lower="author_dep", account_type=User.AccountType.HUMAN)
         rev1 = User.objects.create(username="reviewer_a", username_lower="reviewer_a", account_type=User.AccountType.HUMAN)
         rev2 = User.objects.create(username="reviewer_b", username_lower="reviewer_b", account_type=User.AccountType.HUMAN)
 
         cfg1 = ReviewConfig.objects.create(
             project=project,
-            type=ReviewConfig.ConfigType.PROJECT,
+            type=ReviewConfig.ConfigType.PACKAGE,
             reviewer_user=rev1,
         )
         cfg2 = ReviewConfig.objects.create(
             project=project,
-            type=ReviewConfig.ConfigType.PROJECT,
+            type=ReviewConfig.ConfigType.PACKAGE,
             reviewer_user=rev2,
         )
         cfg2.depends_on.add(cfg1)
 
         pr = PullRequest.objects.create(
-            target=git_mapping,
+            project=project,
+            package=package,
             number=99,
             author=author,
             source_owner="author_dep",
@@ -654,22 +667,24 @@ class TestPullRequestReviewProvisioning(TestCase):
         from reviews.models import ReviewConfig
         from pull_requests.api import provision_reviews_for_revision
 
-        project = Project.objects.create(name="test:cascade-pr")
-        git_mapping = GitMapping.objects.create(owner="test", repo="repo", branch="main", project=project)
+        org = Org.objects.get_or_create(name="test")[0]
+        project = Project.objects.create(name="test:cascade-pr", org=org, branch_name="main")
+        package = Package.objects.create(project=project, name="repo")
         author = User.objects.create(username="author_cas", username_lower="author_cas", account_type=User.AccountType.HUMAN)
         u1 = User.objects.create(username="rev_1", username_lower="rev_1", account_type=User.AccountType.HUMAN)
         u2 = User.objects.create(username="rev_2", username_lower="rev_2", account_type=User.AccountType.HUMAN)
         u3 = User.objects.create(username="rev_3", username_lower="rev_3", account_type=User.AccountType.HUMAN)
 
-        cfg1 = ReviewConfig.objects.create(project=project, type=ReviewConfig.ConfigType.PROJECT, reviewer_user=u1)
-        cfg2 = ReviewConfig.objects.create(project=project, type=ReviewConfig.ConfigType.PROJECT, reviewer_user=u2)
-        cfg3 = ReviewConfig.objects.create(project=project, type=ReviewConfig.ConfigType.PROJECT, reviewer_user=u3)
+        cfg1 = ReviewConfig.objects.create(project=project, type=ReviewConfig.ConfigType.PACKAGE, reviewer_user=u1)
+        cfg2 = ReviewConfig.objects.create(project=project, type=ReviewConfig.ConfigType.PACKAGE, reviewer_user=u2)
+        cfg3 = ReviewConfig.objects.create(project=project, type=ReviewConfig.ConfigType.PACKAGE, reviewer_user=u3)
 
         # cfg3 depends on BOTH cfg1 and cfg2
         cfg3.depends_on.add(cfg1, cfg2)
 
         pr = PullRequest.objects.create(
-            target=git_mapping,
+            project=project,
+            package=package,
             number=101,
             author=author,
             source_owner="author_cas",
@@ -732,18 +747,20 @@ class TestPullRequestReviewProvisioning(TestCase):
         from reviews.models import ReviewConfig
         from pull_requests.api import provision_reviews_for_revision
 
-        project = Project.objects.create(name="test:early-pr")
-        git_mapping = GitMapping.objects.create(owner="test", repo="repo", branch="main", project=project)
+        org = Org.objects.get_or_create(name="test")[0]
+        project = Project.objects.create(name="test:early-pr", org=org, branch_name="main")
+        package = Package.objects.create(project=project, name="repo")
         author = User.objects.create(username="author_early", username_lower="author_early", account_type=User.AccountType.HUMAN)
         u1 = User.objects.create(username="rev_early_1", username_lower="rev_early_1", account_type=User.AccountType.HUMAN)
         u2 = User.objects.create(username="rev_early_2", username_lower="rev_early_2", account_type=User.AccountType.HUMAN)
 
-        cfg1 = ReviewConfig.objects.create(project=project, type=ReviewConfig.ConfigType.PROJECT, reviewer_user=u1)
-        cfg2 = ReviewConfig.objects.create(project=project, type=ReviewConfig.ConfigType.PROJECT, reviewer_user=u2)
+        cfg1 = ReviewConfig.objects.create(project=project, type=ReviewConfig.ConfigType.PACKAGE, reviewer_user=u1)
+        cfg2 = ReviewConfig.objects.create(project=project, type=ReviewConfig.ConfigType.PACKAGE, reviewer_user=u2)
         cfg2.depends_on.add(cfg1)
 
         pr = PullRequest.objects.create(
-            target=git_mapping,
+            project=project,
+            package=package,
             number=102,
             author=author,
             source_owner="author_early",
@@ -789,8 +806,9 @@ class TestPRSyncDebounceLifecycle(TransactionTestCase):
     @override_settings(GITEA_URL="https://gitea.example.com", GITEA_TOKEN="secret-token", DEBOUNCE_TIMEOUT_MINUTES=15)
     @patch("urllib.request.urlopen")
     def test_sync_manual_draft_pr_sets_no_expiry(self, mock_urlopen):
-        project = Project.objects.create(name="suse:obs-flow")
-        GitMapping.objects.create(owner="suse", repo="obs-flow", branch="main", project=project)
+        org = Org.objects.get_or_create(name="suse")[0]
+        project = Project.objects.create(name="suse:obs-flow", org=org, branch_name="main")
+        package = Package.objects.create(project=project, name="obs-flow")
 
         mock_response = MagicMock()
         mock_response.read.return_value = json.dumps({
@@ -817,15 +835,17 @@ class TestPRSyncDebounceLifecycle(TransactionTestCase):
     @override_settings(GITEA_URL="https://gitea.example.com", GITEA_TOKEN="secret-token", DEBOUNCE_TIMEOUT_MINUTES=15)
     @patch("urllib.request.urlopen")
     def test_sync_transition_manual_draft_to_published_without_new_push(self, mock_urlopen):
-        project = Project.objects.create(name="suse:obs-flow")
-        git_mapping = GitMapping.objects.create(owner="suse", repo="obs-flow", branch="main", project=project)
+        org = Org.objects.get_or_create(name="suse")[0]
+        project = Project.objects.create(name="suse:obs-flow", org=org, branch_name="main")
+        package = Package.objects.create(project=project, name="obs-flow")
         author = User.objects.create(username="dev", username_lower="dev", account_type=User.AccountType.HUMAN)
         reviewer = User.objects.create(username="rev", username_lower="rev", account_type=User.AccountType.HUMAN)
         from reviews.models import ReviewConfig
-        ReviewConfig.objects.create(project=project, type=ReviewConfig.ConfigType.PROJECT, reviewer_user=reviewer)
+        ReviewConfig.objects.create(project=project, type=ReviewConfig.ConfigType.PACKAGE, reviewer_user=reviewer)
 
         pr = PullRequest.objects.create(
-            target=git_mapping,
+            project=project,
+            package=package,
             number=1,
             author=author,
             source_owner="dev",
@@ -869,11 +889,12 @@ class TestPRSyncDebounceLifecycle(TransactionTestCase):
     @override_settings(GITEA_URL="https://gitea.example.com", GITEA_TOKEN="secret-token", REVIEW_DEBOUNCE_MINUTES=0)
     @patch("urllib.request.urlopen")
     def test_sync_zero_debounce_publishes_immediately(self, mock_urlopen):
-        project = Project.objects.create(name="suse:obs-flow")
-        git_mapping = GitMapping.objects.create(owner="suse", repo="obs-flow", branch="main", project=project)
+        org = Org.objects.get_or_create(name="suse")[0]
+        project = Project.objects.create(name="suse:obs-flow", org=org, branch_name="main")
+        package = Package.objects.create(project=project, name="obs-flow")
         reviewer = User.objects.create(username="rev", username_lower="rev", account_type=User.AccountType.HUMAN)
         from reviews.models import ReviewConfig
-        ReviewConfig.objects.create(project=project, type=ReviewConfig.ConfigType.PROJECT, reviewer_user=reviewer)
+        ReviewConfig.objects.create(project=project, type=ReviewConfig.ConfigType.PACKAGE, reviewer_user=reviewer)
 
         mock_response = MagicMock()
         mock_response.read.return_value = json.dumps({
@@ -901,15 +922,17 @@ class TestPRSyncDebounceLifecycle(TransactionTestCase):
 
 class TestPRReadyForReviewEndpoint(TestCase):
     def setUp(self):
-        self.project = Project.objects.create(name="test:project")
-        self.git_mapping = GitMapping.objects.create(owner="suse", repo="obs-flow", branch="main", project=self.project)
+        self.org = Org.objects.get_or_create(name="suse")[0]
+        self.project = Project.objects.create(name="test:project", org=self.org, branch_name="main")
+        self.package = Package.objects.create(project=self.project, name="obs-flow")
         self.author = User.objects.create(username="dev", username_lower="dev", account_type=User.AccountType.HUMAN)
         self.reviewer = User.objects.create(username="rev", username_lower="rev", account_type=User.AccountType.HUMAN)
         from reviews.models import ReviewConfig
-        ReviewConfig.objects.create(project=self.project, type=ReviewConfig.ConfigType.PROJECT, reviewer_user=self.reviewer)
+        ReviewConfig.objects.create(project=self.project, type=ReviewConfig.ConfigType.PACKAGE, reviewer_user=self.reviewer)
 
         self.pr1 = PullRequest.objects.create(
-            target=self.git_mapping,
+            project=self.project,
+            package=self.package,
             number=42,
             author=self.author,
             source_owner="dev",
@@ -927,7 +950,8 @@ class TestPRReadyForReviewEndpoint(TestCase):
         )
 
         self.pr2 = PullRequest.objects.create(
-            target=self.git_mapping,
+            project=self.project,
+            package=self.package,
             number=43,
             author=self.author,
             source_owner="dev",
@@ -985,15 +1009,17 @@ class TestPRReadyForReviewEndpoint(TestCase):
 
 class TestPRDraftWebViews(TestCase):
     def setUp(self):
-        self.project = Project.objects.create(name="test:project")
-        self.git_mapping = GitMapping.objects.create(owner="suse", repo="obs-flow", branch="main", project=self.project)
+        self.org = Org.objects.get_or_create(name="suse")[0]
+        self.project = Project.objects.create(name="test:project", org=self.org, branch_name="main")
+        self.package = Package.objects.create(project=self.project, name="obs-flow")
         self.author = User.objects.create(username="dev", username_lower="dev", account_type=User.AccountType.HUMAN)
         self.reviewer = User.objects.create(username="rev", username_lower="rev", account_type=User.AccountType.HUMAN)
         from reviews.models import ReviewConfig
-        ReviewConfig.objects.create(project=self.project, type=ReviewConfig.ConfigType.PROJECT, reviewer_user=self.reviewer)
+        ReviewConfig.objects.create(project=self.project, type=ReviewConfig.ConfigType.PACKAGE, reviewer_user=self.reviewer)
 
         self.pr = PullRequest.objects.create(
-            target=self.git_mapping,
+            project=self.project,
+            package=self.package,
             number=42,
             author=self.author,
             source_owner="dev",
@@ -1009,6 +1035,23 @@ class TestPRDraftWebViews(TestCase):
             is_draft=True,
             draft_expires_at=timezone.now() + timezone.timedelta(days=1),
         )
+
+    def test_pr_views_display_id_branch_and_fingerprint(self):
+        from django.test import Client
+        client = Client()
+
+        # Test PR list view
+        res = client.get("/pull-requests/")
+        self.assertEqual(res.status_code, 200)
+        self.assertContains(res, self.pr.formatted_id)
+        self.assertContains(res, self.pr.target_branch)
+
+        # Test PR detail view
+        res = client.get(f"/pull-requests/{self.pr.id}/")
+        self.assertEqual(res.status_code, 200)
+        self.assertContains(res, self.pr.formatted_id)
+        self.assertContains(res, self.pr.target_branch)
+        self.assertContains(res, self.rev.fingerprint)
 
     def test_pr_detail_shows_countdown_and_ready_button(self):
         from django.test import Client
@@ -1095,12 +1138,14 @@ class TestPRDraftWebViews(TestCase):
 
 class TestPRConvertToDraftEndpoint(TestCase):
     def setUp(self):
-        self.project = Project.objects.create(name="test:project")
-        self.git_mapping = GitMapping.objects.create(owner="suse", repo="obs-flow", branch="main", project=self.project)
+        self.org = Org.objects.get_or_create(name="suse")[0]
+        self.project = Project.objects.create(name="test:project", org=self.org, branch_name="main")
+        self.package = Package.objects.create(project=self.project, name="obs-flow")
         self.author = User.objects.create(username="dev", username_lower="dev", account_type=User.AccountType.HUMAN)
 
         self.pr = PullRequest.objects.create(
-            target=self.git_mapping,
+            project=self.project,
+            package=self.package,
             number=42,
             author=self.author,
             source_owner="dev",
@@ -1132,17 +1177,19 @@ class TestPRConvertToDraftEndpoint(TestCase):
 
 class TestMarkExpiredDraftsReadyCommand(TestCase):
     def setUp(self):
-        self.project = Project.objects.create(name="test:project")
-        self.git_mapping = GitMapping.objects.create(owner="suse", repo="obs-flow", branch="main", project=self.project)
+        self.org = Org.objects.get_or_create(name="suse")[0]
+        self.project = Project.objects.create(name="test:project", org=self.org, branch_name="main")
+        self.package = Package.objects.create(project=self.project, name="obs-flow")
         self.author = User.objects.create(username="dev", username_lower="dev", account_type=User.AccountType.HUMAN)
         self.reviewer = User.objects.create(username="rev", username_lower="rev", account_type=User.AccountType.HUMAN)
         from reviews.models import ReviewConfig
-        ReviewConfig.objects.create(project=self.project, type=ReviewConfig.ConfigType.PROJECT, reviewer_user=self.reviewer)
+        ReviewConfig.objects.create(project=self.project, type=ReviewConfig.ConfigType.PACKAGE, reviewer_user=self.reviewer)
         ReviewConfig.objects.create(project=self.project, type="staging", reviewer_user=self.reviewer)
 
         # 1. Expired PR revision
         self.pr_expired = PullRequest.objects.create(
-            target=self.git_mapping,
+            project=self.project,
+            package=self.package,
             number=1,
             author=self.author,
             source_owner="dev",
@@ -1161,7 +1208,8 @@ class TestMarkExpiredDraftsReadyCommand(TestCase):
 
         # 2. Non-expired PR revision
         self.pr_active = PullRequest.objects.create(
-            target=self.git_mapping,
+            project=self.project,
+            package=self.package,
             number=2,
             author=self.author,
             source_owner="dev",
@@ -1180,7 +1228,8 @@ class TestMarkExpiredDraftsReadyCommand(TestCase):
 
         # 3. Manual draft PR revision (no timer)
         self.pr_manual = PullRequest.objects.create(
-            target=self.git_mapping,
+            project=self.project,
+            package=self.package,
             number=3,
             author=self.author,
             source_owner="dev",
@@ -1279,16 +1328,18 @@ class TestMarkExpiredDraftsReadyCommand(TestCase):
 
 class TestPRMergeEndpoint(TestCase):
     def setUp(self):
-        self.project_direct = Project.objects.create(name="test:direct", workflow_type=Project.WorkflowType.DIRECT)
-        self.mapping_direct = GitMapping.objects.create(owner="suse", repo="direct-repo", branch="main", project=self.project_direct)
+        self.org = Org.objects.get_or_create(name="suse")[0]
+        self.project_direct = Project.objects.create(name="test:direct", org=self.org, branch_name="main", workflow_type=Project.WorkflowType.DIRECT)
+        self.package_direct = Package.objects.create(project=self.project_direct, name="direct-repo")
 
-        self.project_staging = Project.objects.create(name="test:staging", workflow_type=Project.WorkflowType.STAGING)
-        self.mapping_staging = GitMapping.objects.create(owner="suse", repo="staging-repo", branch="main", project=self.project_staging)
+        self.project_staging = Project.objects.create(name="test:staging", org=self.org, branch_name="staging", workflow_type=Project.WorkflowType.STAGING)
+        self.package_staging = Package.objects.create(project=self.project_staging, name="staging-repo")
 
         self.author = User.objects.create(username="merger", username_lower="merger", account_type=User.AccountType.HUMAN)
 
         self.pr_direct = PullRequest.objects.create(
-            target=self.mapping_direct,
+            project=self.project_direct,
+            package=self.package_direct,
             number=1,
             author=self.author,
             source_owner="merger",
@@ -1296,7 +1347,8 @@ class TestPRMergeEndpoint(TestCase):
             source_branch="feat-1",
         )
         self.pr_direct_2 = PullRequest.objects.create(
-            target=self.mapping_direct,
+            project=self.project_direct,
+            package=self.package_direct,
             number=2,
             author=self.author,
             source_owner="merger",
@@ -1304,7 +1356,8 @@ class TestPRMergeEndpoint(TestCase):
             source_branch="feat-2",
         )
         self.pr_staging = PullRequest.objects.create(
-            target=self.mapping_staging,
+            project=self.project_staging,
+            package=self.package_staging,
             number=3,
             author=self.author,
             source_owner="merger",
@@ -1383,16 +1436,18 @@ class TestPRMergeEndpoint(TestCase):
 
 class TestPRWebMergeActions(TestCase):
     def setUp(self):
-        self.project_direct = Project.objects.create(name="test:ui-direct", workflow_type=Project.WorkflowType.DIRECT)
-        self.mapping_direct = GitMapping.objects.create(owner="suse", repo="ui-direct", branch="main", project=self.project_direct)
+        self.org = Org.objects.get_or_create(name="suse")[0]
+        self.project_direct = Project.objects.create(name="test:ui-direct", org=self.org, branch_name="main", workflow_type=Project.WorkflowType.DIRECT)
+        self.package_direct = Package.objects.create(project=self.project_direct, name="ui-direct")
 
-        self.project_staging = Project.objects.create(name="test:ui-staging", workflow_type=Project.WorkflowType.STAGING)
-        self.mapping_staging = GitMapping.objects.create(owner="suse", repo="ui-staging", branch="main", project=self.project_staging)
+        self.project_staging = Project.objects.create(name="test:ui-staging", org=self.org, branch_name="staging", workflow_type=Project.WorkflowType.STAGING)
+        self.package_staging = Package.objects.create(project=self.project_staging, name="ui-staging")
 
         self.author = User.objects.create(username="ui_merger", username_lower="ui_merger", account_type=User.AccountType.HUMAN)
 
         self.pr_direct = PullRequest.objects.create(
-            target=self.mapping_direct,
+            project=self.project_direct,
+            package=self.package_direct,
             number=11,
             author=self.author,
             source_owner="ui_merger",
@@ -1409,7 +1464,8 @@ class TestPRWebMergeActions(TestCase):
             draft_expires_at=None,
         )
         self.pr_staging = PullRequest.objects.create(
-            target=self.mapping_staging,
+            project=self.project_staging,
+            package=self.package_staging,
             number=12,
             author=self.author,
             source_owner="ui_merger",
@@ -1426,7 +1482,8 @@ class TestPRWebMergeActions(TestCase):
             draft_expires_at=None,
         )
         self.pr_draft = PullRequest.objects.create(
-            target=self.mapping_direct,
+            project=self.project_direct,
+            package=self.package_direct,
             number=13,
             author=self.author,
             source_owner="ui_merger",
@@ -1570,7 +1627,8 @@ class TestNativePRCreation(TransactionTestCase):
             self.assertEqual(rev.reviews.count(), 1)
             self.assertEqual(rev.reviews.first().reviewer_user, reviewer_user)
 
-            # Direct merge native PR
+            # Direct merge native PR after accepting required reviews
+            rev.reviews.update(state=PullRequestReview.State.ACCEPTED)
             res_merge = client.post(
                 "/api/v1/pr/merge",
                 content=json.dumps({

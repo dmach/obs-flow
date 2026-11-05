@@ -16,7 +16,7 @@
             <ul>
                 {% for conflict in conflicts %}
                     <li>
-                        <strong>{{ conflict.pr.target.owner }}/{{ conflict.pr.target.repo }}#{{ conflict.pr.number }}</strong>
+                        <strong>{{ conflict.pr.formatted_id }}</strong>
                         is in:
                         {% for b in conflict.other_batches %}
                             <code>#{{ b.id }}{% if b.title %} ({{ b.title }}){% endif %}</code>{% if not forloop.last %}, {% endif %}

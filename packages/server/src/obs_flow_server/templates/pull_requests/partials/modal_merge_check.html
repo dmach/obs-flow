@@ -20,7 +20,7 @@
                     {% for item in items %}
                         <tr>
                             <td><strong>#{{ item.pr.number }}</strong> {{ item.pr.title|default:"" }}</td>
-                            <td>{{ item.pr.target.owner }}/{{ item.pr.target.repo }}</td>
+                            <td>{{ item.pr.target_owner }}/{{ item.pr.target_repo }}</td>
                             <td>
                                 {% if item.can_merge %}
                                     <data data-variant="success" value="ready"><strong>✓ Ready to merge</strong></data>

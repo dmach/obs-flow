@@ -4,7 +4,7 @@ from django.test import Client, TestCase, TransactionTestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
 from accounts.models import User, Group
-from core.models import Project, GitMapping
+from core.models import Project, Package, Org
 from pull_requests.models import PullRequest, PullRequestRevision, PullRequestReview
 from staging.models import StagingBatch, StagingBatchRevision, StagingReview
 
@@ -15,7 +15,6 @@ class TestEmptyDatabase(TestCase):
         self.assertEqual(User.objects.count(), 0)
         self.assertEqual(Group.objects.count(), 0)
         self.assertEqual(Project.objects.count(), 0)
-        self.assertEqual(GitMapping.objects.count(), 0)
         self.assertEqual(PullRequest.objects.count(), 0)
         self.assertEqual(PullRequestRevision.objects.count(), 0)
         self.assertEqual(PullRequestReview.objects.count(), 0)
@@ -50,8 +49,8 @@ class TestFixtureData(TestCase):
         # Verify Project
         self.assertTrue(Project.objects.filter(name="openSUSE:Factory").exists())
 
-        # Verify GitMapping
-        self.assertTrue(GitMapping.objects.filter(owner="openSUSE", repo="osc", branch="master").exists())
+        # Verify Package
+        self.assertTrue(Package.objects.filter(project__name="openSUSE:Factory", name="osc").exists())
 
         # Verify PullRequest
         self.assertTrue(PullRequest.objects.filter(number=1234).exists())
@@ -397,13 +396,13 @@ class TestStagingBatchRevision(TransactionTestCase):
         from django_bolt.testing import TestClient
         from obs_flow_server.api import api
 
-        other_project = Project.objects.create(name="openSUSE:Testing")
-        other_mapping = GitMapping.objects.create(
-            owner="openSUSE", repo="leap-pkg", branch="main", project=other_project
-        )
+        other_org = Org.objects.get_or_create(name="openSUSE")[0]
+        other_project = Project.objects.create(name="openSUSE:Testing", org=other_org, branch_name="testing")
+        other_package = Package.objects.create(project=other_project, name="leap-pkg")
         author = User.objects.get(username="darix")
         other_pr = PullRequest.objects.create(
-            target=other_mapping,
+            project=other_project,
+            package=other_package,
             number=999,
             author=author,
             title="Leap PR",
@@ -441,12 +440,10 @@ class TestStagingBatchRevision(TransactionTestCase):
 
         batch = StagingBatch.objects.get(id=1)
         pkg = Package.objects.create(project=batch.project, name="subpackage")
-        pkg_mapping = GitMapping.objects.create(
-            owner="openSUSE", repo="subpkg-repo", branch="main", package=pkg
-        )
         author = User.objects.get(username="darix")
         pkg_pr = PullRequest.objects.create(
-            target=pkg_mapping,
+            project=batch.project,
+            package=pkg,
             number=555,
             author=author,
             title="Subpackage PR",
@@ -462,7 +459,7 @@ class TestStagingBatchRevision(TransactionTestCase):
         initial_rev_count = batch.revisions.count()
         add_payload = {
             "id": batch.id,
-            "pull_request_ids": ["openSUSE/subpkg-repo#555"],
+            "pull_request_ids": ["openSUSE/subpackage#555"],
         }
         with TestClient(api) as client:
             response = client.post(
@@ -492,13 +489,15 @@ class TestStagingUIModalViews(TransactionTestCase):
 
         # 2. Test with mixed projects
         # Let's create a PR targeting a different project
-        project2 = Project.objects.create(name="suse:obs-flow")
-        mapping2 = GitMapping.objects.create(owner="suse", repo="obs-flow", branch="main", project=project2)
+        org2 = Org.objects.get_or_create(name="suse")[0]
+        project2 = Project.objects.create(name="suse:obs-flow", org=org2, branch_name="main")
+        pkg2 = Package.objects.create(project=project2, name="obs-flow")
 
         # Find a user to be the author
         author = User.objects.first()
         pr2 = PullRequest.objects.create(
-            target=mapping2,
+            project=project2,
+            package=pkg2,
             number=123,
             author=author,
             title="PR 2",
@@ -992,13 +991,15 @@ class TestStagingConvertToDraftEndpoint(TestCase):
 
 class TestStagingMergeEndpoint(TestCase):
     def setUp(self):
-        self.project = Project.objects.create(name="test:staging-merge", workflow_type=Project.WorkflowType.STAGING)
-        self.mapping = GitMapping.objects.create(owner="suse", repo="staging-repo", branch="main", project=self.project)
+        self.org = Org.objects.get_or_create(name="suse")[0]
+        self.project = Project.objects.create(name="test:staging-merge", org=self.org, branch_name="main", workflow_type=Project.WorkflowType.STAGING)
+        self.package = Package.objects.create(project=self.project, name="staging-repo")
         self.author = User.objects.create(username="staging_author", username_lower="staging_author", account_type=User.AccountType.HUMAN)
         self.reviewer = User.objects.create(username="staging_reviewer", username_lower="staging_reviewer", account_type=User.AccountType.HUMAN)
 
         self.pr1 = PullRequest.objects.create(
-            target=self.mapping,
+            project=self.project,
+            package=self.package,
             number=10,
             author=self.author,
             source_owner="staging_author",
@@ -1014,7 +1015,8 @@ class TestStagingMergeEndpoint(TestCase):
         )
 
         self.pr2 = PullRequest.objects.create(
-            target=self.mapping,
+            project=self.project,
+            package=self.package,
             number=20,
             author=self.author,
             source_owner="staging_author",
@@ -1143,13 +1145,15 @@ class TestStagingMergeEndpoint(TestCase):
 
 class TestStagingWebMergeActions(TestCase):
     def setUp(self):
-        self.project = Project.objects.create(name="test:staging-web-merge", workflow_type=Project.WorkflowType.STAGING)
-        self.mapping = GitMapping.objects.create(owner="suse", repo="web-staging-repo", branch="main", project=self.project)
+        self.org = Org.objects.get_or_create(name="suse")[0]
+        self.project = Project.objects.create(name="test:staging-web-merge", org=self.org, branch_name="main", workflow_type=Project.WorkflowType.STAGING)
+        self.package = Package.objects.create(project=self.project, name="web-staging-repo")
         self.author = User.objects.create(username="web_staging_author", username_lower="web_staging_author", account_type=User.AccountType.HUMAN)
         self.reviewer = User.objects.create(username="web_staging_reviewer", username_lower="web_staging_reviewer", account_type=User.AccountType.HUMAN)
 
         self.pr = PullRequest.objects.create(
-            target=self.mapping,
+            project=self.project,
+            package=self.package,
             number=33,
             author=self.author,
             source_owner="web_staging_author",

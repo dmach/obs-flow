@@ -29,13 +29,13 @@ class Command(BaseCommand):
             is_draft=True,
             draft_expires_at__isnull=False,
             draft_expires_at__lte=now,
-        ).select_related("pull_request", "pull_request__target")
+        ).select_related("pull_request", "pull_request__project", "pull_request__package")
 
         pr_count = 0
         for rev in expired_pr_revs:
             pr = rev.pull_request
             self.stdout.write(
-                f"Processing expired draft PullRequestRevision #{rev.revision_number} for PR #{pr.number} on {pr.target}"
+                f"Processing expired draft PullRequestRevision #{rev.revision_number} for PR #{pr.number} on {pr.formatted_id}"
             )
             if not dry_run:
                 mark_ready_for_review(rev)

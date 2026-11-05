@@ -447,7 +447,7 @@ def staging_merge_action(request, batch_id):
     for pr in prs:
         if pr.state != PullRequest.State.MERGED:
             try:
-                _do_gitea_merge(pr.target.owner, pr.target.repo, pr.number)
+                _do_gitea_merge(pr.target_owner, pr.target_repo, pr.number)
                 pr.state = PullRequest.State.MERGED
                 pr.save(update_fields=["state"])
             except Exception as e:
@@ -493,7 +493,7 @@ def staging_bulk_merge(request):
             prs = [bpr.pull_request_revision.pull_request for bpr in latest_rev.revision_pull_requests.all()]
             for pr in prs:
                 if pr.state != PullRequest.State.MERGED:
-                    _do_gitea_merge(pr.target.owner, pr.target.repo, pr.number)
+                    _do_gitea_merge(pr.target_owner, pr.target_repo, pr.number)
                     pr.state = PullRequest.State.MERGED
                     pr.save(update_fields=["state"])
 
@@ -592,7 +592,7 @@ def staging_ui_modal_execute_merge(request):
 
             for pr in prs:
                 if pr.state != PullRequest.State.MERGED:
-                    _do_gitea_merge(pr.target.owner, pr.target.repo, pr.number)
+                    _do_gitea_merge(pr.target_owner, pr.target_repo, pr.number)
                     pr.state = PullRequest.State.MERGED
                     pr.save(update_fields=["state"])
 
