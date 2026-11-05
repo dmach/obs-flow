@@ -132,6 +132,8 @@ STATICFILES_DIRS = [BASE_DIR / "static"]
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 import os
+from pathlib import Path
+GIT_FORGE_ROOT = Path(os.environ.get("GIT_FORGE_ROOT", BASE_DIR / "git_repos"))
 GITEA_URL = os.environ.get("GITEA_URL")
 GITEA_TOKEN = os.environ.get("GITEA_TOKEN")
 
