@@ -49,13 +49,19 @@ def list_orgs(payload: OrgListRequest):
 @sync_to_async
 @transaction.atomic
 def create_org(payload: OrgCreateRequest):
-    user_obj = None
     if payload.user:
-        try:
-            user_obj = User.objects.get(username=payload.user)
-        except User.DoesNotExist:
-            raise ValueError(f"User '{payload.user}' does not exist")
-    org = Org.objects.create(name=payload.name, user=user_obj)
+        user_obj, _ = User.objects.get_or_create(
+            username=payload.user,
+            defaults={"username_lower": payload.user.lower(), "account_type": User.AccountType.HUMAN},
+        )
+        org, _ = Org.objects.get_or_create(
+            user=user_obj,
+            defaults={"name": payload.name},
+        )
+    else:
+        org, _ = Org.objects.get_or_create(
+            name=payload.name,
+        )
     res = OrgCreateResponse(org=org_to_detail(org))
     return msgspec.structs.asdict(res)
 
@@ -92,15 +98,17 @@ def create_project(payload: ProjectCreateRequest):
 
     workflow_type = payload.workflow_type or Project.WorkflowType.DIRECT
     if workflow_type not in Project.WorkflowType.values:
-        raise ValueError(f"Invalid workflow type: {payload.workflow_type}")
+        raise ValueError(f"Invalid workflow type: {workflow_type}")
 
-    project = Project.objects.create(
+    project, created = Project.objects.get_or_create(
         name=payload.name,
-        org=org_obj,
-        branch_name=payload.branch_name,
-        workflow_type=workflow_type,
+        defaults={
+            "org": org_obj,
+            "branch_name": payload.branch_name,
+            "workflow_type": workflow_type,
+        },
     )
-    if project.org:
+    if created and project.org:
         from core.git_forge import ensure_git_repo
         ensure_git_repo(project.org.name, initial_branch=project.branch_name)
 
@@ -168,13 +176,13 @@ def create_package(payload: PackageCreateRequest):
                 f"Source package '{payload.fork_from_project}/{payload.fork_from_package}' not found to fork"
             )
 
-    package = Package.objects.create(
+    package, created = Package.objects.get_or_create(
         project=project,
         name=payload.name,
-        forked_from=forked_from,
+        defaults={"forked_from": forked_from},
     )
 
-    if project.org:
+    if created and project.org:
         from core.git_forge import ensure_git_repo, fork_git_repo
         if forked_from and forked_from.project.org:
             fork_git_repo(
