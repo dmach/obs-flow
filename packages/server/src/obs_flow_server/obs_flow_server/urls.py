@@ -68,4 +68,5 @@ urlpatterns = [
         staging_views.staging_ui_modal_confirm_add,
         name="staging_ui_modal_confirm_add",
     ),
+    path("", include("git_transport.urls")),
 ]
