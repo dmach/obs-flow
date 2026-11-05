@@ -324,4 +324,62 @@ class TestNativeGitForgeAPIs(TransactionTestCase):
             self.assertEqual(len(res.json()["packages"]), 1)
             self.assertEqual(res.json()["packages"][0]["name"], "bash")
 
+    def test_git_forge_repo_creation_and_fork(self):
+        import tempfile
+        import json
+        from pathlib import Path
+        from django.test import override_settings
+        from core.models import Org, Project
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            with override_settings(GIT_FORGE_ROOT=Path(tmpdir)):
+                with TestClient(api) as client:
+                    client.post("/api/v1/org/create", content=json.dumps({"name": "openSUSE"}))
+                    client.post(
+                        "/api/v1/project/create",
+                        content=json.dumps({
+                            "name": "openSUSE:Factory",
+                            "org": "openSUSE",
+                            "branch_name": "factory",
+                        }),
+                    )
+                    client.post(
+                        "/api/v1/package/create",
+                        content=json.dumps({
+                            "project": "openSUSE:Factory",
+                            "name": "zypper",
+                        }),
+                    )
+
+                    repo_path = Path(tmpdir) / "openSUSE" / "zypper.git"
+                    self.assertTrue(repo_path.exists())
+                    self.assertTrue((repo_path / "HEAD").exists())
+
+                    # Create user org and fork
+                    from accounts.models import User
+                    user = User.objects.create(username="contributor", username_lower="contributor", account_type=User.AccountType.HUMAN)
+                    user_org = user.implicit_personal_org
+                    client.post(
+                        "/api/v1/project/create",
+                        content=json.dumps({
+                            "name": "home:contributor",
+                            "org": user_org.name,
+                            "branch_name": "feature",
+                        }),
+                    )
+                    client.post(
+                        "/api/v1/package/create",
+                        content=json.dumps({
+                            "project": "home:contributor",
+                            "name": "zypper",
+                            "fork_from_project": "openSUSE:Factory",
+                            "fork_from_package": "zypper",
+                        }),
+                    )
+
+                    fork_path = Path(tmpdir) / user_org.name / "zypper.git"
+                    self.assertTrue(fork_path.exists())
+                    self.assertTrue((fork_path / "HEAD").exists())
+
+
 

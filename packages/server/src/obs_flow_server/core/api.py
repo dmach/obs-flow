@@ -100,6 +100,10 @@ def create_project(payload: ProjectCreateRequest):
         branch_name=payload.branch_name,
         workflow_type=workflow_type,
     )
+    if project.org:
+        from core.git_forge import ensure_git_repo
+        ensure_git_repo(project.org.name, initial_branch=project.branch_name)
+
     res = ProjectCreateResponse(project=project_to_detail(project))
     return msgspec.structs.asdict(res)
 
@@ -169,5 +173,19 @@ def create_package(payload: PackageCreateRequest):
         name=payload.name,
         forked_from=forked_from,
     )
+
+    if project.org:
+        from core.git_forge import ensure_git_repo, fork_git_repo
+        if forked_from and forked_from.project.org:
+            fork_git_repo(
+                source_org=forked_from.project.org.name,
+                source_package=forked_from.name,
+                target_org=project.org.name,
+                target_package=package.name,
+                branch=project.branch_name,
+            )
+        else:
+            ensure_git_repo(project.org.name, package.name, initial_branch=project.branch_name)
+
     res = PackageCreateResponse(package=package_to_detail(package))
     return msgspec.structs.asdict(res)
