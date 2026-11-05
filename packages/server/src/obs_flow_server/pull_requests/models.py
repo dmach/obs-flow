@@ -4,14 +4,19 @@ from django.conf import settings
 
 from obs_flow_common.pull_requests import pull_request_build_text_id, pull_request_parse_text_id
 
-from core.models import GitMapping, Issue, Project
+from core.models import Issue, Project
 from reviews.models import BaseReview
 
 
 class PullRequestManager(models.Manager):
     def get_by_text_id(self, text_id: str) -> "PullRequest":
         owner, repo, number = pull_request_parse_text_id(text_id)
-        return self.get(target__owner=owner, target__repo=repo, number=number)
+        qs = self.filter(project__org__name=owner, number=number)
+        if repo == "_project":
+            qs = qs.filter(package__isnull=True)
+        else:
+            qs = qs.filter(package__name=repo)
+        return qs.get()
 
 
 class PullRequest(models.Model):
@@ -22,9 +27,8 @@ class PullRequest(models.Model):
         CLOSED = "closed", "Closed"
         MERGED = "merged", "Merged"
 
-    target = models.ForeignKey(GitMapping, on_delete=models.CASCADE, related_name="pull_requests", null=True, blank=True)
-    project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name="native_pull_requests", null=True, blank=True)
-    package = models.ForeignKey("core.Package", on_delete=models.CASCADE, related_name="native_pull_requests", null=True, blank=True)
+    project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name="pull_requests")
+    package = models.ForeignKey("core.Package", on_delete=models.CASCADE, related_name="pull_requests", null=True, blank=True)
     number = models.IntegerField()
     author = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="pull_requests")
     state = models.CharField(max_length=10, choices=State.choices, default=State.OPEN)
@@ -35,7 +39,17 @@ class PullRequest(models.Model):
     source_branch = models.CharField(max_length=255)
 
     class Meta:
-        unique_together = ("target", "number")
+        constraints = [
+            models.UniqueConstraint(
+                fields=["project", "package", "number"],
+                name="unique_pull_request_project_package_number",
+            ),
+            models.UniqueConstraint(
+                fields=["project", "number"],
+                condition=Q(package__isnull=True),
+                name="unique_pull_request_project_number_null_package",
+            ),
+        ]
 
     @property
     def latest_revision(self) -> "PullRequestRevision | None":
@@ -43,7 +57,7 @@ class PullRequest(models.Model):
 
     @property
     def text_id(self) -> str:
-        return pull_request_build_text_id(self.target.owner, self.target.repo, self.number)
+        return pull_request_build_text_id(self.target_owner, self.target_repo, self.number)
 
     @property
     def is_draft(self) -> bool:
@@ -51,26 +65,35 @@ class PullRequest(models.Model):
         return latest.is_draft if latest else False
 
     @property
-    def target_project(self) -> Project | None:
-        if self.project:
-            return self.project
-        if self.package:
-            return self.package.project
-        if self.target:
-            return self.target.target_project
+    def target(self):
         return None
 
     @property
+    def target_project(self) -> Project:
+        return self.project
+
+    @property
     def target_package(self):
-        if self.package:
-            return self.package
-        if self.target and self.target.package:
-            return self.target.package
-        return None
+        return self.package
+
+    @property
+    def target_owner(self) -> str:
+        return self.project.org.name if self.project and self.project.org else ""
+
+    @property
+    def target_repo(self) -> str:
+        return self.package.name if self.package else "_project"
+
+    @property
+    def target_branch(self) -> str:
+        return self.project.branch_name if self.project else ""
+
+    @property
+    def formatted_id(self) -> str:
+        return f"{self.target_owner}/{self.target_repo}#{self.number}"
 
     def __str__(self):
-        target_repr = self.target or (f"{self.target_project}/{self.package.name if self.package else '_project'}")
-        return f"PR #{self.number} ({self.state}) on {target_repr}"
+        return f"{self.formatted_id} ({self.state}) - {self.title}"
 
 
 class PullRequestRevision(models.Model):

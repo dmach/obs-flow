@@ -16,7 +16,6 @@
 {# requests carry the CSRF token without any JavaScript. Rendering the token #}
 {# here also makes Django set the csrftoken cookie on every page. #}
 <body hx-headers:inherited='{"X-CSRFToken": "{{ csrf_token }}"}'>
-    {% url 'git_mapping_list' as git_mapping_url %}
     {% url 'pr_list' as pr_url %}
     {% url 'staging_list' as staging_url %}
     <header>
@@ -46,7 +45,6 @@
         </div>
         <nav aria-label="Main">
             <ul>
-                <li><a href="{{ git_mapping_url }}"{% if git_mapping_url in request.path %} aria-current="page"{% endif %}><img class="icon" src="{% static 'vendor/octicons/git-branch-16.svg' %}" />Git Mappings</a></li>
                 <li><a href="#"><img class="icon" src="{% static 'vendor/octicons/project-16.svg' %}" />Projects</a></li>
                 <li><a href="#"><img class="icon" src="{% static 'vendor/octicons/package-16.svg' %}" />Packages</a></li>
                 <li><a href="{{ pr_url }}"{% if pr_url in request.path %} aria-current="page"{% endif %}><img class="icon" src="{% static 'vendor/octicons/git-pull-request-16.svg' %}" /> Pull Requests</a></li>

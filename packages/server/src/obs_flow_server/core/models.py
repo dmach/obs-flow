@@ -183,44 +183,6 @@ class Package(models.Model):
         return f"{self.project.name}/{self.name}"
 
 
-class GitMapping(models.Model):
-    owner = models.CharField(max_length=255)
-    repo = models.CharField(max_length=255)
-    branch = models.CharField(max_length=255)
-    project = models.OneToOneField(
-        Project, on_delete=models.SET_NULL, null=True, blank=True, related_name="git_mapping"
-    )
-    package = models.OneToOneField(
-        Package, on_delete=models.SET_NULL, null=True, blank=True, related_name="git_mapping"
-    )
-
-    class Meta:
-        constraints = [
-            # UniqueConstraint using Lower('owner') and Lower('repo') with branch
-            models.UniqueConstraint(
-                Lower("owner"),
-                Lower("repo"),
-                "branch",
-                name="unique_git_mapping_branch",
-            ),
-            # CheckConstraint (XOR): Exactly one of project or package MUST be set
-            models.CheckConstraint(
-                condition=(
-                    Q(project__isnull=False, package__isnull=True) | Q(project__isnull=True, package__isnull=False)
-                ),
-                name="git_mapping_xor_project_package",
-            ),
-        ]
-
-    @property
-    def target_project(self) -> Project:
-        return self.project if self.project_id else self.package.project
-
-    def __str__(self):
-        target = self.project or self.package
-        return f"{self.owner}/{self.repo}:{self.branch} -> {target}"
-
-
 class IssueTracker(models.Model):
     class Kind(models.TextChoices):
         OTHER = "other", "Other"

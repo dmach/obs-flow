@@ -114,9 +114,9 @@ class AuthViewsTests(TestCase):
         response = self.client.post(reverse("login"), {
             "username": "testuser",
             "password": "password123",
-            "next": "/git-mappings/"
+            "next": "/pull-requests/"
         })
-        self.assertRedirects(response, "/git-mappings/")
+        self.assertRedirects(response, "/pull-requests/")
 
         # Logout
         response = self.client.post(reverse("logout"))
