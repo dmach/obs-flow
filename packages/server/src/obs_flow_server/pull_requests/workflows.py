@@ -3,20 +3,20 @@
 import json
 import urllib.error
 import urllib.request
-from django.conf import settings
-from django.db import transaction
-
-from obs_flow_common.messages import PRDetail, PRSyncRequest, PRSyncResponse
 
 from accounts.helpers import build_user_dto
 from accounts.models import User
 from core.gitea import merge_pull_request
-from core.models import GitMapping, Project
-from pull_requests.fingerprint import PRRevisionPayload
-from pull_requests.models import PullRequest, PullRequestRevision, PullRequestReview
+from core.models import Org, Package, Project
+from django.conf import settings
+from django.db import transaction
+from obs_flow_common.messages import PRDetail, PRSyncRequest, PRSyncResponse
 from reviews.models import ReviewConfig
-from reviews.workflows import initial_draft_state, mark_draft as _mark_draft, mark_ready, provision_reviews_for
+from reviews.workflows import initial_draft_state, mark_ready, provision_reviews_for
+from reviews.workflows import mark_draft as _mark_draft
 
+from pull_requests.fingerprint import PRRevisionPayload
+from pull_requests.models import PullRequest, PullRequestReview, PullRequestRevision
 
 # =====================================================================
 # Building blocks (entity-level, no external I/O)
@@ -31,12 +31,11 @@ def provision_reviews_for_revision(revision: PullRequestRevision) -> list[PullRe
     Evaluates scopes against changed files and supports decision inheritance.
     """
     pr = revision.pull_request
-    git_mapping = pr.target
-    project = git_mapping.target_project
-    if git_mapping.project_id:
-        config_type = ReviewConfig.ConfigType.PROJECT
-    elif git_mapping.package_id:
+    project = pr.target_project
+    if pr.package:
         config_type = ReviewConfig.ConfigType.PACKAGE
+    elif pr.project:
+        config_type = ReviewConfig.ConfigType.PROJECT
     else:
         config_type = None
 
@@ -172,31 +171,51 @@ def sync_pull_request(req: PRSyncRequest) -> PRSyncResponse:
         }
     )
 
-    # Find GitMapping
-    base_branch = data.get("base", {}).get("ref", "main")
-    try:
-        git_mapping = GitMapping.objects.get(
-            owner__iexact=req.owner,
-            repo__iexact=req.repo,
-            branch=base_branch
-        )
-    except GitMapping.DoesNotExist:
-        raise Exception(f"No GitMapping found for {req.owner}/{req.repo}:{base_branch}")
-
-    # Get or create PR
-    pr, created = PullRequest.objects.get_or_create(
-        target=git_mapping,
+    # Find existing PR or lookup Org, Project, Package
+    existing_pr = PullRequest.objects.filter(
         number=req.number,
-        defaults={
-            "author": author,
-            "title": title,
-            "is_mergeable": mergeable,
-            "state": pr_state,
-            "source_owner": data.get("head", {}).get("repo", {}).get("owner", {}).get("login", req.owner),
-            "source_repo": data.get("head", {}).get("repo", {}).get("name", req.repo),
-            "source_branch": data.get("head", {}).get("ref", "unknown"),
-        }
-    )
+        project__org__name__iexact=req.owner,
+        package__name__iexact=req.repo,
+    ).first()
+    if not existing_pr and req.repo.lower() == "_project":
+        existing_pr = PullRequest.objects.filter(
+            number=req.number,
+            project__org__name__iexact=req.owner,
+            package__isnull=True,
+        ).first()
+
+    if existing_pr:
+        pr = existing_pr
+        created = False
+    else:
+        base_branch = data.get("base", {}).get("ref", "main")
+        try:
+            org = Org.objects.get(name__iexact=req.owner)
+            project = Project.objects.get(org=org, branch_name=base_branch)
+        except (Org.DoesNotExist, Project.DoesNotExist):
+            raise Exception(f"No project found for {req.owner}:{base_branch}")
+
+        if req.repo.lower() == "_project":
+            package = None
+        else:
+            try:
+                package = Package.objects.get(project=project, name__iexact=req.repo)
+            except Package.DoesNotExist:
+                package = None
+
+        pr = PullRequest.objects.create(
+            project=project,
+            package=package,
+            number=req.number,
+            author=author,
+            title=title,
+            is_mergeable=mergeable,
+            state=pr_state,
+            source_owner=data.get("head", {}).get("repo", {}).get("owner", {}).get("login", req.owner),
+            source_repo=data.get("head", {}).get("repo", {}).get("name", req.repo),
+            source_branch=data.get("head", {}).get("ref", "unknown"),
+        )
+        created = True
 
     if not created:
         # Update fields
@@ -206,14 +225,15 @@ def sync_pull_request(req: PRSyncRequest) -> PRSyncResponse:
         pr.save()
 
     # Check revisions
+    target_branch = pr.target_branch or "main"
     pr_payload = PRRevisionPayload(
         head_sha=head_sha,
         base_sha=base_sha,
-        target_branch=pr.target.branch,
+        target_branch=target_branch,
     )
     fingerprint = pr_payload.compute_fingerprint()
 
-    target_project = pr.target.target_project
+    target_project = pr.target_project
     timeout_minutes = target_project.effective_review_debounce_minutes if target_project else settings.REVIEW_DEBOUNCE_MINUTES
     latest_revision = pr.latest_revision
     if not latest_revision or latest_revision.fingerprint != fingerprint:
@@ -265,7 +285,8 @@ def execute_pr_merge(pr: PullRequest) -> None:
     Raises ValueError on forge failure (contract unchanged until P1).
     Callers decide locking; this function does not lock.
     """
-    merge_pull_request(pr.target.owner, pr.target.repo, pr.number)
+    if getattr(settings, "GITEA_URL", None) and getattr(settings, "GITEA_TOKEN", None):
+        merge_pull_request(pr.target_owner, pr.target_repo, pr.number)
     pr.state = PullRequest.State.MERGED
     pr.save(update_fields=["state"])
 

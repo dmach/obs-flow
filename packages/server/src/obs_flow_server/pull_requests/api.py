@@ -1,37 +1,52 @@
-import msgspec
-from asgiref.sync import sync_to_async
-from django.conf import settings
-from django.http import HttpResponseBadRequest, HttpResponseServerError
+from datetime import timedelta
 
+import msgspec
+from accounts.helpers import build_user_dto, get_authenticated_user
+from accounts.models import User
+from asgiref.sync import sync_to_async
+from core.models import Package, Project
+from django.conf import settings
+from django.db import transaction
+from django.http import HttpResponseBadRequest, HttpResponseServerError
+from django.utils import timezone
 from obs_flow_common.messages import (
-    PRSyncRequest,
-    PRReadyForReviewRequest,
-    PRReadyForReviewResponse,
     PRConvertToDraftRequest,
     PRConvertToDraftResponse,
+    PRCreateRequest,
+    PRCreateResponse,
+    PRDetail,
     PRMergeRequest,
     PRMergeResponse,
-    PRReviewShowRequest,
-    PRReviewShowResponse,
+    PRReadyForReviewRequest,
+    PRReadyForReviewResponse,
     PRReviewActionResponse,
     PRReviewApproveRequest,
+    PRReviewClearNeedInfoRequest,
     PRReviewDeclineRequest,
     PRReviewNeedInfoRequest,
-    PRReviewClearNeedInfoRequest,
     PRReviewReopenRequest,
+    PRReviewShowRequest,
+    PRReviewShowResponse,
+    PRSyncRequest,
 )
 from obs_flow_server.api import api
+from reviews.workflows import (
+    apply_review_action,
+    clear_needinfo,
+    get_or_create_review,
+    parse_reviewer,
+    review_to_detail,
+)
 
-from accounts.helpers import get_authenticated_user
-from pull_requests.models import PullRequest, PullRequestReview
+from pull_requests.models import PullRequest, PullRequestReview, PullRequestRevision
 from pull_requests.workflows import (
     mark_draft,
     mark_ready_for_review,
     merge_pull_requests,
     pr_to_detail,
+    provision_reviews_for_revision,
     sync_pull_request,
 )
-from reviews.workflows import apply_review_action, clear_needinfo, get_or_create_review, parse_reviewer, review_to_detail
 
 
 @api.post("/api/v1/pr_review/show")
@@ -123,6 +138,100 @@ def reopen_review_endpoint(payload: PRReviewReopenRequest, request):
     apply_review_action(review, PullRequestReview.State.PENDING, user, payload.message)
 
     res = PRReviewActionResponse(pull_request_id=payload.pull_request_id, review=review_to_detail(review))
+    return msgspec.structs.asdict(res)
+
+
+def build_pr_detail(pr: PullRequest) -> PRDetail:
+    latest_revision = pr.revisions.order_by("-revision_number").first()
+    if pr.target:
+        pr_id = f"{pr.target.owner}/{pr.target.repo}#{pr.number}"
+    else:
+        org_name = pr.target_project.org.name if pr.target_project and pr.target_project.org else "obs"
+        repo_name = pr.package.name if pr.package else "_project"
+        pr_id = f"{org_name}/{repo_name}#{pr.number}"
+
+    return PRDetail(
+        id=pr_id,
+        title=pr.title,
+        state=pr.state,
+        is_draft=pr.is_draft,
+        is_mergeable=pr.is_mergeable,
+        author=build_user_dto(pr.author),
+        latest_revision=latest_revision.revision_number if latest_revision else 1,
+        head_sha=latest_revision.head_sha if latest_revision else "",
+        base_sha=latest_revision.base_sha if latest_revision else "",
+    )
+
+
+@api.post("/api/v1/pr/create")
+@sync_to_async
+@transaction.atomic
+def create_pull_request_endpoint(payload: PRCreateRequest):
+    try:
+        target_project = Project.objects.get(name=payload.target_project)
+    except Project.DoesNotExist:
+        raise ValueError(f"Target project '{payload.target_project}' does not exist")
+
+    target_package = None
+    if payload.target_package:
+        try:
+            target_package = Package.objects.get(project=target_project, name=payload.target_package)
+        except Package.DoesNotExist:
+            raise ValueError(
+                f"Target package '{payload.target_package}' does not exist in project '{payload.target_project}'"
+            )
+
+    author, _ = User.objects.get_or_create(
+        username=payload.author,
+        defaults={"username_lower": payload.author.lower(), "account_type": User.AccountType.HUMAN},
+    )
+
+    from django.db.models import Max
+
+    max_num = (
+        PullRequest.objects.filter(project=target_project, package=target_package).aggregate(Max("number"))[
+            "number__max"
+        ]
+        or 0
+    )
+    pr_number = max_num + 1
+
+    pr = PullRequest.objects.create(
+        project=target_project,
+        package=target_package,
+        number=pr_number,
+        author=author,
+        title=payload.title,
+        source_owner=payload.source_owner,
+        source_repo=payload.source_repo,
+        source_branch=payload.source_branch,
+        state=PullRequest.State.OPEN,
+    )
+
+    timeout_minutes = target_project.effective_review_debounce_minutes
+    if payload.is_draft:
+        rev_is_draft = True
+        rev_draft_expires_at = None
+    elif timeout_minutes == 0:
+        rev_is_draft = False
+        rev_draft_expires_at = None
+    else:
+        rev_is_draft = True
+        rev_draft_expires_at = timezone.now() + timedelta(minutes=timeout_minutes)
+
+    rev = PullRequestRevision.objects.create(
+        pull_request=pr,
+        revision_number=1,
+        head_sha=payload.head_sha,
+        base_sha=payload.base_sha,
+        is_draft=rev_is_draft,
+        draft_expires_at=rev_draft_expires_at,
+    )
+
+    if not rev.is_draft:
+        provision_reviews_for_revision(rev)
+
+    res = PRCreateResponse(pull_request=build_pr_detail(pr))
     return msgspec.structs.asdict(res)
 
 

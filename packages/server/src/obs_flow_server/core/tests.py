@@ -1,14 +1,16 @@
 import json
+
 from django.test import TestCase, TransactionTestCase
 from django_bolt.testing import TestClient
-
-from core.models import Project, Package, Org
 from obs_flow_server.api import api
+
+from core.models import Project
 
 
 class FingerprintTests(TestCase):
     def test_base_payload_sorting_and_omission(self):
         import hashlib
+
         from core.fingerprint import BasePayload
 
         class DummyPayload(BasePayload):
@@ -92,8 +94,9 @@ class TestProjectDebounceSetting(TestCase):
             self.assertEqual(proj_zero.effective_review_debounce_minutes, 0)
 
     def test_system_check_validation(self):
-        from core.apps import check_review_debounce_setting
         from django.test import override_settings
+
+        from core.apps import check_review_debounce_setting
 
         # Valid setting
         with override_settings(REVIEW_DEBOUNCE_MINUTES=15):
@@ -122,6 +125,7 @@ class TestProjectDebounceSetting(TestCase):
 class TestNativeGitForgeDomainModels(TransactionTestCase):
     def test_org_creation_and_properties(self):
         from accounts.models import User
+
         from core.models import Org
 
         # Shared org
@@ -137,8 +141,9 @@ class TestNativeGitForgeDomainModels(TransactionTestCase):
         self.assertEqual(personal.user, user)
 
     def test_org_name_validations(self):
-        from core.models import Org
         from django.core.exceptions import ValidationError
+
+        from core.models import Org
 
         # Invalid characters or formats
         invalid_names = [".hidden", "bad..name", "invalid.git", "", "-starts-with-dash"]
@@ -148,8 +153,9 @@ class TestNativeGitForgeDomainModels(TransactionTestCase):
                     Org.objects.create(name=bad_name)
 
     def test_org_immutability(self):
-        from core.models import Org
         from django.core.exceptions import ValidationError
+
+        from core.models import Org
 
         org = Org.objects.create(name="suse-org")
         org.name = "suse-renamed"
@@ -157,16 +163,18 @@ class TestNativeGitForgeDomainModels(TransactionTestCase):
             org.save()
 
     def test_org_case_insensitive_uniqueness(self):
-        from core.models import Org
         from django.db import IntegrityError
+
+        from core.models import Org
 
         Org.objects.create(name="MyOrg")
         with self.assertRaises(IntegrityError):
             Org.objects.create(name="myorg")
 
     def test_project_with_org_and_branch(self):
-        from core.models import Org, Project
         from django.core.exceptions import ValidationError
+
+        from core.models import Org, Project
 
         org = Org.objects.create(name="opensuse-distro")
         proj = Project.objects.create(name="openSUSE:Factory", org=org, branch_name="factory")
@@ -182,8 +190,9 @@ class TestNativeGitForgeDomainModels(TransactionTestCase):
             Project.objects.create(name="proj3", org=org, branch_name="foo..bar")
 
     def test_project_branch_unique_per_org(self):
-        from core.models import Org, Project
         from django.db import IntegrityError
+
+        from core.models import Org, Project
 
         org1 = Org.objects.create(name="org1")
         org2 = Org.objects.create(name="org2")
@@ -198,8 +207,9 @@ class TestNativeGitForgeDomainModels(TransactionTestCase):
             Project.objects.create(name="p3", org=org1, branch_name="master")
 
     def test_project_immutability(self):
-        from core.models import Org, Project
         from django.core.exceptions import ValidationError
+
+        from core.models import Org, Project
 
         org = Org.objects.create(name="myorg")
         proj = Project.objects.create(name="myproject", org=org, branch_name="main")
@@ -218,8 +228,9 @@ class TestNativeGitForgeDomainModels(TransactionTestCase):
 
     def test_package_validations_and_forks(self):
         from accounts.models import User
-        from core.models import Org, Project, Package
         from django.core.exceptions import ValidationError
+
+        from core.models import Org, Package, Project
 
         org = Org.objects.create(name="distro")
         proj = Project.objects.create(name="Factory", org=org, branch_name="factory")
@@ -245,4 +256,85 @@ class TestNativeGitForgeDomainModels(TransactionTestCase):
         forked_pkg = Package.objects.create(project=devel_proj, name="bash", forked_from=pkg)
         self.assertEqual(forked_pkg.forked_from, pkg)
         self.assertIn(forked_pkg, pkg.forks.all())
+
+
+class TestNativeGitForgeAPIs(TransactionTestCase):
+    def test_org_api_create_and_list(self):
+        import json
+        with TestClient(api) as client:
+            # Create shared org
+            res = client.post("/api/v1/org/create", content=json.dumps({"name": "openSUSE"}))
+            self.assertEqual(res.status_code, 200)
+            data = res.json()["org"]
+            self.assertEqual(data["name"], "openSUSE")
+            self.assertFalse(data["is_personal"])
+
+            # List orgs
+            res = client.post("/api/v1/org/list", content="{}")
+            self.assertEqual(res.status_code, 200)
+            org_names = [o["name"] for o in res.json()["orgs"]]
+            self.assertIn("openSUSE", org_names)
+
+    def test_project_api_create_and_list(self):
+        import json
+
+        from core.models import Org
+        org = Org.objects.create(name="distro")
+
+        with TestClient(api) as client:
+            res = client.post(
+                "/api/v1/project/create",
+                content=json.dumps({
+                    "name": "openSUSE:Factory",
+                    "org": "distro",
+                    "branch_name": "factory",
+                    "workflow_type": "staging",
+                }),
+            )
+            self.assertEqual(res.status_code, 200)
+            proj = res.json()["project"]
+            self.assertEqual(proj["name"], "openSUSE:Factory")
+            self.assertEqual(proj["org"], "distro")
+            self.assertEqual(proj["branch_name"], "factory")
+            self.assertEqual(proj["workflow_type"], "staging")
+
+            # Check list includes org and branch_name
+            res = client.post("/api/v1/project/list", content="{}")
+            self.assertEqual(res.status_code, 200)
+            matching = [p for p in res.json()["projects"] if p["name"] == "openSUSE:Factory"]
+            self.assertEqual(len(matching), 1)
+            self.assertEqual(matching[0]["org"], "distro")
+            self.assertEqual(matching[0]["branch_name"], "factory")
+
+    def test_package_api_create_and_list(self):
+        import json
+
+        from core.models import Org, Project
+
+        org = Org.objects.create(name="distro")
+        proj = Project.objects.create(name="Factory", org=org, branch_name="factory")
+
+        with TestClient(api) as client:
+            # Create package
+            res = client.post(
+                "/api/v1/package/create",
+                content=json.dumps({
+                    "project": "Factory",
+                    "name": "bash",
+                }),
+            )
+            self.assertEqual(res.status_code, 200)
+            pkg = res.json()["package"]
+            self.assertEqual(pkg["name"], "bash")
+            self.assertEqual(pkg["project"], "Factory")
+
+            # List packages
+            res = client.post(
+                "/api/v1/package/list",
+                content=json.dumps({"project": "Factory"}),
+            )
+            self.assertEqual(res.status_code, 200)
+            self.assertEqual(len(res.json()["packages"]), 1)
+            self.assertEqual(res.json()["packages"][0]["name"], "bash")
+
 

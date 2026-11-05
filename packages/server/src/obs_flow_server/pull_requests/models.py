@@ -1,10 +1,11 @@
+from core.models import Issue, Project
+from django.conf import settings
 from django.db import models
 from django.db.models import Q
-from django.conf import settings
-
-from obs_flow_common.pull_requests import pull_request_build_text_id, pull_request_parse_text_id
-
-from core.models import Issue, Project
+from obs_flow_common.pull_requests import (
+    pull_request_build_text_id,
+    pull_request_parse_text_id,
+)
 from reviews.models import BaseReview
 
 

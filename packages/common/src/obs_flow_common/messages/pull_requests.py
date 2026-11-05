@@ -28,6 +28,25 @@ class PRSyncResponse(msgspec.Struct):
     pull_request: PRDetail
 
 
+class PRCreateRequest(msgspec.Struct):
+    """Request to create a native pull request."""
+    target_project: str
+    author: str
+    title: str
+    source_owner: str
+    source_repo: str
+    source_branch: str
+    target_package: str | None = None
+    head_sha: str = "0000000000000000000000000000000000000000"
+    base_sha: str = "0000000000000000000000000000000000000000"
+    is_draft: bool = False
+
+
+class PRCreateResponse(msgspec.Struct):
+    """Response containing created pull request details."""
+    pull_request: PRDetail
+
+
 class PRReadyForReviewRequest(msgspec.Struct):
     """Request to mark pull requests' latest revisions as ready for review."""
     pull_request_ids: list[str]
