@@ -143,15 +143,8 @@ def reopen_review_endpoint(payload: PRReviewReopenRequest, request):
 
 def build_pr_detail(pr: PullRequest) -> PRDetail:
     latest_revision = pr.revisions.order_by("-revision_number").first()
-    if pr.target:
-        pr_id = f"{pr.target.owner}/{pr.target.repo}#{pr.number}"
-    else:
-        org_name = pr.target_project.org.name if pr.target_project and pr.target_project.org else "obs"
-        repo_name = pr.package.name if pr.package else "_project"
-        pr_id = f"{org_name}/{repo_name}#{pr.number}"
-
     return PRDetail(
-        id=pr_id,
+        id=pr.formatted_id,
         title=pr.title,
         state=pr.state,
         is_draft=pr.is_draft,
@@ -219,11 +212,21 @@ def create_pull_request_endpoint(payload: PRCreateRequest):
         rev_is_draft = True
         rev_draft_expires_at = timezone.now() + timedelta(minutes=timeout_minutes)
 
+    target_branch = target_project.branch_name or "main"
+    from pull_requests.fingerprint import PRRevisionPayload
+    pr_payload = PRRevisionPayload(
+        head_sha=payload.head_sha or "0" * 40,
+        base_sha=payload.base_sha or "0" * 40,
+        target_branch=target_branch,
+    )
+    computed_fingerprint = pr_payload.compute_fingerprint()
+
     rev = PullRequestRevision.objects.create(
         pull_request=pr,
         revision_number=1,
-        head_sha=payload.head_sha,
-        base_sha=payload.base_sha,
+        head_sha=payload.head_sha or "0" * 40,
+        base_sha=payload.base_sha or "0" * 40,
+        fingerprint=computed_fingerprint,
         is_draft=rev_is_draft,
         draft_expires_at=rev_draft_expires_at,
     )

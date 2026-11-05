@@ -97,12 +97,12 @@
                 {% for pr in page_obj %}
                     <tr>
                         <td data-label="Select">
-                            <input type="checkbox" name="selected_prs" value="{{ pr.id }}" aria-label="Select {{ pr.target.owner }}/{{ pr.target.repo }}#{{ pr.number }}">
+                            <input type="checkbox" name="selected_prs" value="{{ pr.id }}" aria-label="Select {{ pr.formatted_id }}">
                         </td>
-                        <th scope="row" data-label="ID"><a href="{% url 'pr_detail' pr.id %}">{{ pr.target.owner }}/{{ pr.target.repo }}#{{ pr.number }}</a></th>
+                        <th scope="row" data-label="ID"><a href="{% url 'pr_detail' pr.id %}">{{ pr.formatted_id }}</a></th>
                         <td data-label="Title">{{ pr.title }}</td>
                         <td data-label="Author">{{ pr.author.username }}</td>
-                        <td data-label="Target Branch"><code>{{ pr.target.branch }}</code></td>
+                        <td data-label="Target Branch"><code>{{ pr.target_branch }}</code></td>
                         <td data-label="Mergeable">
                             {% if pr.is_mergeable == True %}
                                 <data data-variant="success" value="success">yes</data>
