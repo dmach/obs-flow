@@ -111,17 +111,6 @@
     }
   },
   {
-    "model": "core.gitmapping",
-    "pk": 1,
-    "fields": {
-      "owner": "openSUSE",
-      "repo": "osc",
-      "branch": "master",
-      "project": 1,
-      "package": null
-    }
-  },
-  {
     "model": "core.project",
     "pk": 2,
     "fields": {
@@ -156,47 +145,11 @@
     }
   },
   {
-    "model": "core.gitmapping",
-    "pk": 2,
-    "fields": {
-      "owner": "openSUSE",
-      "repo": "Leap",
-      "branch": "leap-16.1",
-      "project": 2,
-      "package": null
-    }
-  },
-  {
-    "model": "core.gitmapping",
+    "model": "core.package",
     "pk": 3,
     "fields": {
-      "owner": "pool",
-      "repo": "osc",
-      "branch": "leap-16.1",
-      "project": null,
-      "package": 1
-    }
-  },
-  {
-    "model": "core.gitmapping",
-    "pk": 4,
-    "fields": {
-      "owner": "openSUSE",
-      "repo": "Leap",
-      "branch": "leap-16.0",
-      "project": 3,
-      "package": null
-    }
-  },
-  {
-    "model": "core.gitmapping",
-    "pk": 5,
-    "fields": {
-      "owner": "pool",
-      "repo": "osc",
-      "branch": "leap-16.0",
-      "project": null,
-      "package": 2
+      "project": 1,
+      "name": "osc"
     }
   },
   {
@@ -325,7 +278,8 @@
     "model": "pull_requests.pullrequest",
     "pk": 1,
     "fields": {
-      "target": 1,
+      "project": 1,
+      "package": 3,
       "number": 1234,
       "author": 3,
       "title": "Pull Request #1234 for openSUSE/osc",
@@ -351,7 +305,8 @@
     "model": "pull_requests.pullrequest",
     "pk": 2,
     "fields": {
-      "target": 1,
+      "project": 1,
+      "package": 3,
       "number": 5678,
       "author": 2,
       "title": "Debounced Draft PR #5678 for openSUSE/osc",

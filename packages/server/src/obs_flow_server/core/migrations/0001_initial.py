@@ -58,17 +58,6 @@ class Migration(migrations.Migration):
             ],
         ),
         migrations.CreateModel(
-            name='GitMapping',
-            fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('owner', models.CharField(max_length=255)),
-                ('repo', models.CharField(max_length=255)),
-                ('branch', models.CharField(max_length=255)),
-                ('package', models.OneToOneField(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='git_mapping', to='core.package')),
-                ('project', models.OneToOneField(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='git_mapping', to='core.project')),
-            ],
-        ),
-        migrations.CreateModel(
             name='Issue',
             fields=[
                 ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
@@ -94,13 +83,5 @@ class Migration(migrations.Migration):
         migrations.AlterUniqueTogether(
             name='package',
             unique_together={('project', 'name')},
-        ),
-        migrations.AddConstraint(
-            model_name='gitmapping',
-            constraint=models.UniqueConstraint(django.db.models.functions.text.Lower('owner'), django.db.models.functions.text.Lower('repo'), models.F('branch'), name='unique_git_mapping_branch'),
-        ),
-        migrations.AddConstraint(
-            model_name='gitmapping',
-            constraint=models.CheckConstraint(condition=models.Q(models.Q(('package__isnull', True), ('project__isnull', False)), models.Q(('package__isnull', False), ('project__isnull', True)), _connector='OR'), name='git_mapping_xor_project_package'),
         ),
     ]

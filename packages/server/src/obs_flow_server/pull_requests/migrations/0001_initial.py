@@ -28,12 +28,14 @@ class Migration(migrations.Migration):
                 ('source_repo', models.CharField(max_length=255)),
                 ('source_branch', models.CharField(max_length=255)),
                 ('author', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='pull_requests', to=settings.AUTH_USER_MODEL)),
-                ('package', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.CASCADE, related_name='native_pull_requests', to='core.package')),
-                ('project', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.CASCADE, related_name='native_pull_requests', to='core.project')),
-                ('target', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.CASCADE, related_name='pull_requests', to='core.gitmapping')),
+                ('package', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.CASCADE, related_name='pull_requests', to='core.package')),
+                ('project', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='pull_requests', to='core.project')),
             ],
             options={
-                'unique_together': {('target', 'number')},
+                'constraints': [
+                    models.UniqueConstraint(fields=('project', 'package', 'number'), name='unique_pull_request_project_package_number'),
+                    models.UniqueConstraint(condition=models.Q(('package__isnull', True)), fields=('project', 'number'), name='unique_pull_request_project_number_null_package'),
+                ],
             },
         ),
         migrations.CreateModel(
