@@ -15,10 +15,14 @@
         <table class="table" style="width: 100%; border-collapse: collapse;">
             <tbody>
                 {% if file_path %}
-                    <tr>
-                        <td style="width: 24px;"></td>
-                        <td><a href="{{ base_code_url }}{{ parent_path }}">..</a></td>
-                        <td></td>
+                    <tr style="border-bottom: 1px solid var(--color-border-default);">
+                        <td style="width: 24px; padding: 0.5rem;">
+                            <img class="icon" src="{% static 'vendor/octicons/file-directory-16.svg' %}" style="color: var(--color-icon-directory);" />
+                        </td>
+                        <td style="padding: 0.5rem;">
+                            <a href="{{ base_code_url }}{{ parent_path }}">..</a>
+                        </td>
+                        <td style="padding: 0.5rem;"></td>
                     </tr>
                 {% endif %}
                 {% for entry in tree %}
