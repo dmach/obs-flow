@@ -2,6 +2,6 @@
 
 {% block page_content %}
     {% url 'package_code' package.project.name package.name as base_code_url %}
-    {% url 'package_raw' package.project.name package.name '' as base_raw_url %}
+    {% url 'package_raw' package.project.name package.name as base_raw_url %}
     {% include "core/_code_browser.html" with base_code_url=base_code_url base_raw_url=base_raw_url %}
 {% endblock %}
