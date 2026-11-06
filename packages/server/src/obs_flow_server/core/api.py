@@ -12,6 +12,8 @@ from obs_flow_common.messages import (
     ProjectDetail,
     ProjectListRequest,
     ProjectListResponse,
+    ProjectShowRequest,
+    ProjectShowResponse,
     ProjectCreateRequest,
     ProjectCreateResponse,
     ProjectUpdateRequest,
@@ -19,6 +21,8 @@ from obs_flow_common.messages import (
     PackageDetail,
     PackageListRequest,
     PackageListResponse,
+    PackageShowRequest,
+    PackageShowResponse,
     PackageCreateRequest,
     PackageCreateResponse,
 )
@@ -80,8 +84,25 @@ def project_to_detail(project: Project) -> ProjectDetail:
 @sync_to_async
 def list_projects(payload: ProjectListRequest):
     projects = Project.objects.select_related("org").all().order_by("name")
+    if payload.name:
+        projects = projects.filter(name__icontains=payload.name)
+    if payload.org:
+        projects = projects.filter(org__name__icontains=payload.org)
+    if payload.workflow_type:
+        projects = projects.filter(workflow_type=payload.workflow_type)
     details = [project_to_detail(p) for p in projects]
     res = ProjectListResponse(projects=details)
+    return msgspec.structs.asdict(res)
+
+
+@api.post("/api/v1/project/show")
+@sync_to_async
+def show_project(payload: ProjectShowRequest):
+    try:
+        project = Project.objects.select_related("org").get(name=payload.name)
+    except Project.DoesNotExist:
+        raise ValueError(f"Project '{payload.name}' does not exist")
+    res = ProjectShowResponse(project=project_to_detail(project))
     return msgspec.structs.asdict(res)
 
 
@@ -149,9 +170,24 @@ def package_to_detail(package: Package) -> PackageDetail:
 def list_packages(payload: PackageListRequest):
     qs = Package.objects.select_related("project", "forked_from", "forked_from__project").all().order_by("name")
     if payload.project:
-        qs = qs.filter(project__name=payload.project)
+        qs = qs.filter(project__name__icontains=payload.project)
+    if payload.name:
+        qs = qs.filter(name__icontains=payload.name)
     details = [package_to_detail(pkg) for pkg in qs]
     res = PackageListResponse(packages=details)
+    return msgspec.structs.asdict(res)
+
+
+@api.post("/api/v1/package/show")
+@sync_to_async
+def show_package(payload: PackageShowRequest):
+    try:
+        package = Package.objects.select_related("project", "forked_from", "forked_from__project").get(
+            project__name=payload.project, name=payload.name
+        )
+    except Package.DoesNotExist:
+        raise ValueError(f"Package '{payload.project}/{payload.name}' does not exist")
+    res = PackageShowResponse(package=package_to_detail(package))
     return msgspec.structs.asdict(res)
 
 

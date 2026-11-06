@@ -76,6 +76,34 @@ class TestProjectAPI(TransactionTestCase):
             response = client.post("/api/v1/project/update", content=json.dumps(payload))
         self.assertNotEqual(response.status_code, 200)
 
+    def test_list_projects_filtering(self):
+        with TestClient(api) as client:
+            # Filter by name
+            response = client.post("/api/v1/project/list", content=json.dumps({"name": "Factory"}))
+            self.assertEqual(response.status_code, 200)
+            res_data = response.json()
+            self.assertEqual(len(res_data["projects"]), 1)
+            self.assertEqual(res_data["projects"][0]["name"], "openSUSE:Factory")
+
+            # Filter by workflow_type
+            response = client.post("/api/v1/project/list", content=json.dumps({"workflow_type": "direct"}))
+            self.assertEqual(response.status_code, 200)
+            res_data = response.json()
+            self.assertEqual(len(res_data["projects"]), 1)
+            self.assertEqual(res_data["projects"][0]["name"], "openSUSE:Leap:16.0")
+
+    def test_show_project(self):
+        with TestClient(api) as client:
+            response = client.post("/api/v1/project/show", content=json.dumps({"name": "openSUSE:Factory"}))
+            self.assertEqual(response.status_code, 200)
+            res_data = response.json()
+            self.assertEqual(res_data["project"]["name"], "openSUSE:Factory")
+            self.assertEqual(res_data["project"]["workflow_type"], "staging")
+
+            # Nonexistent project
+            response = client.post("/api/v1/project/show", content=json.dumps({"name": "nonexistent"}))
+            self.assertNotEqual(response.status_code, 200)
+
 
 class TestProjectDebounceSetting(TestCase):
     def test_effective_review_debounce_minutes(self):
@@ -323,6 +351,33 @@ class TestNativeGitForgeAPIs(TransactionTestCase):
             self.assertEqual(res.status_code, 200)
             self.assertEqual(len(res.json()["packages"]), 1)
             self.assertEqual(res.json()["packages"][0]["name"], "bash")
+
+    def test_package_api_show_and_filter(self):
+        import json
+        from core.models import Org, Project
+
+        org = Org.objects.create(name="distro2")
+        proj = Project.objects.create(name="Factory2", org=org, branch_name="factory2")
+
+        with TestClient(api) as client:
+            client.post("/api/v1/package/create", content=json.dumps({"project": "Factory2", "name": "pkg-a"}))
+            client.post("/api/v1/package/create", content=json.dumps({"project": "Factory2", "name": "pkg-b"}))
+
+            # Filter by name
+            res = client.post("/api/v1/package/list", content=json.dumps({"project": "Factory2", "name": "pkg-a"}))
+            self.assertEqual(res.status_code, 200)
+            self.assertEqual(len(res.json()["packages"]), 1)
+            self.assertEqual(res.json()["packages"][0]["name"], "pkg-a")
+
+            # Show package
+            res = client.post("/api/v1/package/show", content=json.dumps({"project": "Factory2", "name": "pkg-a"}))
+            self.assertEqual(res.status_code, 200)
+            self.assertEqual(res.json()["package"]["name"], "pkg-a")
+            self.assertEqual(res.json()["package"]["project"], "Factory2")
+
+            # Show nonexistent package
+            res = client.post("/api/v1/package/show", content=json.dumps({"project": "Factory2", "name": "nonexistent"}))
+            self.assertNotEqual(res.status_code, 200)
 
     def test_git_forge_repo_creation_and_fork(self):
         import tempfile
