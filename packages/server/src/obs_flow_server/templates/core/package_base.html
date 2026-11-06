@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}{{ package.name }} - Packages - OBS Flow{% endblock %}
+
+{% block content %}
+<nav aria-label="breadcrumb">
+    <ul>
+        <li><a href="{% url 'home' %}">Home</a></li>
+        <li><a href="{% url 'package_list' %}">Packages</a></li>
+        <li>{{ package.name }}</li>
+    </ul>
+</nav>
+
+<h1>{{ package.name }} <small>#{{ package.id }}</small></h1>
+<p>
+    <small>Project: <a href="{% url 'project_detail' package.project.id %}"><strong>{{ package.project.name }}</strong></a></small>
+    {% if package.forked_from %}
+        <small>&middot; Forked from: <a href="{% url 'package_detail' package.forked_from.id %}"><code>{{ package.forked_from }}</code></a></small>
+    {% endif %}
+</p>
+
+<nav aria-label="Subnav">
+    <ul>
+        <li>
+            <a href="{% url 'package_detail' package.id %}"{% if active_tab == 'overview' %} aria-current="page"{% endif %}>
+                <img class="icon" src="{% static 'vendor/octicons/package-16.svg' %}" /> Overview
+            </a>
+        </li>
+        <li>
+            <a href="{% url 'package_pr_list' package.id %}"{% if active_tab == 'pull_requests' %} aria-current="page"{% endif %}>
+                <img class="icon" src="{% static 'vendor/octicons/git-pull-request-16.svg' %}" /> Pull Requests
+            </a>
+        </li>
+    </ul>
+</nav>
+
+{% block package_content %}{% endblock %}
+{% endblock %}
