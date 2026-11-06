@@ -379,9 +379,6 @@ body > header > div {
 body > header nav[aria-label="Account"] {
 	margin-left: auto;
 }
-body > header nav[aria-label="Main"] [aria-current="page"] {
-	background: var(--flow-bg-hover);
-}
 body > header > div > a {
 	display: inline-flex;
 	align-items: center;
@@ -444,7 +441,6 @@ nav[aria-label="Subnav"] li {
 nav[aria-label="Subnav"] li:has(> [aria-current="page"]) {
 	border-bottom-color: var(--flow-fg-accent);
 }
-nav[aria-label="Main"] [aria-current="page"],
 nav[aria-label="Subnav"] [aria-current="page"] {
 	font-weight: 600;
 }
