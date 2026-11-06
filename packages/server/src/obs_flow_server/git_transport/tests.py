@@ -33,15 +33,21 @@ class GitTransportAuthTests(TestCase):
         )
         self.client = Client()
 
-    def test_unauthenticated_request_returns_401(self):
-        res = self.client.get("/package/testproject/testpkg.git/info/refs?service=git-upload-pack")
+    def test_unauthenticated_push_returns_401(self):
+        res = self.client.get("/package/testproject/testpkg.git/info/refs?service=git-receive-pack")
         self.assertEqual(res.status_code, 401)
         self.assertIn("WWW-Authenticate", res.headers)
         self.assertIn('Basic realm="OBS Flow Git"', res.headers["WWW-Authenticate"])
 
+    def test_unauthenticated_clone_is_allowed(self):
+        res = self.client.get("/package/testproject/testpkg.git/info/refs?service=git-upload-pack")
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(res.headers["Content-Type"], "application/x-git-upload-pack-advertisement")
+        self.assertTrue(res.content.startswith(b"001e# service=git-upload-pack\n0000"))
+
     def test_invalid_credentials_returns_401(self):
         auth = _make_basic_auth("gituser", "wrongpassword")
-        res = self.client.get("/package/testproject/testpkg.git/info/refs?service=git-upload-pack", **auth)
+        res = self.client.get("/package/testproject/testpkg.git/info/refs?service=git-receive-pack", **auth)
         self.assertEqual(res.status_code, 401)
 
     def test_valid_user_password_authenticates(self):
@@ -363,10 +369,10 @@ class GitTransportLiveServerTests(LiveServerTestCase):
         repo_url = f"{self.live_server_url}/package/live:direct/livepkg.git"
         auth_url = repo_url.replace("://", f"://liveuser:livepassword@")
 
-        # 1. Clone empty repository
+        # 1. Clone empty repository anonymously
         clone_dir = temp_dir / "checkout"
         res = subprocess.run(
-            ["git", "clone", auth_url, str(clone_dir)],
+            ["git", "clone", repo_url, str(clone_dir)],
             capture_output=True,
             text=True,
         )
@@ -375,6 +381,7 @@ class GitTransportLiveServerTests(LiveServerTestCase):
         # 2. Configure user in repo and create initial commit
         subprocess.run(["git", "config", "user.name", "Live User"], cwd=str(clone_dir), check=True)
         subprocess.run(["git", "config", "user.email", "live@example.com"], cwd=str(clone_dir), check=True)
+        subprocess.run(["git", "remote", "set-url", "origin", auth_url], cwd=str(clone_dir), check=True)
         (clone_dir / "file.txt").write_text("Hello Git Transport\n")
         subprocess.run(["git", "add", "file.txt"], cwd=str(clone_dir), check=True)
         subprocess.run(["git", "commit", "-m", "Initial commit"], cwd=str(clone_dir), check=True)

@@ -43,12 +43,13 @@ def _resolve_repo(project_param: str, package_param: str | None = None) -> tuple
 
 def _info_refs_handler(request: HttpRequest, project_param: str, package_param: str | None = None) -> HttpResponse:
     user = authenticate_git_user(request)
-    if not user:
-        return unauthorized_response()
-
     service = request.GET.get("service")
     if service not in ("git-upload-pack", "git-receive-pack"):
         return HttpResponseBadRequest("Only Smart HTTP is supported (missing or invalid service parameter).\n")
+
+    # Push requires authentication; clone/fetch allows anonymous access
+    if service == "git-receive-pack" and not user:
+        return unauthorized_response()
 
     _project, _pkg_name, repo_path = _resolve_repo(project_param, package_param)
 
@@ -71,10 +72,6 @@ def _info_refs_handler(request: HttpRequest, project_param: str, package_param: 
 
 
 def _upload_pack_handler(request: HttpRequest, project_param: str, package_param: str | None = None) -> HttpResponse:
-    user = authenticate_git_user(request)
-    if not user:
-        return unauthorized_response()
-
     _project, _pkg_name, repo_path = _resolve_repo(project_param, package_param)
 
     try:
