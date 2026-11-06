@@ -8,6 +8,8 @@ import msgspec
 from obs_flow_common.messages import (
     PackageListRequest,
     PackageListResponse,
+    PackageShowRequest,
+    PackageShowResponse,
     PackageCreateRequest,
     PackageCreateResponse,
 )
@@ -28,6 +30,21 @@ def package_list(conn: Connection, req: PackageListRequest) -> PackageListRespon
     serialized_data = msgspec.json.encode(req)
     response_bytes = conn.post("/api/v1/package/list", data=serialized_data)
     return msgspec.json.decode(response_bytes, type=PackageListResponse)
+
+
+def package_show(conn: Connection, req: PackageShowRequest) -> PackageShowResponse:
+    """Shows an existing package.
+
+    Args:
+        conn: The Connection instance to the OBS Flow server.
+        req: The PackageShowRequest payload.
+
+    Returns:
+        A PackageShowResponse containing the package details.
+    """
+    serialized_data = msgspec.json.encode(req)
+    response_bytes = conn.post("/api/v1/package/show", data=serialized_data)
+    return msgspec.json.decode(response_bytes, type=PackageShowResponse)
 
 
 def package_create(conn: Connection, req: PackageCreateRequest) -> PackageCreateResponse:

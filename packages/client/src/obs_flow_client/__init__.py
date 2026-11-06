@@ -17,10 +17,12 @@ from obs_flow_client.org import (
 )
 from obs_flow_client.package import (
     package_list,
+    package_show,
     package_create,
 )
 from obs_flow_client.project import (
     project_list,
+    project_show,
     project_create,
     project_update,
 )
@@ -68,9 +70,11 @@ __all__ = [
     "org_list",
     "org_create",
     "package_list",
+    "package_show",
     "package_create",
     "project_create",
     "project_list",
+    "project_show",
     "project_update",
     "pr_create",
     "pr_ready_for_review",
