@@ -17,10 +17,10 @@
                         {% for fork in forks %}
                             <tr>
                                 <td data-label="Project">
-                                    <a href="{% url 'project_detail' fork.project.id %}">{{ fork.project.name }}</a>
+                                    <a href="{{ fork.project.get_absolute_url }}">{{ fork.project.name }}</a>
                                 </td>
                                 <th scope="row" data-label="Package">
-                                    <a href="{% url 'package_detail' fork.id %}">{{ fork.name }}</a>
+                                    <a href="{{ fork.get_absolute_url }}">{{ fork.name }}</a>
                                 </th>
                             </tr>
                         {% endfor %}
@@ -35,11 +35,11 @@
     <aside>
         <section>
             <h4>Package Information</h4>
-            <p><small>Project:</small><br><a href="{% url 'project_detail' package.project.id %}"><strong>{{ package.project.name }}</strong></a></p>
+            <p><small>Project:</small><br><a href="{{ package.project.get_absolute_url }}"><strong>{{ package.project.name }}</strong></a></p>
             <p><small>Organization:</small><br><strong>{{ package.project.org.name|default:"None" }}</strong></p>
             <p><small>Forked From:</small><br>
                 {% if package.forked_from %}
-                    <a href="{% url 'package_detail' package.forked_from.id %}">{{ package.forked_from }}</a>
+                    <a href="{{ package.forked_from.get_absolute_url }}">{{ package.forked_from }}</a>
                 {% else %}
                     <strong>None</strong>
                 {% endif %}

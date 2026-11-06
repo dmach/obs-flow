@@ -9,25 +9,25 @@
     <ul>
         <li><a href="{% url 'home' %}">Home</a></li>
         <li><a href="{% url 'package_list' %}">Packages</a></li>
-        <li><a href="{% url 'project_detail' package.project.id %}">{{ package.project.name }}</a>/{{ package.name }}</li>
+        <li><a href="{{ package.project.get_absolute_url }}">{{ package.project.name }}</a>/{{ package.name }}</li>
     </ul>
 </nav>
 
 {% if package.forked_from %}
 <p>
-    <small>Forked from: <a href="{% url 'package_detail' package.forked_from.id %}"><code>{{ package.forked_from }}</code></a></small>
+    <small>Forked from: <a href="{{ package.forked_from.get_absolute_url }}"><code>{{ package.forked_from }}</code></a></small>
 </p>
 {% endif %}
 
 <nav aria-label="Subnav">
     <ul>
         <li>
-            <a href="{% url 'package_detail' package.id %}"{% if active_tab == 'overview' %} aria-current="page"{% endif %}>
+            <a href="{{ package.get_absolute_url }}"{% if active_tab == 'overview' %} aria-current="page"{% endif %}>
                 <img class="icon" src="{% static 'vendor/octicons/package-16.svg' %}" /> Overview
             </a>
         </li>
         <li>
-            <a href="{% url 'package_pr_list' package.id %}"{% if active_tab == 'pull_requests' %} aria-current="page"{% endif %}>
+            <a href="{% url 'package_pr_list' package.project.name package.name %}"{% if active_tab == 'pull_requests' %} aria-current="page"{% endif %}>
                 <img class="icon" src="{% static 'vendor/octicons/git-pull-request-16.svg' %}" /> Pull Requests
             </a>
         </li>

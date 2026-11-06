@@ -49,7 +49,7 @@ def project_list(request):
         if workflow_type:
             qs = qs.filter(workflow_type=workflow_type)
 
-    allowed_sorts = ["id", "name", "org__name", "branch_name", "workflow_type"]
+    allowed_sorts = ["name", "org__name", "branch_name", "workflow_type"]
     sort_param = request.GET.get("sort", "name")
     if sort_param.lstrip("-") not in allowed_sorts:
         sort_param = "name"
@@ -80,8 +80,8 @@ def project_list(request):
     )
 
 
-def project_detail(request, project_id):
-    project = get_object_or_404(Project.objects.select_related("org"), id=project_id)
+def project_detail(request, project_name):
+    project = get_object_or_404(Project.objects.select_related("org"), name=project_name)
     packages = project.packages.select_related("forked_from", "forked_from__project").all().order_by("name")
 
     return render(
@@ -118,7 +118,7 @@ def package_list(request):
             else:
                 qs = qs.filter(project__name__icontains=project)
 
-    allowed_sorts = ["id", "name", "project__name"]
+    allowed_sorts = ["name", "project__name"]
     sort_param = request.GET.get("sort", "name")
     if sort_param.lstrip("-") not in allowed_sorts:
         sort_param = "name"
@@ -149,10 +149,11 @@ def package_list(request):
     )
 
 
-def package_detail(request, package_id):
+def package_detail(request, project_name, package_name):
     package = get_object_or_404(
         Package.objects.select_related("project", "project__org", "forked_from", "forked_from__project"),
-        id=package_id,
+        project__name=project_name,
+        name=package_name,
     )
     forks = package.forks.select_related("project").all().order_by("project__name")
 

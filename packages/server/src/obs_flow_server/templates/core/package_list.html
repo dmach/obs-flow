@@ -24,12 +24,6 @@
         <thead>
             <tr>
                 <th>
-                    <a href="?sort={% if current_sort == 'id' %}-id{% else %}id{% endif %}{{ base_query }}">
-                        ID
-                        {% if current_sort == 'id' %}▲{% elif current_sort == '-id' %}▼{% endif %}
-                    </a>
-                </th>
-                <th>
                     <a href="?sort={% if current_sort == 'name' %}-name{% else %}name{% endif %}{{ base_query }}">
                         Package
                         {% if current_sort == 'name' %}▲{% elif current_sort == '-name' %}▼{% endif %}
@@ -49,16 +43,15 @@
         <tbody>
             {% for package in page_obj %}
                 <tr>
-                    <td data-label="ID">{{ package.id }}</td>
                     <th scope="row" data-label="Package">
-                        <a href="{% url 'package_detail' package.id %}">{{ package.name }}</a>
+                        <a href="{{ package.get_absolute_url }}">{{ package.name }}</a>
                     </th>
                     <td data-label="Project">
-                        <a href="{% url 'project_detail' package.project.id %}">{{ package.project.name }}</a>
+                        <a href="{{ package.project.get_absolute_url }}">{{ package.project.name }}</a>
                     </td>
                     <td data-label="Forked From">
                         {% if package.forked_from %}
-                            <a href="{% url 'package_detail' package.forked_from.id %}">{{ package.forked_from }}</a>
+                            <a href="{{ package.forked_from.get_absolute_url }}">{{ package.forked_from }}</a>
                         {% else %}
                             -
                         {% endif %}

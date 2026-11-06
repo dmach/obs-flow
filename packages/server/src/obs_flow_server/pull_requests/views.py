@@ -138,8 +138,8 @@ def pr_list(request):
 
 
 @ensure_csrf_cookie
-def project_pr_list(request, project_id):
-    project = get_object_or_404(Project.objects.select_related("org"), id=project_id)
+def project_pr_list(request, project_name):
+    project = get_object_or_404(Project.objects.select_related("org"), name=project_name)
     qs = PullRequest.objects.select_related("project", "project__org", "package", "author").filter(project=project)
     context = get_pr_list_context(request, qs)
     context["project"] = project
@@ -148,9 +148,12 @@ def project_pr_list(request, project_id):
 
 
 @ensure_csrf_cookie
-def package_pr_list(request, package_id):
+def package_pr_list(request, project_name, package_name):
     from core.models import Package
-    package = get_object_or_404(Package.objects.select_related("project", "project__org"), id=package_id)
+    package = get_object_or_404(Package.objects.select_related("project", "project__org"),
+        project__name=project_name,
+        name=package_name,
+    )
     qs = PullRequest.objects.select_related("project", "project__org", "package", "author").filter(package=package)
     context = get_pr_list_context(request, qs)
     context["package"] = package
