@@ -169,7 +169,7 @@ def package_detail(request, project_name, package_name):
 
 from django.http import Http404
 from .git_forge import get_repo_path, ensure_git_repo
-from .git_utils import get_git_tree, get_git_blob, get_git_type
+from .git_utils import get_git_tree, get_git_blob, get_git_type, get_git_commits
 
 def project_code(request, project_name, file_path=""):
     project = get_object_or_404(Project.objects.select_related("org"), name=project_name)
@@ -294,3 +294,40 @@ def package_raw(request, project_name, package_name, file_path=""):
         content_type = "application/octet-stream"
         
     return HttpResponse(blob_content, content_type=content_type)
+
+
+def project_commits(request, project_name):
+    project = get_object_or_404(Project.objects.select_related("org"), name=project_name)
+    ref = request.GET.get("ref", project.branch_name or "HEAD")
+    repo_path = ensure_git_repo(project.org.name, initial_branch=project.branch_name)
+    commits = get_git_commits(repo_path, ref=ref)
+
+    context = {
+        "project": project,
+        "repo_name": project.name,
+        "active_tab": "commits",
+        "ref": ref,
+        "commits": commits,
+    }
+    return render(request, "core/project_commits.html", context)
+
+
+def package_commits(request, project_name, package_name):
+    package = get_object_or_404(
+        Package.objects.select_related("project", "project__org"),
+        project__name=project_name,
+        name=package_name,
+    )
+    ref = request.GET.get("ref", package.project.branch_name or "HEAD")
+    repo_path = ensure_git_repo(package.project.org.name, package_name=package.name, initial_branch=package.project.branch_name)
+    commits = get_git_commits(repo_path, ref=ref)
+
+    context = {
+        "package": package,
+        "repo_name": f"{package.project.name}/{package.name}",
+        "active_tab": "commits",
+        "ref": ref,
+        "commits": commits,
+    }
+    return render(request, "core/package_commits.html", context)
+
