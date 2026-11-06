@@ -418,6 +418,32 @@ class TestPRSyncEndpoint(TransactionTestCase):
 
 
 class TestPRViews(TransactionTestCase):
+    def test_pr_urls_are_human_readable(self):
+        from django.test import Client
+
+        org = Org.objects.create(name="suse")
+        project = Project.objects.create(name="suse:obs-flow", org=org, branch_name="main")
+        other = Project.objects.create(name="suse:other", org=org, branch_name="other")
+        package = Package.objects.create(project=project, name="bash")
+        other_pkg = Package.objects.create(project=other, name="bash")
+        author = User.objects.create(username="u1", username_lower="u1", account_type=User.AccountType.HUMAN)
+        kw = dict(author=author, source_owner="u1", source_repo="r", source_branch="b")
+        pkg_pr = PullRequest.objects.create(project=project, package=package, number=1, title="pkg pr", **kw)
+        other_pkg_pr = PullRequest.objects.create(project=other, package=other_pkg, number=1, title="other pkg pr", **kw)
+        proj_pr = PullRequest.objects.create(project=project, number=1, title="proj pr", **kw)
+
+        self.assertEqual(pkg_pr.get_absolute_url(), "/packages/suse:obs-flow/bash/pull-requests/1/")
+        self.assertEqual(proj_pr.get_absolute_url(), "/projects/suse:obs-flow/pull-requests/1/")
+        client = Client()
+        self.assertEqual(client.get(pkg_pr.get_absolute_url()).context["pr"], pkg_pr)
+        self.assertEqual(client.get(other_pkg_pr.get_absolute_url()).context["pr"], other_pkg_pr)
+        self.assertEqual(client.get(proj_pr.get_absolute_url()).context["pr"], proj_pr)
+        self.assertEqual(client.get(f"/pull-requests/{pkg_pr.id}/").status_code, 404)
+        self.assertEqual(client.get("/packages/suse:obs-flow/bash/pull-requests/99/").status_code, 404)
+
+        listing = client.get("/packages/suse:obs-flow/bash/pull-requests/")
+        self.assertContains(listing, 'href="/packages/suse:obs-flow/bash/pull-requests/1/"')
+
     def test_pr_detail_view_with_package(self):
         """Verify that the PR detail page correctly renders the project name and package name when the target is a package."""
         from django.test import Client
@@ -440,7 +466,7 @@ class TestPRViews(TransactionTestCase):
         )
 
         client = Client()
-        response = client.get(f"/pull-requests/{pr.id}/")
+        response = client.get(f"{pr.get_absolute_url()}")
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "suse:obs-flow")
         self.assertContains(response, "my-package")
@@ -1047,7 +1073,7 @@ class TestPRDraftWebViews(TestCase):
         self.assertContains(res, self.pr.target_branch)
 
         # Test PR detail view
-        res = client.get(f"/pull-requests/{self.pr.id}/")
+        res = client.get(f"{self.pr.get_absolute_url()}")
         self.assertEqual(res.status_code, 200)
         self.assertContains(res, self.pr.formatted_id)
         self.assertContains(res, self.pr.target_branch)
@@ -1056,7 +1082,7 @@ class TestPRDraftWebViews(TestCase):
     def test_pr_detail_shows_countdown_and_ready_button(self):
         from django.test import Client
         client = Client()
-        res = client.get(f"/pull-requests/{self.pr.id}/")
+        res = client.get(f"{self.pr.get_absolute_url()}")
         self.assertEqual(res.status_code, 200)
         self.assertContains(res, "debouncing:")
         self.assertContains(res, "Ready for Review")
@@ -1066,20 +1092,20 @@ class TestPRDraftWebViews(TestCase):
         client = Client()
 
         # 1. Click Ready for Review
-        res = client.post(f"/pull-requests/{self.pr.id}/ready-for-review/")
-        self.assertRedirects(res, f"/pull-requests/{self.pr.id}/")
+        res = client.post(f"{self.pr.get_absolute_url()}ready-for-review/")
+        self.assertRedirects(res, f"{self.pr.get_absolute_url()}")
         self.pr.refresh_from_db()
         self.assertFalse(self.pr.is_draft)
         self.assertEqual(self.rev.reviews.count(), 1)
 
         # PR detail now shows Convert to Draft
-        res = client.get(f"/pull-requests/{self.pr.id}/")
+        res = client.get(f"{self.pr.get_absolute_url()}")
         self.assertContains(res, "Convert to Draft")
         self.assertNotContains(res, "debouncing:")
 
         # 2. Click Convert to Draft
-        res = client.post(f"/pull-requests/{self.pr.id}/convert-to-draft/")
-        self.assertRedirects(res, f"/pull-requests/{self.pr.id}/")
+        res = client.post(f"{self.pr.get_absolute_url()}convert-to-draft/")
+        self.assertRedirects(res, f"{self.pr.get_absolute_url()}")
         self.pr.refresh_from_db()
         self.rev.refresh_from_db()
         self.assertTrue(self.pr.is_draft)
@@ -1092,7 +1118,7 @@ class TestPRDraftWebViews(TestCase):
         client = Client()
 
         # HTMX ready for review returns partial directly with OOB reviews section containing reviewer
-        res = client.post(f"/pull-requests/{self.pr.id}/ready-for-review/", HTTP_HX_REQUEST="true")
+        res = client.post(f"{self.pr.get_absolute_url()}ready-for-review/", HTTP_HX_REQUEST="true")
         self.assertEqual(res.status_code, 200)
         self.assertContains(res, 'id="pr-draft-section"')
         self.assertContains(res, "Convert to Draft")
@@ -1106,7 +1132,7 @@ class TestPRDraftWebViews(TestCase):
         self.rev.save()
 
         # GET /draft-status/ auto-publishes expired draft and returns partial with Convert to Draft and updated reviews
-        res = client.get(f"/pull-requests/{self.pr.id}/draft-status/", HTTP_HX_REQUEST="true")
+        res = client.get(f"{self.pr.get_absolute_url()}draft-status/", HTTP_HX_REQUEST="true")
         self.assertEqual(res.status_code, 200)
         self.assertContains(res, "Convert to Draft")
         self.assertNotContains(res, "debouncing:")
@@ -1125,12 +1151,12 @@ class TestPRDraftWebViews(TestCase):
         self.assertIsNotNone(self.rev.draft_expires_at)
 
         # Detail contains Cancel Timeout button
-        res = client.get(f"/pull-requests/{self.pr.id}/")
+        res = client.get(f"{self.pr.get_absolute_url()}")
         self.assertContains(res, "Cancel Timeout")
 
         # Click Cancel Timeout
-        res = client.post(f"/pull-requests/{self.pr.id}/cancel-timeout/")
-        self.assertRedirects(res, f"/pull-requests/{self.pr.id}/")
+        res = client.post(f"{self.pr.get_absolute_url()}cancel-timeout/")
+        self.assertRedirects(res, f"{self.pr.get_absolute_url()}")
         self.rev.refresh_from_db()
         self.assertTrue(self.rev.is_draft)
         self.assertIsNone(self.rev.draft_expires_at)
@@ -1502,14 +1528,14 @@ class TestPRWebMergeActions(TestCase):
 
     def test_pr_detail_renders_merge_button_for_direct_project(self):
         client = Client()
-        res = client.get(f"/pull-requests/{self.pr_direct.id}/")
+        res = client.get(f"{self.pr_direct.get_absolute_url()}")
         self.assertEqual(res.status_code, 200)
         self.assertContains(res, "Merge Pull Request")
         self.assertNotContains(res, "Staging Workflow:")
 
     def test_pr_detail_renders_staging_notice_for_staging_project(self):
         client = Client()
-        res = client.get(f"/pull-requests/{self.pr_staging.id}/")
+        res = client.get(f"{self.pr_staging.get_absolute_url()}")
         self.assertEqual(res.status_code, 200)
         self.assertNotContains(res, "Merge Pull Request")
         self.assertContains(res, "Staging Workflow:")
@@ -1523,8 +1549,8 @@ class TestPRWebMergeActions(TestCase):
         mock_urlopen.return_value.__enter__.return_value = mock_response
 
         client = Client()
-        res = client.post(f"/pull-requests/{self.pr_direct.id}/merge/")
-        self.assertRedirects(res, f"/pull-requests/{self.pr_direct.id}/")
+        res = client.post(f"{self.pr_direct.get_absolute_url()}merge/")
+        self.assertRedirects(res, f"{self.pr_direct.get_absolute_url()}")
 
         self.pr_direct.refresh_from_db()
         self.assertEqual(self.pr_direct.state, PullRequest.State.MERGED)

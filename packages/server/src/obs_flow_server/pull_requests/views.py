@@ -161,8 +161,15 @@ def package_pr_list(request, project_name, package_name):
     return render(request, "core/package_pr_list.html", context)
 
 
-def pr_detail(request, pr_id):
-    pr = get_object_or_404(PullRequest, id=pr_id)
+def get_pr_or_404(project_name, number, package_name=None):
+    qs = PullRequest.objects.select_related("project", "project__org", "package", "author")
+    if package_name is None:
+        return get_object_or_404(qs, project__name=project_name, package__isnull=True, number=number)
+    return get_object_or_404(qs, project__name=project_name, package__name=package_name, number=number)
+
+
+def pr_detail(request, project_name, number, package_name=None):
+    pr = get_pr_or_404(project_name, number, package_name)
     revisions = pr.revisions.all().order_by("-revision_number")
     latest_revision = revisions.first()
     reviews = latest_revision.reviews.all() if latest_revision else []
@@ -191,8 +198,8 @@ def _render_pr_draft_section(request, pr, latest_revision):
     )
 
 
-def pr_draft_status(request, pr_id):
-    pr = get_object_or_404(PullRequest, id=pr_id)
+def pr_draft_status(request, project_name, number, package_name=None):
+    pr = get_pr_or_404(project_name, number, package_name)
     latest_revision = pr.revisions.order_by("-revision_number").first()
     if latest_revision and latest_revision.is_draft and latest_revision.draft_expires_at and latest_revision.draft_expires_at <= timezone.now():
         from pull_requests.api import mark_ready_for_review
@@ -203,8 +210,8 @@ def pr_draft_status(request, pr_id):
 
 
 @require_POST
-def pr_ready_for_review(request, pr_id):
-    pr = get_object_or_404(PullRequest, id=pr_id)
+def pr_ready_for_review(request, project_name, number, package_name=None):
+    pr = get_pr_or_404(project_name, number, package_name)
     latest_revision = pr.revisions.order_by("-revision_number").first()
     if latest_revision:
         from pull_requests.api import mark_ready_for_review
@@ -215,12 +222,12 @@ def pr_ready_for_review(request, pr_id):
 
     if request.headers.get("HX-Request"):
         return _render_pr_draft_section(request, pr, latest_revision)
-    return redirect("pr_detail", pr_id=pr.id)
+    return redirect(pr)
 
 
 @require_POST
-def pr_cancel_timeout(request, pr_id):
-    pr = get_object_or_404(PullRequest, id=pr_id)
+def pr_cancel_timeout(request, project_name, number, package_name=None):
+    pr = get_pr_or_404(project_name, number, package_name)
     latest_revision = pr.revisions.order_by("-revision_number").first()
     if latest_revision:
         from pull_requests.api import mark_draft
@@ -231,12 +238,12 @@ def pr_cancel_timeout(request, pr_id):
 
     if request.headers.get("HX-Request"):
         return _render_pr_draft_section(request, pr, latest_revision)
-    return redirect("pr_detail", pr_id=pr.id)
+    return redirect(pr)
 
 
 @require_POST
-def pr_convert_to_draft(request, pr_id):
-    pr = get_object_or_404(PullRequest, id=pr_id)
+def pr_convert_to_draft(request, project_name, number, package_name=None):
+    pr = get_pr_or_404(project_name, number, package_name)
     latest_revision = pr.revisions.order_by("-revision_number").first()
     if latest_revision:
         from pull_requests.api import mark_draft
@@ -247,22 +254,22 @@ def pr_convert_to_draft(request, pr_id):
 
     if request.headers.get("HX-Request"):
         return _render_pr_draft_section(request, pr, latest_revision)
-    return redirect("pr_detail", pr_id=pr.id)
+    return redirect(pr)
 
 
 @require_POST
-def pr_merge_action(request, pr_id):
-    pr = get_object_or_404(PullRequest, id=pr_id)
+def pr_merge_action(request, project_name, number, package_name=None):
+    pr = get_pr_or_404(project_name, number, package_name)
     if pr.target_project and pr.target_project.workflow_type == Project.WorkflowType.STAGING:
         messages.error(
             request,
             f"Direct merges are not allowed for project '{pr.target_project.name}'. This PR must be merged via a staging batch."
         )
-        return redirect("pr_detail", pr_id=pr.id)
+        return redirect(pr)
 
     if pr.state == PullRequest.State.MERGED:
         messages.error(request, f"Pull request #{pr.number} is already merged.")
-        return redirect("pr_detail", pr_id=pr.id)
+        return redirect(pr)
 
     from pull_requests.api import _do_gitea_merge
     try:
@@ -273,7 +280,7 @@ def pr_merge_action(request, pr_id):
     except Exception as e:
         messages.error(request, str(e))
 
-    return redirect("pr_detail", pr_id=pr.id)
+    return redirect(pr)
 
 
 @require_POST
