@@ -437,4 +437,59 @@ class TestNativeGitForgeAPIs(TransactionTestCase):
                     self.assertTrue((fork_path / "HEAD").exists())
 
 
+class TestCoreUIViews(TestCase):
+    def setUp(self):
+        from django.test import Client
+        self.client = Client()
+        self.org = Org.objects.create(name="distro-ui")
+        self.proj = Project.objects.create(
+            name="openSUSE:Factory",
+            org=self.org,
+            branch_name="factory",
+            workflow_type=Project.WorkflowType.STAGING,
+        )
+        self.pkg = Package.objects.create(project=self.proj, name="bash")
+
+    def test_project_list_view(self):
+        response = self.client.get("/projects/")
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "openSUSE:Factory")
+
+        # Test filter
+        response = self.client.get("/projects/?name=Nonexistent")
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, "openSUSE:Factory")
+
+    def test_project_detail_view(self):
+        response = self.client.get(f"/projects/{self.proj.id}/")
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "openSUSE:Factory")
+        self.assertContains(response, "bash")
+
+        # 404 for missing project
+        response = self.client.get("/projects/99999/")
+        self.assertEqual(response.status_code, 404)
+
+    def test_package_list_view(self):
+        response = self.client.get("/packages/")
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "bash")
+
+        # Test filter
+        response = self.client.get("/packages/?name=Nonexistent")
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, "bash")
+
+    def test_package_detail_view(self):
+        response = self.client.get(f"/packages/{self.pkg.id}/")
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "bash")
+        self.assertContains(response, "openSUSE:Factory")
+
+        # 404 for missing package
+        response = self.client.get("/packages/99999/")
+        self.assertEqual(response.status_code, 404)
+
+
+
 
