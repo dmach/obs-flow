@@ -1,15 +1,11 @@
-{% extends "base.html" %}
+{% extends pr.package|yesno:"core/package_base.html,core/project_base.html" %}
 
 {% block title %}{{ pr.formatted_id }} - OBS Flow{% endblock %}
 
-{% block content %}
-<nav aria-label="breadcrumb">
-    <ul>
-        <li><a href="{% url 'home' %}">Home</a></li>
-        <li><a href="{% url 'pr_list' %}">Pull Requests</a></li>
-        <li>{{ pr.formatted_id }}</li>
-    </ul>
-</nav>
+{% block crumb_entity %}{% if pr.package %}<a href="{{ pr.package.get_absolute_url }}">{{ pr.project.name }}/{{ pr.package.name }}</a>{% else %}<a href="{{ pr.project.get_absolute_url }}">{{ pr.project.name }}</a>{% endif %}{% endblock %}
+{% block crumb_tail %}<li>#{{ pr.number }}</li>{% endblock %}
+
+{% block page_content %}
 
 <h1>{{ pr.title }} <small>#{{ pr.number }}</small></h1>
 <p>
