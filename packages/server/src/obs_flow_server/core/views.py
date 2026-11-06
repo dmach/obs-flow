@@ -166,3 +166,59 @@ def package_detail(request, project_name, package_name):
             "active_tab": "overview",
         },
     )
+
+from django.http import Http404
+from .git_forge import get_repo_path
+from .git_utils import get_git_tree, get_git_blob, get_git_type
+
+def project_code(request, project_name, file_path=""):
+    project = get_object_or_404(Project.objects.select_related("org"), name=project_name)
+    ref = request.GET.get("ref", project.branch_name or "HEAD")
+    repo_path = get_repo_path(project.org.name)
+    
+    obj_type = get_git_type(repo_path, ref, file_path)
+    if obj_type is None:
+        raise Http404("Path not found in repository")
+        
+    context = {
+        "project": project,
+        "active_tab": "code",
+        "ref": ref,
+        "file_path": file_path,
+        "obj_type": obj_type,
+    }
+    
+    if obj_type == "tree":
+        context["tree"] = get_git_tree(repo_path, ref, file_path)
+    elif obj_type == "blob":
+        context["blob"] = get_git_blob(repo_path, ref, file_path)
+        
+    return render(request, "core/project_code.html", context)
+
+def package_code(request, project_name, package_name, file_path=""):
+    package = get_object_or_404(
+        Package.objects.select_related("project", "project__org", "forked_from", "forked_from__project"),
+        project__name=project_name,
+        name=package_name,
+    )
+    ref = request.GET.get("ref", package.project.branch_name or "HEAD")
+    repo_path = get_repo_path(package.project.org.name, package.name)
+    
+    obj_type = get_git_type(repo_path, ref, file_path)
+    if obj_type is None:
+        raise Http404("Path not found in repository")
+        
+    context = {
+        "package": package,
+        "active_tab": "code",
+        "ref": ref,
+        "file_path": file_path,
+        "obj_type": obj_type,
+    }
+    
+    if obj_type == "tree":
+        context["tree"] = get_git_tree(repo_path, ref, file_path)
+    elif obj_type == "blob":
+        context["blob"] = get_git_blob(repo_path, ref, file_path)
+        
+    return render(request, "core/package_code.html", context)
