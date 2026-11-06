@@ -50,9 +50,8 @@ def update_staging_batch(batch_id: int, title=None, embargo_date=None, release_d
     return batch
 
 
-def staging_list(request):
+def get_staging_list_context(request, qs):
     form = StagingBatchFilterForm(request.GET)
-    qs = StagingBatch.objects.select_related("project", "author").all().order_by("-id")
 
     if form.is_valid():
         target_owner = form.cleaned_data.get("target_owner")
@@ -118,10 +117,11 @@ def staging_list(request):
             else:
                 qs = qs.filter(revisions__revision_pull_requests__pull_request_revision__pull_request__target__owner__icontains=pr_target_owner)
         if pr_target_repo:
-            if pr_target_repo_exact:
-                qs = qs.filter(revisions__revision_pull_requests__pull_request_revision__pull_request__target__repo__iexact=pr_target_repo)
-            else:
-                qs = qs.filter(revisions__revision_pull_requests__pull_request_revision__pull_request__target__repo__icontains=pr_target_repo)
+            if target_repo := pr_target_repo:
+                if pr_target_repo_exact:
+                    qs = qs.filter(revisions__revision_pull_requests__pull_request_revision__pull_request__target__repo__iexact=target_repo)
+                else:
+                    qs = qs.filter(revisions__revision_pull_requests__pull_request_revision__pull_request__target__repo__icontains=target_repo)
         if pr_target_branch:
             if pr_target_branch_exact:
                 qs = qs.filter(revisions__revision_pull_requests__pull_request_revision__pull_request__target__branch__iexact=pr_target_branch)
@@ -148,18 +148,29 @@ def staging_list(request):
     page_params = {k: v for k, v in request.GET.items() if k != 'page' and v}
     filter_query = "&" + urllib.parse.urlencode(page_params) if page_params else ""
 
-    return render(
-        request,
-        "staging/staging_list.html",
-        {
-            "form": form,
-            "page_obj": page_obj,
-            "filter_query": filter_query,
-            "base_query": base_query,
-            "current_sort": sort_param,
-            "total_count": paginator.count,
-        }
-    )
+    return {
+        "form": form,
+        "page_obj": page_obj,
+        "filter_query": filter_query,
+        "base_query": base_query,
+        "current_sort": sort_param,
+        "total_count": paginator.count,
+    }
+
+
+def staging_list(request):
+    qs = StagingBatch.objects.select_related("project", "author").all()
+    context = get_staging_list_context(request, qs)
+    return render(request, "staging/staging_list.html", context)
+
+
+def project_staging_list(request, project_id):
+    project = get_object_or_404(Project.objects.select_related("org"), id=project_id)
+    qs = StagingBatch.objects.select_related("project", "author").filter(project=project)
+    context = get_staging_list_context(request, qs)
+    context["project"] = project
+    context["active_tab"] = "staging"
+    return render(request, "core/project_staging_list.html", context)
 
 
 def staging_detail(request, batch_id):
