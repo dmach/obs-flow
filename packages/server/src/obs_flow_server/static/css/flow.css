@@ -46,6 +46,7 @@
 	--flow-shadow: 0 0 0 1px var(--flow-border), 0 8px 24px 0 light-dark(#25292e1f, #010409);
 
 	--flow-radius: 6px;
+	--flow-gutter: 1.5rem;
 }
 
 /* Variants only set two helper properties; elements decide how to use them. */
@@ -364,18 +365,22 @@ body > header > *,
 .page-header > *,
 main,
 body > footer {
-	max-width: 1280px;
-	margin-inline: auto;
-	padding-inline: 1rem;
+	padding-inline: var(--flow-gutter);
 }
 
 /* Top row: brand left, account right. */
 body > header > div {
 	display: flex;
 	align-items: center;
-	justify-content: space-between;
-	gap: 1rem;
+	flex-wrap: wrap;
+	gap: 0.5rem 1.5rem;
 	min-height: 3.5rem;
+}
+body > header nav[aria-label="Account"] {
+	margin-left: auto;
+}
+body > header nav[aria-label="Main"] [aria-current="page"] {
+	background: var(--flow-bg-hover);
 }
 body > header > div > a {
 	display: inline-flex;
@@ -423,20 +428,19 @@ header summary:hover {
 }
 
 /* Section tabs (GitHub UnderlineNav). */
-nav[aria-label="Main"],
 nav[aria-label="Subnav"] {
-	padding-inline: 0.5rem;
+	padding-inline: 0;
+	border-bottom: 1px solid var(--flow-border);
 }
-nav[aria-label="Main"] > ul,
 nav[aria-label="Subnav"] > ul {
 	flex-wrap: wrap;
+	padding-inline: calc(var(--flow-gutter) - 0.5rem);
 }
-nav[aria-label="Main"] li,
 nav[aria-label="Subnav"] li {
+	margin-bottom: -1px;
 	padding-bottom: 0.5rem;
 	border-bottom: 2px solid transparent;
 }
-nav[aria-label="Main"] li:has(> [aria-current="page"]),
 nav[aria-label="Subnav"] li:has(> [aria-current="page"]) {
 	border-bottom-color: var(--flow-fg-accent);
 }
@@ -452,7 +456,6 @@ body > header:has(+ .page-header) {
 .page-header {
 	margin-bottom: 1.5rem;
 	padding-top: 1rem;
-	border-bottom: 1px solid var(--flow-border);
 	background: var(--flow-bg-subtle);
 }
 .page-header > h1 {
