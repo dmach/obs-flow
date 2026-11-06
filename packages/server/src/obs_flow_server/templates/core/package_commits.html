@@ -1,0 +1,6 @@
+{% extends "core/package_base.html" %}
+
+{% block page_content %}
+    {% url 'package_code' package.project.name package.name as base_code_url %}
+    {% include "core/_commits_table.html" with base_code_url=base_code_url %}
+{% endblock %}
