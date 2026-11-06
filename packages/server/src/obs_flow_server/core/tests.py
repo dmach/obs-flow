@@ -490,6 +490,46 @@ class TestCoreUIViews(TestCase):
         response = self.client.get("/packages/99999/")
         self.assertEqual(response.status_code, 404)
 
+    def test_project_pr_list_view(self):
+        from accounts.models import User
+        from pull_requests.models import PullRequest
+        user = User.objects.create(username="alice", username_lower="alice", account_type=User.AccountType.HUMAN)
+        other_proj = Project.objects.create(name="openSUSE:Leap", org=self.org, branch_name="leap")
+        PullRequest.objects.create(project=self.proj, package=self.pkg, number=1, author=user, title="Fix bash bug")
+        PullRequest.objects.create(project=other_proj, number=1, author=user, title="Leap core change")
+
+        response = self.client.get(f"/projects/{self.proj.id}/pull-requests/")
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Fix bash bug")
+        self.assertNotContains(response, "Leap core change")
+
+    def test_project_staging_list_view(self):
+        from accounts.models import User
+        from staging.models import StagingBatch
+        user = User.objects.create(username="bob", username_lower="bob", account_type=User.AccountType.HUMAN)
+        other_proj = Project.objects.create(name="openSUSE:Tumbleweed", org=self.org, branch_name="tw")
+        StagingBatch.objects.create(project=self.proj, author=user, title="Factory batch 1")
+        StagingBatch.objects.create(project=other_proj, author=user, title="TW batch 1")
+
+        response = self.client.get(f"/projects/{self.proj.id}/staging/")
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Factory batch 1")
+        self.assertNotContains(response, "TW batch 1")
+
+    def test_package_pr_list_view(self):
+        from accounts.models import User
+        from pull_requests.models import PullRequest
+        user = User.objects.create(username="charlie", username_lower="charlie", account_type=User.AccountType.HUMAN)
+        pkg2 = Package.objects.create(project=self.proj, name="zsh")
+        PullRequest.objects.create(project=self.proj, package=self.pkg, number=1, author=user, title="Bash specific PR")
+        PullRequest.objects.create(project=self.proj, package=pkg2, number=2, author=user, title="Zsh specific PR")
+
+        response = self.client.get(f"/packages/{self.pkg.id}/pull-requests/")
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Bash specific PR")
+        self.assertNotContains(response, "Zsh specific PR")
+
+
 
 
 
