@@ -1,0 +1,84 @@
+{% extends "base.html" %}
+
+{% block title %}Projects - OBS Flow{% endblock %}
+
+{% block content %}
+<header>
+    <h1>Projects <data value="{{ total_count }}">{{ total_count }}</data></h1>
+</header>
+
+<details {% if base_query %}open{% endif %}>
+    <summary>Search &amp; Filters</summary>
+    <form method="GET" action="" data-clean-url="true">
+        {% include "partials/filter_fields.html" with fields=form.primary_fields %}
+
+        <footer>
+            <a href="?" role="button">Reset</a>
+            <button type="submit" data-variant="primary">Apply Filter</button>
+        </footer>
+    </form>
+</details>
+
+{% if page_obj %}
+    <table>
+        <thead>
+            <tr>
+                <th>
+                    <a href="?sort={% if current_sort == 'id' %}-id{% else %}id{% endif %}{{ base_query }}">
+                        ID
+                        {% if current_sort == 'id' %}▲{% elif current_sort == '-id' %}▼{% endif %}
+                    </a>
+                </th>
+                <th>
+                    <a href="?sort={% if current_sort == 'name' %}-name{% else %}name{% endif %}{{ base_query }}">
+                        Name
+                        {% if current_sort == 'name' %}▲{% elif current_sort == '-name' %}▼{% endif %}
+                    </a>
+                </th>
+                <th>
+                    <a href="?sort={% if current_sort == 'org__name' %}-org__name{% else %}org__name{% endif %}{{ base_query }}">
+                        Organization
+                        {% if current_sort == 'org__name' %}▲{% elif current_sort == '-org__name' %}▼{% endif %}
+                    </a>
+                </th>
+                <th>
+                    <a href="?sort={% if current_sort == 'branch_name' %}-branch_name{% else %}branch_name{% endif %}{{ base_query }}">
+                        Branch
+                        {% if current_sort == 'branch_name' %}▲{% elif current_sort == '-branch_name' %}▼{% endif %}
+                    </a>
+                </th>
+                <th>
+                    <a href="?sort={% if current_sort == 'workflow_type' %}-workflow_type{% else %}workflow_type{% endif %}{{ base_query }}">
+                        Workflow Type
+                        {% if current_sort == 'workflow_type' %}▲{% elif current_sort == '-workflow_type' %}▼{% endif %}
+                    </a>
+                </th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for project in page_obj %}
+                <tr>
+                    <td data-label="ID">{{ project.id }}</td>
+                    <th scope="row" data-label="Name">
+                        <a href="{% url 'project_detail' project.id %}">{{ project.name }}</a>
+                    </th>
+                    <td data-label="Organization">{{ project.org.name|default:"-" }}</td>
+                    <td data-label="Branch"><code>{{ project.branch_name|default:"-" }}</code></td>
+                    <td data-label="Workflow Type">
+                        <mark data-state="{% if project.workflow_type == 'staging' %}staging{% else %}open{% endif %}">
+                            {{ project.get_workflow_type_display }}
+                        </mark>
+                    </td>
+                </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    {% include "partials/pagination.html" %}
+{% else %}
+    <article data-empty>
+        <h3>No projects found</h3>
+        {% if base_query %}<p>Try changing or <a href="?">resetting the filters</a>.</p>{% endif %}
+    </article>
+{% endif %}
+{% endblock %}

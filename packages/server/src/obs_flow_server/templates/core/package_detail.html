@@ -1,0 +1,104 @@
+{% extends "base.html" %}
+
+{% block title %}{{ package.name }} - Packages - OBS Flow{% endblock %}
+
+{% block content %}
+<nav aria-label="breadcrumb">
+    <ul>
+        <li><a href="{% url 'home' %}">Home</a></li>
+        <li><a href="{% url 'package_list' %}">Packages</a></li>
+        <li>{{ package.name }}</li>
+    </ul>
+</nav>
+
+<h1>{{ package.name }} <small>#{{ package.id }}</small></h1>
+<p>
+    <small>Project: <a href="{% url 'project_detail' package.project.id %}"><strong>{{ package.project.name }}</strong></a></small>
+    {% if package.forked_from %}
+        <small>&middot; Forked from: <a href="{% url 'package_detail' package.forked_from.id %}"><code>{{ package.forked_from }}</code></a></small>
+    {% endif %}
+</p>
+
+<div>
+    <div>
+        <section>
+            <h2>Forks <small>({{ forks|length }})</small></h2>
+            {% if forks %}
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Project</th>
+                            <th>Package</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for fork in forks %}
+                            <tr>
+                                <td data-label="Project">
+                                    <a href="{% url 'project_detail' fork.project.id %}">{{ fork.project.name }}</a>
+                                </td>
+                                <th scope="row" data-label="Package">
+                                    <a href="{% url 'package_detail' fork.id %}">{{ fork.name }}</a>
+                                </th>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            {% else %}
+                <article data-empty><p>No packages have forked this package.</p></article>
+            {% endif %}
+        </section>
+
+        <section>
+            <h2>Recent Pull Requests</h2>
+            {% if recent_prs %}
+                <table>
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Title</th>
+                            <th>Author</th>
+                            <th>State</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for pr in recent_prs %}
+                            <tr>
+                                <th scope="row" data-label="ID">
+                                    <a href="{% url 'pr_detail' pr.id %}">{{ pr.formatted_id }}</a>
+                                </th>
+                                <td data-label="Title">{{ pr.title }}</td>
+                                <td data-label="Author">{{ pr.author.username }}</td>
+                                <td data-label="State">
+                                    {% if pr.is_draft and pr.state == "open" %}
+                                        <mark data-state="draft">Draft</mark>
+                                    {% else %}
+                                        <mark data-state="{{ pr.state }}">{{ pr.get_state_display }}</mark>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            {% else %}
+                <article data-empty><p>No pull requests for this package.</p></article>
+            {% endif %}
+        </section>
+    </div>
+
+    <aside>
+        <section>
+            <h4>Package Information</h4>
+            <p><small>Project:</small><br><a href="{% url 'project_detail' package.project.id %}"><strong>{{ package.project.name }}</strong></a></p>
+            <p><small>Organization:</small><br><strong>{{ package.project.org.name|default:"None" }}</strong></p>
+            <p><small>Forked From:</small><br>
+                {% if package.forked_from %}
+                    <a href="{% url 'package_detail' package.forked_from.id %}">{{ package.forked_from }}</a>
+                {% else %}
+                    <strong>None</strong>
+                {% endif %}
+            </p>
+        </section>
+    </aside>
+</div>
+{% endblock %}

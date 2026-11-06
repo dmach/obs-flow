@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+
+{% block title %}Packages - OBS Flow{% endblock %}
+
+{% block content %}
+<header>
+    <h1>Packages <data value="{{ total_count }}">{{ total_count }}</data></h1>
+</header>
+
+<details {% if base_query %}open{% endif %}>
+    <summary>Search &amp; Filters</summary>
+    <form method="GET" action="" data-clean-url="true">
+        {% include "partials/filter_fields.html" with fields=form.primary_fields %}
+
+        <footer>
+            <a href="?" role="button">Reset</a>
+            <button type="submit" data-variant="primary">Apply Filter</button>
+        </footer>
+    </form>
+</details>
+
+{% if page_obj %}
+    <table>
+        <thead>
+            <tr>
+                <th>
+                    <a href="?sort={% if current_sort == 'id' %}-id{% else %}id{% endif %}{{ base_query }}">
+                        ID
+                        {% if current_sort == 'id' %}▲{% elif current_sort == '-id' %}▼{% endif %}
+                    </a>
+                </th>
+                <th>
+                    <a href="?sort={% if current_sort == 'name' %}-name{% else %}name{% endif %}{{ base_query }}">
+                        Package
+                        {% if current_sort == 'name' %}▲{% elif current_sort == '-name' %}▼{% endif %}
+                    </a>
+                </th>
+                <th>
+                    <a href="?sort={% if current_sort == 'project__name' %}-project__name{% else %}project__name{% endif %}{{ base_query }}">
+                        Project
+                        {% if current_sort == 'project__name' %}▲{% elif current_sort == '-project__name' %}▼{% endif %}
+                    </a>
+                </th>
+                <th>
+                    Forked From
+                </th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for package in page_obj %}
+                <tr>
+                    <td data-label="ID">{{ package.id }}</td>
+                    <th scope="row" data-label="Package">
+                        <a href="{% url 'package_detail' package.id %}">{{ package.name }}</a>
+                    </th>
+                    <td data-label="Project">
+                        <a href="{% url 'project_detail' package.project.id %}">{{ package.project.name }}</a>
+                    </td>
+                    <td data-label="Forked From">
+                        {% if package.forked_from %}
+                            <a href="{% url 'package_detail' package.forked_from.id %}">{{ package.forked_from }}</a>
+                        {% else %}
+                            -
+                        {% endif %}
+                    </td>
+                </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    {% include "partials/pagination.html" %}
+{% else %}
+    <article data-empty>
+        <h3>No packages found</h3>
+        {% if base_query %}<p>Try changing or <a href="?">resetting the filters</a>.</p>{% endif %}
+    </article>
+{% endif %}
+{% endblock %}
