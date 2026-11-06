@@ -34,7 +34,7 @@
                     <tbody>
                         {% for item in pull_requests_data %}
                             <tr>
-                                <th scope="row" data-label="ID"><a href="{% url 'pr_detail' item.pr.id %}">{{ item.pr.formatted_id }}</a></th>
+                                <th scope="row" data-label="ID"><a href="{{ item.pr.get_absolute_url }}">{{ item.pr.formatted_id }}</a></th>
                                 <td data-label="Title">{{ item.pr.title }}</td>
                                 <td data-label="Reviews"><data value="{{ item.accepted_reviews }}">{{ item.accepted_reviews }}/{{ item.total_reviews }}</data></td>
                                 <td data-label="State"><mark data-state="{{ item.pr.state }}">{{ item.pr.get_state_display }}</mark></td>

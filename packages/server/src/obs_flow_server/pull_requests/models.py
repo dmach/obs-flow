@@ -2,6 +2,7 @@ from core.models import Issue, Project
 from django.conf import settings
 from django.db import models
 from django.db.models import Q
+from django.urls import reverse
 from obs_flow_common.pull_requests import (
     pull_request_build_text_id,
     pull_request_parse_text_id,
@@ -88,6 +89,15 @@ class PullRequest(models.Model):
     @property
     def target_branch(self) -> str:
         return self.project.branch_name if self.project else ""
+
+    def url_for(self, route: str = "pr_detail") -> str:
+        kwargs = {"project_name": self.project.name, "number": self.number}
+        if self.package_id is not None:
+            kwargs["package_name"] = self.package.name
+        return reverse(route, kwargs=kwargs)
+
+    def get_absolute_url(self) -> str:
+        return self.url_for("pr_detail")
 
     @property
     def formatted_id(self) -> str:

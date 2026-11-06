@@ -1,3 +1,4 @@
+{% load pr_urls %}
 <section id="pr-draft-section">
     <h4>Draft</h4>
     <p>
@@ -6,7 +7,7 @@
         {% if latest_revision and latest_revision.draft_expires_at %}
             <span class="debounce-countdown"
                   data-expires="{{ latest_revision.draft_expires_at|date:'c' }}"
-                  hx-get="{% url 'pr_draft_status' pr.id %}"
+                  hx-get="{% pr_url pr 'pr_draft_status' %}"
                   hx-trigger="countdown-expired"
                   hx-target="#pr-draft-section"
                   hx-swap="outerHTML">
@@ -18,18 +19,18 @@
     {% endif %}
 </p>
 {% if pr.is_draft %}
-        <form method="post" action="{% url 'pr_ready_for_review' pr.id %}" hx-post="{% url 'pr_ready_for_review' pr.id %}" hx-target="#pr-draft-section" hx-swap="outerHTML">
+        <form method="post" action="{% pr_url pr 'pr_ready_for_review' %}" hx-post="{% pr_url pr 'pr_ready_for_review' %}" hx-target="#pr-draft-section" hx-swap="outerHTML">
             {% csrf_token %}
             <button type="submit">Ready for Review</button>
         </form>
         {% if latest_revision and latest_revision.draft_expires_at %}
-            <form method="post" action="{% url 'pr_cancel_timeout' pr.id %}" hx-post="{% url 'pr_cancel_timeout' pr.id %}" hx-target="#pr-draft-section" hx-swap="outerHTML">
+            <form method="post" action="{% pr_url pr 'pr_cancel_timeout' %}" hx-post="{% pr_url pr 'pr_cancel_timeout' %}" hx-target="#pr-draft-section" hx-swap="outerHTML">
                 {% csrf_token %}
                 <button type="submit">Cancel Timeout</button>
             </form>
         {% endif %}
     {% else %}
-        <form method="post" action="{% url 'pr_convert_to_draft' pr.id %}" hx-post="{% url 'pr_convert_to_draft' pr.id %}" hx-target="#pr-draft-section" hx-swap="outerHTML">
+        <form method="post" action="{% pr_url pr 'pr_convert_to_draft' %}" hx-post="{% pr_url pr 'pr_convert_to_draft' %}" hx-target="#pr-draft-section" hx-swap="outerHTML">
             {% csrf_token %}
             <button type="submit">Convert to Draft</button>
         </form>

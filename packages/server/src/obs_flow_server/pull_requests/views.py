@@ -9,6 +9,7 @@ from django.views.decorators.csrf import ensure_csrf_cookie
 from django.views.decorators.http import require_POST
 
 from core.htmx import close_modal_and_refresh
+from core.models import Project
 from pull_requests.models import PullRequest
 from pull_requests.forms import PullRequestFilterForm
 from pull_requests.workflows import execute_pr_merge, mark_draft, mark_ready_for_review, validate_pr_merge
@@ -161,8 +162,15 @@ def package_pr_list(request, project_name, package_name):
     return render(request, "core/package_pr_list.html", context)
 
 
-def pr_detail(request, pr_id):
-    pr = get_object_or_404(PullRequest, id=pr_id)
+def get_pr_or_404(project_name, number, package_name=None):
+    qs = PullRequest.objects.select_related("project", "project__org", "package", "author")
+    if package_name is None:
+        return get_object_or_404(qs, project__name=project_name, package__isnull=True, number=number)
+    return get_object_or_404(qs, project__name=project_name, package__name=package_name, number=number)
+
+
+def pr_detail(request, project_name, number, package_name=None):
+    pr = get_pr_or_404(project_name, number, package_name)
     revisions = pr.revisions.all().order_by("-revision_number")
     latest_revision = revisions.first()
     reviews = latest_revision.reviews.all() if latest_revision else []
@@ -191,9 +199,9 @@ def _render_pr_draft_section(request, pr, latest_revision):
     )
 
 
-def pr_draft_status(request, pr_id):
-    pr = get_object_or_404(PullRequest, id=pr_id)
-    latest_revision = pr.latest_revision
+def pr_draft_status(request, project_name, number, package_name=None):
+    pr = get_pr_or_404(project_name, number, package_name)
+    latest_revision = pr.revisions.order_by("-revision_number").first()
     if latest_revision and latest_revision.is_draft and latest_revision.draft_expires_at and latest_revision.draft_expires_at <= timezone.now():
         mark_ready_for_review(latest_revision)
         pr.refresh_from_db()
@@ -202,9 +210,9 @@ def pr_draft_status(request, pr_id):
 
 
 @require_POST
-def pr_ready_for_review(request, pr_id):
-    pr = get_object_or_404(PullRequest, id=pr_id)
-    latest_revision = pr.latest_revision
+def pr_ready_for_review(request, project_name, number, package_name=None):
+    pr = get_pr_or_404(project_name, number, package_name)
+    latest_revision = pr.revisions.order_by("-revision_number").first()
     if latest_revision:
         mark_ready_for_review(latest_revision)
         messages.success(request, f"Pull request #{pr.number} is now ready for review.")
@@ -213,13 +221,13 @@ def pr_ready_for_review(request, pr_id):
 
     if request.headers.get("HX-Request"):
         return _render_pr_draft_section(request, pr, latest_revision)
-    return redirect("pr_detail", pr_id=pr.id)
+    return redirect(pr)
 
 
 @require_POST
-def pr_cancel_timeout(request, pr_id):
-    pr = get_object_or_404(PullRequest, id=pr_id)
-    latest_revision = pr.latest_revision
+def pr_cancel_timeout(request, project_name, number, package_name=None):
+    pr = get_pr_or_404(project_name, number, package_name)
+    latest_revision = pr.revisions.order_by("-revision_number").first()
     if latest_revision:
         mark_draft(latest_revision)
         messages.success(request, f"Cancelled review debounce timeout for PR #{pr.number}.")
@@ -228,13 +236,13 @@ def pr_cancel_timeout(request, pr_id):
 
     if request.headers.get("HX-Request"):
         return _render_pr_draft_section(request, pr, latest_revision)
-    return redirect("pr_detail", pr_id=pr.id)
+    return redirect(pr)
 
 
 @require_POST
-def pr_convert_to_draft(request, pr_id):
-    pr = get_object_or_404(PullRequest, id=pr_id)
-    latest_revision = pr.latest_revision
+def pr_convert_to_draft(request, project_name, number, package_name=None):
+    pr = get_pr_or_404(project_name, number, package_name)
+    latest_revision = pr.revisions.order_by("-revision_number").first()
     if latest_revision:
         mark_draft(latest_revision)
         messages.success(request, f"Pull request #{pr.number} converted to draft.")
@@ -243,16 +251,16 @@ def pr_convert_to_draft(request, pr_id):
 
     if request.headers.get("HX-Request"):
         return _render_pr_draft_section(request, pr, latest_revision)
-    return redirect("pr_detail", pr_id=pr.id)
+    return redirect(pr)
 
 
 @require_POST
-def pr_merge_action(request, pr_id):
-    pr = get_object_or_404(PullRequest, id=pr_id)
+def pr_merge_action(request, project_name, number, package_name=None):
+    pr = get_pr_or_404(project_name, number, package_name)
     reasons = validate_pr_merge(pr)
     if reasons:
         messages.error(request, "; ".join(reasons))
-        return redirect("pr_detail", pr_id=pr.id)
+        return redirect(pr)
 
     try:
         execute_pr_merge(pr)
@@ -260,7 +268,7 @@ def pr_merge_action(request, pr_id):
     except Exception as e:
         messages.error(request, str(e))
 
-    return redirect("pr_detail", pr_id=pr.id)
+    return redirect(pr)
 
 
 @require_POST
