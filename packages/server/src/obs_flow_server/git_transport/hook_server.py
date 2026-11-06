@@ -100,10 +100,12 @@ def _serve(sock_path: Path):
 
 def start_hook_server(socket_path: Path | None = None) -> Path:
     global _server_thread, _server_running, _server_socket
-    if _server_running:
-        return Path(settings.GIT_HOOKS_SOCKET_PATH)
-
     sock_path = Path(socket_path or settings.GIT_HOOKS_SOCKET_PATH)
+    if _server_running and sock_path.exists():
+        return sock_path
+
+    stop_hook_server()
+
     sock_path.parent.mkdir(parents=True, exist_ok=True)
 
     if sock_path.exists():
@@ -114,6 +116,10 @@ def start_hook_server(socket_path: Path | None = None) -> Path:
 
     _server_socket = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
     _server_socket.bind(str(sock_path))
+    try:
+        os.chmod(str(sock_path), 0o666)
+    except OSError:
+        pass
     _server_socket.listen(128)
     _server_running = True
 
