@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}{{ project.name }} - Projects - OBS Flow{% endblock %}
+
+{% block content %}
+<nav aria-label="breadcrumb">
+    <ul>
+        <li><a href="{% url 'home' %}">Home</a></li>
+        <li><a href="{% url 'project_list' %}">Projects</a></li>
+        <li>{{ project.name }}</li>
+    </ul>
+</nav>
+
+<h1>{{ project.name }} <small>#{{ project.id }}</small></h1>
+<p>
+    <mark data-state="{% if project.workflow_type == 'staging' %}staging{% else %}open{% endif %}">
+        {{ project.get_workflow_type_display }}
+    </mark>
+    {% if project.org %}
+        <small>Organization: <strong>{{ project.org.name }}</strong></small>
+    {% endif %}
+    {% if project.branch_name %}
+        <small>&middot; Branch: <code>{{ project.branch_name }}</code></small>
+    {% endif %}
+</p>
+
+<nav aria-label="Subnav">
+    <ul>
+        <li>
+            <a href="{% url 'project_detail' project.id %}"{% if active_tab == 'overview' %} aria-current="page"{% endif %}>
+                <img class="icon" src="{% static 'vendor/octicons/package-16.svg' %}" /> Packages
+            </a>
+        </li>
+        <li>
+            <a href="{% url 'project_pr_list' project.id %}"{% if active_tab == 'pull_requests' %} aria-current="page"{% endif %}>
+                <img class="icon" src="{% static 'vendor/octicons/git-pull-request-16.svg' %}" /> Pull Requests
+            </a>
+        </li>
+        <li>
+            <a href="{% url 'project_staging_list' project.id %}"{% if active_tab == 'staging' %} aria-current="page"{% endif %}>
+                <img class="icon" src="{% static 'vendor/octicons/iterations-16.svg' %}" /> Staging Batches
+            </a>
+        </li>
+    </ul>
+</nav>
+
+{% block project_content %}{% endblock %}
+{% endblock %}

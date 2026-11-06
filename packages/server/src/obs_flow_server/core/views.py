@@ -83,7 +83,6 @@ def project_list(request):
 def project_detail(request, project_id):
     project = get_object_or_404(Project.objects.select_related("org"), id=project_id)
     packages = project.packages.select_related("forked_from", "forked_from__project").all().order_by("name")
-    recent_prs = project.pull_requests.select_related("author", "package").order_by("-id")[:20]
 
     return render(
         request,
@@ -91,7 +90,7 @@ def project_detail(request, project_id):
         {
             "project": project,
             "packages": packages,
-            "recent_prs": recent_prs,
+            "active_tab": "overview",
         },
     )
 
@@ -156,7 +155,6 @@ def package_detail(request, package_id):
         id=package_id,
     )
     forks = package.forks.select_related("project").all().order_by("project__name")
-    recent_prs = package.pull_requests.select_related("author", "project").order_by("-id")[:20]
 
     return render(
         request,
@@ -164,6 +162,6 @@ def package_detail(request, package_id):
         {
             "package": package,
             "forks": forks,
-            "recent_prs": recent_prs,
+            "active_tab": "overview",
         },
     )
