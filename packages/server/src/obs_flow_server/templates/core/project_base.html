@@ -3,7 +3,8 @@
 
 {% block title %}{{ project.name }} - Projects - OBS Flow{% endblock %}
 
-{% block content %}
+{% block subheader %}
+<div class="page-header">
 <nav aria-label="breadcrumb">
     <ul>
         <li><a href="{% url 'home' %}">Home</a></li>
@@ -44,6 +45,9 @@
         </li>
     </ul>
 </nav>
+</div>
+{% endblock %}
 
+{% block content %}
 {% block project_content %}{% endblock %}
 {% endblock %}

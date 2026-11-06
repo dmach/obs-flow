@@ -361,6 +361,7 @@ body > header {
 	background: var(--flow-bg-subtle);
 }
 body > header > *,
+.page-header > *,
 main,
 body > footer {
 	max-width: 1280px;
@@ -388,7 +389,8 @@ body > header > div > a:hover {
 	text-decoration: none;
 }
 
-header nav > ul {
+header nav > ul,
+nav[aria-label="Subnav"] > ul {
 	display: flex;
 	gap: 0.25rem;
 	margin: 0;
@@ -396,6 +398,7 @@ header nav > ul {
 	list-style: none;
 }
 header nav a,
+nav[aria-label="Subnav"] a,
 header summary {
 	display: flex;
 	align-items: center;
@@ -406,6 +409,7 @@ header summary {
 	white-space: nowrap;
 }
 header nav a:hover,
+nav[aria-label="Subnav"] a:hover,
 header summary:hover {
 	background: var(--flow-bg-hover);
 	text-decoration: none;
@@ -439,6 +443,23 @@ nav[aria-label="Subnav"] li:has(> [aria-current="page"]) {
 nav[aria-label="Main"] [aria-current="page"],
 nav[aria-label="Subnav"] [aria-current="page"] {
 	font-weight: 600;
+}
+
+/* Full-bleed page header band (breadcrumb, title, Subnav). */
+body > header:has(+ .page-header) {
+	margin-bottom: 0;
+}
+.page-header {
+	margin-bottom: 1.5rem;
+	padding-top: 1rem;
+	border-bottom: 1px solid var(--flow-border);
+	background: var(--flow-bg-subtle);
+}
+.page-header > h1 {
+	margin-bottom: 0.25rem;
+}
+nav[aria-label="Subnav"] {
+	margin-top: 1rem;
 }
 
 /* Account dropdown. */
@@ -475,11 +496,13 @@ header summary + ul {
 
 /* Invert black octicons in dark mode. */
 @media (prefers-color-scheme: dark) {
-	:root:not([data-theme="light"]) header img {
+	:root:not([data-theme="light"]) header img,
+	:root:not([data-theme="light"]) .page-header img {
 		filter: invert(1);
 	}
 }
-:root[data-theme="dark"] header img {
+:root[data-theme="dark"] header img,
+:root[data-theme="dark"] .page-header img {
 	filter: invert(1);
 }
 
