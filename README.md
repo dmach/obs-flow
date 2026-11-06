@@ -70,3 +70,4 @@
 - PR - have a flag indicating, that rebuild is required?
 - Make source validator available by default, be able to opt-out on project level? (review check? githook? can we define specialized reviewers == bot users to provide such functionality out of the box?)
 - new package requests that are capable of creating branches from the source branch, without any intermediate commits (+ auto reparent? maybe)
+- Review: https://forge.fedoraproject.org/forge/forge/issues/113
