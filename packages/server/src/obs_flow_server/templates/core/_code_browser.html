@@ -1,13 +1,22 @@
 {% load static %}
 
 <div class="code-browser">
-    <div class="code-browser-header" style="margin-bottom: 1rem; display: flex; align-items: center; gap: 0.5rem;">
-        <strong>{{ ref }}</strong>
-        <span style="color: var(--color-fg-muted);">/</span>
-        <a href="{{ base_code_url }}">root</a>
+    <div class="code-browser-header" style="margin-bottom: 1rem; display: flex; justify-content: space-between; align-items: center;">
+        <div style="display: flex; align-items: center; gap: 0.5rem; font-size: 1.1em;">
+            <strong><a href="{{ base_code_url }}">{{ repo_name }}</a></strong>
+            {% for part in path_parts %}
+                <span style="color: var(--color-fg-muted);">/</span>
+                {% if forloop.last and obj_type == 'blob' %}
+                    <span>{{ part.name }}</span>
+                {% else %}
+                    <a href="{{ base_code_url }}{{ part.path }}">{{ part.name }}</a>
+                {% endif %}
+            {% endfor %}
+        </div>
         {% if file_path %}
-            <span style="color: var(--color-fg-muted);">/</span>
-            <span>{{ file_path }}</span>
+        <button class="btn btn-sm" onclick="navigator.clipboard.writeText('{{ file_path }}')" title="Copy path">
+            Copy path
+        </button>
         {% endif %}
     </div>
 

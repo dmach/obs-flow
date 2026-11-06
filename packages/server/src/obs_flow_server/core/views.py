@@ -182,12 +182,23 @@ def project_code(request, project_name, file_path=""):
         
     parent_path = "/".join(file_path.rstrip("/").split("/")[:-1]) if file_path else ""
     
+    path_parts = []
+    if file_path:
+        parts = file_path.strip("/").split("/")
+        for i, part in enumerate(parts):
+            path_parts.append({
+                "name": part,
+                "path": "/".join(parts[:i+1])
+            })
+    
     context = {
         "project": project,
+        "repo_name": project.name,
         "active_tab": "code",
         "ref": ref,
         "file_path": file_path,
         "parent_path": parent_path,
+        "path_parts": path_parts,
         "obj_type": obj_type,
     }
     
@@ -213,12 +224,23 @@ def package_code(request, project_name, package_name, file_path=""):
         
     parent_path = "/".join(file_path.rstrip("/").split("/")[:-1]) if file_path else ""
     
+    path_parts = []
+    if file_path:
+        parts = file_path.strip("/").split("/")
+        for i, part in enumerate(parts):
+            path_parts.append({
+                "name": part,
+                "path": "/".join(parts[:i+1])
+            })
+    
     context = {
         "package": package,
+        "repo_name": f"{package.project.name}/{package.name}",
         "active_tab": "code",
         "ref": ref,
         "file_path": file_path,
         "parent_path": parent_path,
+        "path_parts": path_parts,
         "obj_type": obj_type,
     }
     
@@ -231,7 +253,7 @@ def package_code(request, project_name, package_name, file_path=""):
 
 from django.http import HttpResponse
 
-def project_raw(request, project_name, file_path):
+def project_raw(request, project_name, file_path=""):
     project = get_object_or_404(Project.objects.select_related("org"), name=project_name)
     ref = request.GET.get("ref", project.branch_name or "HEAD")
     repo_path = get_repo_path(project.org.name)
@@ -250,7 +272,7 @@ def project_raw(request, project_name, file_path):
         
     return HttpResponse(blob_content, content_type=content_type)
 
-def package_raw(request, project_name, package_name, file_path):
+def package_raw(request, project_name, package_name, file_path=""):
     package = get_object_or_404(
         Package.objects.select_related("project", "project__org"),
         project__name=project_name,
