@@ -2,10 +2,13 @@
 
 <div class="code-browser">
     <div class="code-browser-header" style="margin-bottom: 1rem; display: flex; align-items: center; gap: 0.5rem; font-size: 1.1em;">
-        <strong><a href="{{ base_code_url }}">{{ repo_name }}</a></strong>
+        <strong><a href="{{ base_code_url }}{{ ref_param }}">{{ repo_name }}</a></strong>
+        {% if ref_param %}
+            <span style="font-size: 0.85em; color: var(--color-fg-muted); font-family: monospace;">@{{ ref|slice:":7" }}</span>
+        {% endif %}
         {% if path_parts %}
             <span style="color: var(--color-fg-muted);">/</span>
-            <span>{% for part in path_parts %}{% if not forloop.first %}<span style="color: var(--color-fg-muted);">/</span>{% endif %}{% if forloop.last and obj_type == 'blob' %}<span>{{ part.name }}</span>{% else %}<a href="{{ base_code_url }}{{ part.path }}">{{ part.name }}</a>{% endif %}{% endfor %}</span>
+            <span>{% for part in path_parts %}{% if not forloop.first %}<span style="color: var(--color-fg-muted);">/</span>{% endif %}{% if forloop.last and obj_type == 'blob' %}<span>{{ part.name }}</span>{% else %}<a href="{{ base_code_url }}{{ part.path }}{{ ref_param }}">{{ part.name }}</a>{% endif %}{% endfor %}</span>
             <button type="button" onclick="navigator.clipboard.writeText('{{ file_path }}')" title="Copy path" aria-label="Copy path" style="padding: 0.15rem 0.35rem; display: inline-flex; align-items: center; justify-content: center; line-height: 1; cursor: pointer;">
                 <img class="icon" src="{% static 'vendor/octicons/copy-16.svg' %}" alt="Copy path" style="width: 1rem; height: 1rem;" />
             </button>
@@ -21,7 +24,7 @@
                             <img class="icon" src="{% static 'vendor/octicons/file-directory-16.svg' %}" style="color: var(--color-icon-directory);" />
                         </td>
                         <td style="padding: 0.5rem;">
-                            <a href="{{ base_code_url }}{{ parent_path }}">..</a>
+                            <a href="{{ base_code_url }}{{ parent_path }}{{ ref_param }}">..</a>
                         </td>
                         <td style="padding: 0.5rem;"></td>
                         <td style="padding: 0.5rem;"></td>
@@ -38,7 +41,7 @@
                             {% endif %}
                         </td>
                         <td style="padding: 0.5rem;">
-                            <a href="{{ base_code_url }}{% if file_path %}{{ file_path }}/{% endif %}{{ entry.name }}">{{ entry.name }}</a>
+                            <a href="{{ base_code_url }}{% if file_path %}{{ file_path }}/{% endif %}{{ entry.name }}{{ ref_param }}">{{ entry.name }}</a>
                         </td>
                         <td style="padding: 0.5rem; color: var(--color-fg-muted); max-width: 300px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
                             {% if entry.commit_msg %}{{ entry.commit_msg }}{% endif %}
@@ -61,7 +64,7 @@
         <div class="blob-container" style="border: 1px solid var(--color-border-default); border-radius: 6px; overflow: hidden;">
             <div class="blob-header" style="background-color: var(--color-canvas-subtle); padding: 0.5rem 1rem; border-bottom: 1px solid var(--color-border-default); display: flex; justify-content: space-between; align-items: center;">
                 <span>{{ file_path }}</span>
-                <a href="{{ base_raw_url }}{% if file_path %}{{ file_path }}{% endif %}" class="btn btn-sm">Raw</a>
+                <a href="{{ base_raw_url }}{% if file_path %}{{ file_path }}{% endif %}{{ ref_param }}" class="btn btn-sm">Raw</a>
             </div>
             <div class="blob-content" style="padding: 1rem; overflow-x: auto; background-color: var(--color-canvas-default);">
                 <pre style="margin: 0;"><code>{{ blob }}</code></pre>

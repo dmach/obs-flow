@@ -672,3 +672,98 @@ class TestCodeBrowserViews(TestCase):
         response = self.client.get(f"/packages/{self.proj.name}/{self.pkg.name}/raw/testpkg.spec")
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.content.decode("utf-8"), "Name: testpkg\nVersion: 1.0\n")
+
+    def test_project_and_package_commits_view(self):
+        from core.git_forge import ensure_git_repo
+        import subprocess
+        import tempfile
+
+        # Project with 2 commits
+        repo_path = ensure_git_repo(self.org.name, initial_branch="master")
+        with tempfile.TemporaryDirectory() as workdir:
+            subprocess.run(["git", "clone", str(repo_path), workdir], check=True, capture_output=True)
+            subprocess.run(["git", "config", "user.name", "Alice Dev"], cwd=workdir, check=True)
+            subprocess.run(["git", "config", "user.email", "alice@example.com"], cwd=workdir, check=True)
+
+            (Path(workdir) / "file1.txt").write_text("v1\n")
+            subprocess.run(["git", "add", "."], cwd=workdir, check=True)
+            subprocess.run(["git", "commit", "--author=Alice Dev <alice@example.com>", "-m", "Commit 1"], cwd=workdir, check=True)
+
+            (Path(workdir) / "file2.txt").write_text("v2\n")
+            subprocess.run(["git", "add", "."], cwd=workdir, check=True)
+            subprocess.run(["git", "commit", "--author=Alice Dev <alice@example.com>", "-m", "Commit 2"], cwd=workdir, check=True)
+            subprocess.run(["git", "push", "origin", "master"], cwd=workdir, check=True)
+
+        # Check project commits page
+        response = self.client.get(f"/projects/{self.proj.name}/commits/")
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Commit 1")
+        self.assertContains(response, "Commit 2")
+        self.assertContains(response, "Alice Dev")
+        self.assertContains(response, "&lt;&gt;")  # Browse code button
+
+        # Package with 1 commit
+        pkg_repo = ensure_git_repo(self.org.name, package_name=self.pkg.name, initial_branch="master")
+        with tempfile.TemporaryDirectory() as workdir:
+            subprocess.run(["git", "clone", str(pkg_repo), workdir], check=True, capture_output=True)
+            subprocess.run(["git", "config", "user.name", "Bob Packager"], cwd=workdir, check=True)
+            subprocess.run(["git", "config", "user.email", "bob@example.com"], cwd=workdir, check=True)
+
+            (Path(workdir) / "pkg.spec").write_text("spec\n")
+            subprocess.run(["git", "add", "."], cwd=workdir, check=True)
+            subprocess.run(["git", "commit", "--author=Bob Packager <bob@example.com>", "-m", "Initial pkg commit"], cwd=workdir, check=True)
+            subprocess.run(["git", "push", "origin", "master"], cwd=workdir, check=True)
+
+        # Check package commits page
+        response = self.client.get(f"/packages/{self.proj.name}/{self.pkg.name}/commits/")
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Initial pkg commit")
+        self.assertContains(response, "Bob Packager")
+
+    def test_browse_code_at_historical_ref(self):
+        from core.git_forge import ensure_git_repo
+        import subprocess
+        import tempfile
+
+        repo_path = ensure_git_repo(self.org.name, initial_branch="master")
+        commit1_sha = None
+        commit2_sha = None
+
+        with tempfile.TemporaryDirectory() as workdir:
+            subprocess.run(["git", "clone", str(repo_path), workdir], check=True, capture_output=True)
+            subprocess.run(["git", "config", "user.name", "Dev"], cwd=workdir, check=True)
+            subprocess.run(["git", "config", "user.email", "dev@example.com"], cwd=workdir, check=True)
+
+            (Path(workdir) / "first.txt").write_text("first\n")
+            subprocess.run(["git", "add", "."], cwd=workdir, check=True)
+            subprocess.run(["git", "commit", "-m", "First commit"], cwd=workdir, check=True)
+            proc = subprocess.run(["git", "rev-parse", "HEAD"], cwd=workdir, capture_output=True, text=True, check=True)
+            commit1_sha = proc.stdout.strip()
+
+            (Path(workdir) / "second.txt").write_text("second\n")
+            subprocess.run(["git", "add", "."], cwd=workdir, check=True)
+            subprocess.run(["git", "commit", "-m", "Second commit"], cwd=workdir, check=True)
+            proc = subprocess.run(["git", "rev-parse", "HEAD"], cwd=workdir, capture_output=True, text=True, check=True)
+            commit2_sha = proc.stdout.strip()
+
+            subprocess.run(["git", "push", "origin", "master"], cwd=workdir, check=True)
+
+        # 1. At HEAD (master), both files exist
+        response = self.client.get(f"/projects/{self.proj.name}/code/")
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "first.txt")
+        self.assertContains(response, "second.txt")
+
+        # 2. At commit 1, only first.txt exists, second.txt does not
+        response = self.client.get(f"/projects/{self.proj.name}/code/?ref={commit1_sha}")
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "first.txt")
+        self.assertNotContains(response, "second.txt")
+        self.assertContains(response, f"@{(commit1_sha[:7])}")
+        self.assertContains(response, f"?ref={commit1_sha}")
+
+        # 3. Viewing file blob at commit 1
+        response = self.client.get(f"/projects/{self.proj.name}/code/first.txt?ref={commit1_sha}")
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "first")
+        self.assertContains(response, f"?ref={commit1_sha}")

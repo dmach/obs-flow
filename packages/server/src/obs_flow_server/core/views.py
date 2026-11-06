@@ -173,7 +173,9 @@ from .git_utils import get_git_tree, get_git_blob, get_git_type, get_git_commits
 
 def project_code(request, project_name, file_path=""):
     project = get_object_or_404(Project.objects.select_related("org"), name=project_name)
-    ref = request.GET.get("ref", project.branch_name or "HEAD")
+    default_branch = project.branch_name or "HEAD"
+    ref = request.GET.get("ref", default_branch)
+    ref_param = f"?ref={ref}" if ref != default_branch else ""
     repo_path = ensure_git_repo(project.org.name, initial_branch=project.branch_name)
     
     obj_type = get_git_type(repo_path, ref, file_path)
@@ -196,6 +198,7 @@ def project_code(request, project_name, file_path=""):
         "repo_name": project.name,
         "active_tab": "code",
         "ref": ref,
+        "ref_param": ref_param,
         "file_path": file_path,
         "parent_path": parent_path,
         "path_parts": path_parts,
@@ -215,7 +218,9 @@ def package_code(request, project_name, package_name, file_path=""):
         project__name=project_name,
         name=package_name,
     )
-    ref = request.GET.get("ref", package.project.branch_name or "HEAD")
+    default_branch = package.project.branch_name or "HEAD"
+    ref = request.GET.get("ref", default_branch)
+    ref_param = f"?ref={ref}" if ref != default_branch else ""
     repo_path = ensure_git_repo(package.project.org.name, package_name=package.name, initial_branch=package.project.branch_name)
     
     obj_type = get_git_type(repo_path, ref, file_path)
@@ -238,6 +243,7 @@ def package_code(request, project_name, package_name, file_path=""):
         "repo_name": f"{package.project.name}/{package.name}",
         "active_tab": "code",
         "ref": ref,
+        "ref_param": ref_param,
         "file_path": file_path,
         "parent_path": parent_path,
         "path_parts": path_parts,
