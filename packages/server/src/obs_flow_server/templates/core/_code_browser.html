@@ -38,7 +38,7 @@
                             <a href="{{ base_code_url }}{% if file_path %}{{ file_path }}/{% endif %}{{ entry.name }}">{{ entry.name }}</a>
                         </td>
                         <td style="padding: 0.5rem; text-align: right; color: var(--color-fg-muted);">
-                            {% if entry.size %}{{ entry.size|filesizeformat }}{% endif %}
+                            {% if entry.size is not None %}{{ entry.size|filesizeformat }}{% endif %}
                         </td>
                     </tr>
                 {% empty %}
