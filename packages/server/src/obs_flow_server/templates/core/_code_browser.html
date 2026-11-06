@@ -23,6 +23,8 @@
                             <a href="{{ base_code_url }}{{ parent_path }}">..</a>
                         </td>
                         <td style="padding: 0.5rem;"></td>
+                        <td style="padding: 0.5rem;"></td>
+                        <td style="padding: 0.5rem;"></td>
                     </tr>
                 {% endif %}
                 {% for entry in tree %}
@@ -37,13 +39,19 @@
                         <td style="padding: 0.5rem;">
                             <a href="{{ base_code_url }}{% if file_path %}{{ file_path }}/{% endif %}{{ entry.name }}">{{ entry.name }}</a>
                         </td>
-                        <td style="padding: 0.5rem; text-align: right; color: var(--color-fg-muted);">
+                        <td style="padding: 0.5rem; color: var(--color-fg-muted); max-width: 300px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                            {% if entry.commit_msg %}{{ entry.commit_msg }}{% endif %}
+                        </td>
+                        <td style="padding: 0.5rem; text-align: right; color: var(--color-fg-muted); white-space: nowrap;">
+                            {% if entry.commit_date %}{{ entry.commit_date }}{% endif %}
+                        </td>
+                        <td style="padding: 0.5rem; text-align: right; color: var(--color-fg-muted); white-space: nowrap;">
                             {% if entry.size is not None %}{{ entry.size|filesizeformat }}{% endif %}
                         </td>
                     </tr>
                 {% empty %}
                     <tr>
-                        <td colspan="3" style="padding: 1rem; text-align: center; color: var(--color-fg-muted);">Empty directory</td>
+                        <td colspan="5" style="padding: 1rem; text-align: center; color: var(--color-fg-muted);">Empty directory</td>
                     </tr>
                 {% endfor %}
             </tbody>

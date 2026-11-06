@@ -9,6 +9,8 @@ class GitTreeEntry(TypedDict):
     sha: str
     size: int | None
     name: str
+    commit_msg: str | None
+    commit_date: str | None
 
 
 def get_git_tree(repo_path: Path, ref: str, path: str = "") -> list[GitTreeEntry]:
@@ -32,12 +34,35 @@ def get_git_tree(repo_path: Path, ref: str, path: str = "") -> list[GitTreeEntry
         if len(parts) == 5:
             mode, obj_type, sha, size_str, name = parts
             size = int(size_str) if size_str.strip() != "-" else None
+            name = name.strip()
+            
+            # Fetch last commit info
+            entry_path = f"{path}/{name}" if path else name
+            commit_msg = None
+            commit_date = None
+            try:
+                log_proc = subprocess.run(
+                    ["git", "log", "-1", "--format=%s%x00%cd", "--date=format:%Y-%m-%d %H:%M:%S", ref, "--", entry_path],
+                    cwd=str(repo_path),
+                    capture_output=True,
+                    text=True,
+                    check=True,
+                )
+                if log_proc.stdout:
+                    msg, date = log_proc.stdout.strip().split('\x00', 1)
+                    commit_msg = msg
+                    commit_date = date
+            except Exception:
+                pass
+
             entries.append({
                 "mode": mode,
                 "type": obj_type,  # type: ignore
                 "sha": sha,
                 "size": size,
-                "name": name.strip()
+                "name": name,
+                "commit_msg": commit_msg,
+                "commit_date": commit_date,
             })
     
     entries.sort(key=lambda e: (0 if e["type"] == "tree" else 1, e["name"]))
