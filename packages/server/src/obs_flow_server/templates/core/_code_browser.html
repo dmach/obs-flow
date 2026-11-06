@@ -1,22 +1,14 @@
 {% load static %}
 
 <div class="code-browser">
-    <div class="code-browser-header" style="margin-bottom: 1rem; display: flex; justify-content: space-between; align-items: center;">
-        <div style="display: flex; align-items: center; gap: 0.5rem; font-size: 1.1em;">
-            <strong><a href="{{ base_code_url }}">{{ repo_name }}</a></strong>
-            {% for part in path_parts %}
-                <span style="color: var(--color-fg-muted);">/</span>
-                {% if forloop.last and obj_type == 'blob' %}
-                    <span>{{ part.name }}</span>
-                {% else %}
-                    <a href="{{ base_code_url }}{{ part.path }}">{{ part.name }}</a>
-                {% endif %}
-            {% endfor %}
-        </div>
-        {% if file_path %}
-        <button class="btn btn-sm" onclick="navigator.clipboard.writeText('{{ file_path }}')" title="Copy path">
-            Copy path
-        </button>
+    <div class="code-browser-header" style="margin-bottom: 1rem; display: flex; align-items: center; gap: 0.5rem; font-size: 1.1em;">
+        <strong><a href="{{ base_code_url }}">{{ repo_name }}</a></strong>
+        {% if path_parts %}
+            <span style="color: var(--color-fg-muted);">/</span>
+            <span>{% for part in path_parts %}{% if not forloop.first %}<span style="color: var(--color-fg-muted);">/</span>{% endif %}{% if forloop.last and obj_type == 'blob' %}<span>{{ part.name }}</span>{% else %}<a href="{{ base_code_url }}{{ part.path }}">{{ part.name }}</a>{% endif %}{% endfor %}</span>
+            <button type="button" onclick="navigator.clipboard.writeText('{{ file_path }}')" title="Copy path" aria-label="Copy path" style="padding: 0.15rem 0.35rem; display: inline-flex; align-items: center; justify-content: center; line-height: 1; cursor: pointer;">
+                <img class="icon" src="{% static 'vendor/octicons/copy-16.svg' %}" alt="Copy path" style="width: 1rem; height: 1rem;" />
+            </button>
         {% endif %}
     </div>
 
