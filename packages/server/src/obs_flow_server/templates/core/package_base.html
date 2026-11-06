@@ -9,17 +9,15 @@
     <ul>
         <li><a href="{% url 'home' %}">Home</a></li>
         <li><a href="{% url 'package_list' %}">Packages</a></li>
-        <li>{{ package.name }}</li>
+        <li><a href="{% url 'project_detail' package.project.id %}">{{ package.project.name }}</a>/{{ package.name }}</li>
     </ul>
 </nav>
 
-<h1>{{ package.name }} <small>#{{ package.id }}</small></h1>
+{% if package.forked_from %}
 <p>
-    <small>Project: <a href="{% url 'project_detail' package.project.id %}"><strong>{{ package.project.name }}</strong></a></small>
-    {% if package.forked_from %}
-        <small>&middot; Forked from: <a href="{% url 'package_detail' package.forked_from.id %}"><code>{{ package.forked_from }}</code></a></small>
-    {% endif %}
+    <small>Forked from: <a href="{% url 'package_detail' package.forked_from.id %}"><code>{{ package.forked_from }}</code></a></small>
 </p>
+{% endif %}
 
 <nav aria-label="Subnav">
     <ul>
