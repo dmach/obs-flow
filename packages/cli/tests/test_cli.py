@@ -213,3 +213,68 @@ def test_cli_pr_create():
         assert res.exit_code == 0
         assert "openSUSE/bash#1" in res.output
 
+
+def test_cli_project_show_and_list_filters():
+    from obs_flow_common.messages import ProjectShowResponse
+
+    runner = CliRunner()
+    mock_proj = ProjectDetail(
+        id=1,
+        name="openSUSE:Factory",
+        workflow_type="staging",
+        org="openSUSE",
+        branch_name="factory",
+    )
+    with patch("obs_flow_client.project_show") as mock_show:
+        mock_show.return_value = ProjectShowResponse(project=mock_proj)
+        res = runner.invoke(main, ["project", "show", "openSUSE:Factory"])
+        assert res.exit_code == 0
+        assert "openSUSE:Factory" in res.output
+        assert "staging" in res.output
+
+    with patch("obs_flow_client.project_list") as mock_list:
+        mock_list.return_value = ProjectListResponse(projects=[mock_proj])
+        res = runner.invoke(main, ["project", "list", "--name", "Factory", "--org", "openSUSE", "--workflow-type", "staging"])
+        assert res.exit_code == 0
+        assert "openSUSE:Factory" in res.output
+        mock_list.assert_called_once()
+        req = mock_list.call_args[0][1]
+        assert req.name == "Factory"
+        assert req.org == "openSUSE"
+        assert req.workflow_type == "staging"
+
+
+def test_cli_package_show_and_list_filter():
+    from obs_flow_common.messages import PackageDetail, PackageShowResponse, PackageListResponse
+
+    runner = CliRunner()
+    mock_pkg = PackageDetail(
+        id=1,
+        project="openSUSE:Factory",
+        name="bash",
+        forked_from=None,
+    )
+
+    with patch("obs_flow_client.package_show") as mock_show:
+        mock_show.return_value = PackageShowResponse(package=mock_pkg)
+        # Test project package as separate args
+        res = runner.invoke(main, ["package", "show", "openSUSE:Factory", "bash"])
+        assert res.exit_code == 0
+        assert "bash" in res.output
+
+        # Test project/package as single arg
+        res = runner.invoke(main, ["package", "show", "openSUSE:Factory/bash"])
+        assert res.exit_code == 0
+        assert "bash" in res.output
+
+    with patch("obs_flow_client.package_list") as mock_list:
+        mock_list.return_value = PackageListResponse(packages=[mock_pkg])
+        res = runner.invoke(main, ["package", "list", "--project", "openSUSE:Factory", "--name", "bash"])
+        assert res.exit_code == 0
+        assert "bash" in res.output
+        mock_list.assert_called_once()
+        req = mock_list.call_args[0][1]
+        assert req.project == "openSUSE:Factory"
+        assert req.name == "bash"
+
+

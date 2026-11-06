@@ -2,7 +2,14 @@ import click
 
 
 @click.command(name="list")
-def cli() -> None:
+@click.option("--name", help="Filter projects by name.")
+@click.option("--org", help="Filter projects by organization.")
+@click.option(
+    "--workflow-type",
+    type=click.Choice(["direct", "staging"]),
+    help="Filter projects by workflow type.",
+)
+def cli(name: str | None, org: str | None, workflow_type: str | None) -> None:
     """List projects."""
 
     from obs_flow_client import project_list
@@ -10,7 +17,7 @@ def cli() -> None:
     from ..helpers import get_connection, get_config
     from ..output.project import ProjectRenderer
 
-    req = ProjectListRequest()
+    req = ProjectListRequest(name=name, org=org, workflow_type=workflow_type)
     with get_connection() as conn:
         res = project_list(conn, req)
 

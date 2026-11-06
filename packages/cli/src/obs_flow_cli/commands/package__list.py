@@ -3,7 +3,8 @@ import click
 
 @click.command(name="list")
 @click.option("--project", help="Filter packages by project name.")
-def cli(project: str | None) -> None:
+@click.option("--name", help="Filter packages by package name.")
+def cli(project: str | None, name: str | None) -> None:
     """List packages."""
 
     from obs_flow_client import package_list
@@ -11,7 +12,7 @@ def cli(project: str | None) -> None:
     from ..helpers import get_connection, get_config
     from ..output.package import PackageRenderer
 
-    req = PackageListRequest(project=project)
+    req = PackageListRequest(project=project, name=name)
     with get_connection() as conn:
         res = package_list(conn, req)
 
