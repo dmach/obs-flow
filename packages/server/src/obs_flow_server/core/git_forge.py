@@ -37,6 +37,11 @@ def main():
         "project": project,
         "package": package,
         "updates": updates,
+        "env": {
+            "GIT_QUARANTINE_PATH": os.environ.get("GIT_QUARANTINE_PATH"),
+            "GIT_OBJECT_DIRECTORY": os.environ.get("GIT_OBJECT_DIRECTORY"),
+            "GIT_ALTERNATE_OBJECT_DIRECTORIES": os.environ.get("GIT_ALTERNATE_OBJECT_DIRECTORIES"),
+        }
     }
 
     try:

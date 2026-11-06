@@ -1,3 +1,4 @@
+import os
 import subprocess
 from pathlib import Path
 from accounts.models import User
@@ -5,12 +6,18 @@ from core.models import Project
 from core.git_forge import get_repo_path
 
 
-def is_git_ancestor(repo_path: Path, old_sha: str, new_sha: str) -> bool:
+def is_git_ancestor(repo_path: Path, old_sha: str, new_sha: str, env: dict[str, str | None] | None = None) -> bool:
     try:
+        run_env = os.environ.copy()
+        if env:
+            for k, v in env.items():
+                if v is not None:
+                    run_env[k] = v
         res = subprocess.run(
             ["git", "merge-base", "--is-ancestor", old_sha, new_sha],
             cwd=str(repo_path),
             capture_output=True,
+            env=run_env,
         )
         return res.returncode == 0
     except Exception:
@@ -24,6 +31,7 @@ def evaluate_ref_update(
     old_sha: str,
     new_sha: str,
     ref_name: str,
+    env: dict[str, str | None] | None = None,
 ) -> tuple[bool, str | None]:
     if not username:
         return False, "Authentication required."
@@ -60,7 +68,7 @@ def evaluate_ref_update(
         # Direct workflow: check force-push if not creation
         if not is_creation and not is_deletion:
             repo_path = get_repo_path(project.org.name, package_name)
-            if repo_path.exists() and not is_git_ancestor(repo_path, old_sha, new_sha):
+            if repo_path.exists() and not is_git_ancestor(repo_path, old_sha, new_sha, env):
                 return False, f"Force-push to project branch '{project.branch_name}' is not allowed."
 
         return True, None

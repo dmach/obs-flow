@@ -37,6 +37,7 @@ def _handle_client(client_sock: socket.socket):
         project_name = payload.get("project")
         package_name = payload.get("package") or None
         updates = payload.get("updates", [])
+        env = payload.get("env", {})
 
         if action == "pre-receive":
             response = {"ok": True}
@@ -51,6 +52,7 @@ def _handle_client(client_sock: socket.socket):
                     old_sha=old_sha,
                     new_sha=new_sha,
                     ref_name=ref_name,
+                    env=env,
                 )
                 if not allowed:
                     response = {"ok": False, "error": err}
