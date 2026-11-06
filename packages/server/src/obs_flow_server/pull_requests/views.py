@@ -14,10 +14,8 @@ from pull_requests.models import PullRequest, PullRequestReview
 from pull_requests.forms import PullRequestFilterForm
 
 
-@ensure_csrf_cookie
-def pr_list(request):
+def get_pr_list_context(request, qs):
     form = PullRequestFilterForm(request.GET)
-    qs = PullRequest.objects.select_related("project", "project__org", "package", "author").all().order_by("-id")
 
     if form.is_valid():
         title = form.cleaned_data.get("title")
@@ -122,18 +120,42 @@ def pr_list(request):
     page_params = {k: v for k, v in request.GET.items() if k != 'page' and v}
     filter_query = "&" + urllib.parse.urlencode(page_params) if page_params else ""
 
-    return render(
-        request,
-        "pull_requests/pr_list.html",
-        {
-            "form": form,
-            "page_obj": page_obj,
-            "filter_query": filter_query,
-            "base_query": base_query,
-            "current_sort": sort_param,
-            "total_count": paginator.count,
-        }
-    )
+    return {
+        "form": form,
+        "page_obj": page_obj,
+        "filter_query": filter_query,
+        "base_query": base_query,
+        "current_sort": sort_param,
+        "total_count": paginator.count,
+    }
+
+
+@ensure_csrf_cookie
+def pr_list(request):
+    qs = PullRequest.objects.select_related("project", "project__org", "package", "author").all()
+    context = get_pr_list_context(request, qs)
+    return render(request, "pull_requests/pr_list.html", context)
+
+
+@ensure_csrf_cookie
+def project_pr_list(request, project_id):
+    project = get_object_or_404(Project.objects.select_related("org"), id=project_id)
+    qs = PullRequest.objects.select_related("project", "project__org", "package", "author").filter(project=project)
+    context = get_pr_list_context(request, qs)
+    context["project"] = project
+    context["active_tab"] = "pull_requests"
+    return render(request, "core/project_pr_list.html", context)
+
+
+@ensure_csrf_cookie
+def package_pr_list(request, package_id):
+    from core.models import Package
+    package = get_object_or_404(Package.objects.select_related("project", "project__org"), id=package_id)
+    qs = PullRequest.objects.select_related("project", "project__org", "package", "author").filter(package=package)
+    context = get_pr_list_context(request, qs)
+    context["package"] = package
+    context["active_tab"] = "pull_requests"
+    return render(request, "core/package_pr_list.html", context)
 
 
 def pr_detail(request, pr_id):
