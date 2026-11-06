@@ -4,7 +4,7 @@
     <div class="code-browser-header" style="margin-bottom: 1rem; display: flex; align-items: center; gap: 0.5rem;">
         <strong>{{ ref }}</strong>
         <span style="color: var(--color-fg-muted);">/</span>
-        <a href="{{ base_code_url }}?ref={{ ref }}">root</a>
+        <a href="{{ base_code_url }}">root</a>
         {% if file_path %}
             <span style="color: var(--color-fg-muted);">/</span>
             <span>{{ file_path }}</span>
@@ -17,7 +17,7 @@
                 {% if file_path %}
                     <tr>
                         <td style="width: 24px;"></td>
-                        <td><a href="{{ base_code_url }}{{ parent_path }}?ref={{ ref }}">..</a></td>
+                        <td><a href="{{ base_code_url }}{{ parent_path }}">..</a></td>
                         <td></td>
                     </tr>
                 {% endif %}
@@ -31,7 +31,7 @@
                             {% endif %}
                         </td>
                         <td style="padding: 0.5rem;">
-                            <a href="{{ base_code_url }}{% if file_path %}{{ file_path }}/{% endif %}{{ entry.name }}?ref={{ ref }}">{{ entry.name }}</a>
+                            <a href="{{ base_code_url }}{% if file_path %}{{ file_path }}/{% endif %}{{ entry.name }}">{{ entry.name }}</a>
                         </td>
                         <td style="padding: 0.5rem; text-align: right; color: var(--color-fg-muted);">
                             {% if entry.size %}{{ entry.size|filesizeformat }}{% endif %}
