@@ -46,8 +46,9 @@
         </table>
     {% elif obj_type == 'blob' %}
         <div class="blob-container" style="border: 1px solid var(--color-border-default); border-radius: 6px; overflow: hidden;">
-            <div class="blob-header" style="background-color: var(--color-canvas-subtle); padding: 0.5rem 1rem; border-bottom: 1px solid var(--color-border-default);">
+            <div class="blob-header" style="background-color: var(--color-canvas-subtle); padding: 0.5rem 1rem; border-bottom: 1px solid var(--color-border-default); display: flex; justify-content: space-between; align-items: center;">
                 <code>{{ file_path }}</code>
+                <a href="{{ base_raw_url }}{{ file_path }}" class="btn btn-sm">Raw</a>
             </div>
             <div class="blob-content" style="padding: 1rem; overflow-x: auto; background-color: var(--color-canvas-default);">
                 <pre style="margin: 0;"><code>{{ blob }}</code></pre>

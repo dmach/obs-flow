@@ -228,3 +228,47 @@ def package_code(request, project_name, package_name, file_path=""):
         context["blob"] = get_git_blob(repo_path, ref, file_path)
         
     return render(request, "core/package_code.html", context)
+
+from django.http import HttpResponse
+
+def project_raw(request, project_name, file_path):
+    project = get_object_or_404(Project.objects.select_related("org"), name=project_name)
+    ref = request.GET.get("ref", project.branch_name or "HEAD")
+    repo_path = get_repo_path(project.org.name)
+    
+    obj_type = get_git_type(repo_path, ref, file_path)
+    if obj_type != "blob":
+        raise Http404("File not found or is not a blob")
+        
+    blob_content = get_git_blob(repo_path, ref, file_path)
+    if blob_content is None:
+        raise Http404("File content not found")
+        
+    content_type = "text/plain"
+    if isinstance(blob_content, bytes):
+        content_type = "application/octet-stream"
+        
+    return HttpResponse(blob_content, content_type=content_type)
+
+def package_raw(request, project_name, package_name, file_path):
+    package = get_object_or_404(
+        Package.objects.select_related("project", "project__org"),
+        project__name=project_name,
+        name=package_name,
+    )
+    ref = request.GET.get("ref", package.project.branch_name or "HEAD")
+    repo_path = get_repo_path(package.project.org.name, package.name)
+    
+    obj_type = get_git_type(repo_path, ref, file_path)
+    if obj_type != "blob":
+        raise Http404("File not found or is not a blob")
+        
+    blob_content = get_git_blob(repo_path, ref, file_path)
+    if blob_content is None:
+        raise Http404("File content not found")
+        
+    content_type = "text/plain"
+    if isinstance(blob_content, bytes):
+        content_type = "application/octet-stream"
+        
+    return HttpResponse(blob_content, content_type=content_type)
