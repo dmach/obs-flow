@@ -1,10 +1,11 @@
 import json
-
-from django.test import TestCase, TransactionTestCase
+from pathlib import Path
+from django.test import TestCase, TransactionTestCase, override_settings
 from django_bolt.testing import TestClient
 from obs_flow_server.api import api
 
-from core.models import Project
+from accounts.models import User
+from core.models import Org, Package, Project
 
 
 class FingerprintTests(TestCase):
@@ -109,7 +110,6 @@ class TestProjectAPI(TransactionTestCase):
 
 class TestProjectDebounceSetting(TestCase):
     def test_effective_review_debounce_minutes(self):
-        from django.test import override_settings
 
         with override_settings(REVIEW_DEBOUNCE_MINUTES=20):
             proj_default = Project.objects.create(name="proj:default")
@@ -122,7 +122,6 @@ class TestProjectDebounceSetting(TestCase):
             self.assertEqual(proj_zero.effective_review_debounce_minutes, 0)
 
     def test_system_check_validation(self):
-        from django.test import override_settings
 
         from core.apps import check_review_debounce_setting
 
@@ -152,7 +151,6 @@ class TestProjectDebounceSetting(TestCase):
 
 class TestNativeGitForgeDomainModels(TransactionTestCase):
     def test_org_creation_and_properties(self):
-        from accounts.models import User
 
         from core.models import Org
 
@@ -255,7 +253,6 @@ class TestNativeGitForgeDomainModels(TransactionTestCase):
             proj.save()
 
     def test_package_validations_and_forks(self):
-        from accounts.models import User
         from django.core.exceptions import ValidationError
 
         from core.models import Org, Package, Project
@@ -396,8 +393,6 @@ class TestNativeGitForgeAPIs(TransactionTestCase):
         import tempfile
         import json
         from pathlib import Path
-        from django.test import override_settings
-        from core.models import Org, Project
 
         with tempfile.TemporaryDirectory() as tmpdir:
             with override_settings(GIT_FORGE_ROOT=Path(tmpdir)):
@@ -520,7 +515,6 @@ class TestCoreUIViews(TestCase):
         self.assertEqual(response.context["package"].project, self.proj)
 
     def test_project_pr_list_view(self):
-        from accounts.models import User
         from pull_requests.models import PullRequest
         user = User.objects.create(username="alice", username_lower="alice", account_type=User.AccountType.HUMAN)
         other_proj = Project.objects.create(name="openSUSE:Leap", org=self.org, branch_name="leap")
@@ -533,7 +527,6 @@ class TestCoreUIViews(TestCase):
         self.assertNotContains(response, "Leap core change")
 
     def test_project_staging_list_view(self):
-        from accounts.models import User
         from staging.models import StagingBatch
         user = User.objects.create(username="bob", username_lower="bob", account_type=User.AccountType.HUMAN)
         other_proj = Project.objects.create(name="openSUSE:Tumbleweed", org=self.org, branch_name="tw")
@@ -546,7 +539,6 @@ class TestCoreUIViews(TestCase):
         self.assertNotContains(response, "TW batch 1")
 
     def test_package_pr_list_view(self):
-        from accounts.models import User
         from pull_requests.models import PullRequest
         user = User.objects.create(username="charlie", username_lower="charlie", account_type=User.AccountType.HUMAN)
         pkg2 = Package.objects.create(project=self.proj, name="zsh")
@@ -562,3 +554,121 @@ class TestCoreUIViews(TestCase):
 
 
 
+
+
+class TestCodeBrowserViews(TestCase):
+    def setUp(self):
+        import tempfile
+        from pathlib import Path
+        self.tmpdir = tempfile.TemporaryDirectory()
+        self.settings_override = override_settings(GIT_FORGE_ROOT=Path(self.tmpdir.name))
+        self.settings_override.enable()
+
+        self.org = Org.objects.create(name="obs")
+        self.proj = Project.objects.create(
+            name="obs:project",
+            org=self.org,
+            branch_name="master",
+            workflow_type=Project.WorkflowType.DIRECT,
+        )
+        self.pkg = Package.objects.create(project=self.proj, name="testpkg")
+
+    def tearDown(self):
+        self.settings_override.disable()
+        self.tmpdir.cleanup()
+
+    def test_project_code_empty_repo(self):
+        response = self.client.get(f"/projects/{self.proj.name}/code/")
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Empty directory")
+        self.assertContains(response, self.proj.name)
+
+    def test_project_code_with_tree_and_blob(self):
+        from core.git_forge import ensure_git_repo
+        import subprocess
+        import tempfile
+
+        repo_path = ensure_git_repo(self.org.name, initial_branch="master")
+        # Populate repo with a commit
+        with tempfile.TemporaryDirectory() as workdir:
+            subprocess.run(["git", "clone", str(repo_path), workdir], check=True, capture_output=True)
+            subprocess.run(["git", "config", "user.name", "Test User"], cwd=workdir, check=True)
+            subprocess.run(["git", "config", "user.email", "test@example.com"], cwd=workdir, check=True)
+            
+            # Create files
+            readme = Path(workdir) / "README.md"
+            readme.write_text("Hello World\n")
+            src_dir = Path(workdir) / "src"
+            src_dir.mkdir()
+            code_file = src_dir / "main.py"
+            code_file.write_text("print('test')\n")
+            
+            subprocess.run(["git", "add", "."], cwd=workdir, check=True)
+            subprocess.run(["git", "commit", "-m", "Initial commit"], cwd=workdir, check=True)
+            subprocess.run(["git", "push", "origin", "master"], cwd=workdir, check=True)
+
+        # 1. Root directory
+        response = self.client.get(f"/projects/{self.proj.name}/code/")
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "README.md")
+        self.assertContains(response, "src")
+        self.assertContains(response, "Initial commit")
+
+        # 2. Subdirectory
+        response = self.client.get(f"/projects/{self.proj.name}/code/src")
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "main.py")
+        self.assertContains(response, "..")
+
+        # 3. File blob
+        response = self.client.get(f"/projects/{self.proj.name}/code/src/main.py")
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "print(&#x27;test&#x27;)")
+        self.assertContains(response, "Copy path")
+        self.assertContains(response, "Raw")
+
+        # 4. Raw file
+        response = self.client.get(f"/projects/{self.proj.name}/raw/src/main.py")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.content.decode("utf-8"), "print('test')\n")
+        self.assertEqual(response["Content-Type"], "text/plain")
+
+        # 5. Non-existent path
+        response = self.client.get(f"/projects/{self.proj.name}/code/nonexistent")
+        self.assertEqual(response.status_code, 404)
+        response = self.client.get(f"/projects/{self.proj.name}/raw/nonexistent")
+        self.assertEqual(response.status_code, 404)
+
+    def test_package_code_with_tree_and_blob(self):
+        from core.git_forge import ensure_git_repo
+        import subprocess
+        import tempfile
+
+        repo_path = ensure_git_repo(self.org.name, package_name=self.pkg.name, initial_branch="master")
+        with tempfile.TemporaryDirectory() as workdir:
+            subprocess.run(["git", "clone", str(repo_path), workdir], check=True, capture_output=True)
+            subprocess.run(["git", "config", "user.name", "Test User"], cwd=workdir, check=True)
+            subprocess.run(["git", "config", "user.email", "test@example.com"], cwd=workdir, check=True)
+            
+            pkg_file = Path(workdir) / "testpkg.spec"
+            pkg_file.write_text("Name: testpkg\nVersion: 1.0\n")
+            
+            subprocess.run(["git", "add", "."], cwd=workdir, check=True)
+            subprocess.run(["git", "commit", "-m", "Add spec file"], cwd=workdir, check=True)
+            subprocess.run(["git", "push", "origin", "master"], cwd=workdir, check=True)
+
+        # 1. Package root
+        response = self.client.get(f"/packages/{self.proj.name}/{self.pkg.name}/code/")
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "testpkg.spec")
+        self.assertContains(response, "Add spec file")
+
+        # 2. Package blob
+        response = self.client.get(f"/packages/{self.proj.name}/{self.pkg.name}/code/testpkg.spec")
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Name: testpkg")
+
+        # 3. Package raw
+        response = self.client.get(f"/packages/{self.proj.name}/{self.pkg.name}/raw/testpkg.spec")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.content.decode("utf-8"), "Name: testpkg\nVersion: 1.0\n")

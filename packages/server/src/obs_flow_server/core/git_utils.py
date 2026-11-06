@@ -14,6 +14,8 @@ class GitTreeEntry(TypedDict):
 
 
 def get_git_tree(repo_path: Path, ref: str, path: str = "") -> list[GitTreeEntry]:
+    if not repo_path.exists():
+        return []
     target = f"{ref}:{path}" if path else ref
     try:
         proc = subprocess.run(
@@ -70,6 +72,8 @@ def get_git_tree(repo_path: Path, ref: str, path: str = "") -> list[GitTreeEntry
 
 
 def get_git_blob(repo_path: Path, ref: str, path: str) -> str | bytes | None:
+    if not repo_path.exists():
+        return None
     target = f"{ref}:{path}"
     try:
         proc = subprocess.run(
@@ -87,6 +91,8 @@ def get_git_blob(repo_path: Path, ref: str, path: str) -> str | bytes | None:
 
 
 def get_git_type(repo_path: Path, ref: str, path: str) -> Literal["blob", "tree", "commit"] | None:
+    if not repo_path.exists():
+        return None if path else "tree"
     if not path:
         return "tree"
     try:
