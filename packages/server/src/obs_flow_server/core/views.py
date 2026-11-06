@@ -180,11 +180,14 @@ def project_code(request, project_name, file_path=""):
     if obj_type is None:
         raise Http404("Path not found in repository")
         
+    parent_path = "/".join(file_path.rstrip("/").split("/")[:-1]) if file_path else ""
+    
     context = {
         "project": project,
         "active_tab": "code",
         "ref": ref,
         "file_path": file_path,
+        "parent_path": parent_path,
         "obj_type": obj_type,
     }
     
@@ -208,11 +211,14 @@ def package_code(request, project_name, package_name, file_path=""):
     if obj_type is None:
         raise Http404("Path not found in repository")
         
+    parent_path = "/".join(file_path.rstrip("/").split("/")[:-1]) if file_path else ""
+    
     context = {
         "package": package,
         "active_tab": "code",
         "ref": ref,
         "file_path": file_path,
+        "parent_path": parent_path,
         "obj_type": obj_type,
     }
     

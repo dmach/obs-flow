@@ -1,0 +1,57 @@
+{% load static %}
+
+<div class="code-browser">
+    <div class="code-browser-header" style="margin-bottom: 1rem; display: flex; align-items: center; gap: 0.5rem;">
+        <strong>{{ ref }}</strong>
+        <span style="color: var(--color-fg-muted);">/</span>
+        <a href="{{ base_code_url }}?ref={{ ref }}">root</a>
+        {% if file_path %}
+            <span style="color: var(--color-fg-muted);">/</span>
+            <span>{{ file_path }}</span>
+        {% endif %}
+    </div>
+
+    {% if obj_type == 'tree' %}
+        <table class="table" style="width: 100%; border-collapse: collapse;">
+            <tbody>
+                {% if file_path %}
+                    <tr>
+                        <td style="width: 24px;"></td>
+                        <td><a href="{{ base_code_url }}{{ parent_path }}?ref={{ ref }}">..</a></td>
+                        <td></td>
+                    </tr>
+                {% endif %}
+                {% for entry in tree %}
+                    <tr style="border-bottom: 1px solid var(--color-border-default);">
+                        <td style="width: 24px; padding: 0.5rem;">
+                            {% if entry.type == 'tree' %}
+                                <img class="icon" src="{% static 'vendor/octicons/file-directory-16.svg' %}" style="color: var(--color-icon-directory);" />
+                            {% else %}
+                                <img class="icon" src="{% static 'vendor/octicons/file-16.svg' %}" style="color: var(--color-icon-default);" />
+                            {% endif %}
+                        </td>
+                        <td style="padding: 0.5rem;">
+                            <a href="{{ base_code_url }}{% if file_path %}{{ file_path }}/{% endif %}{{ entry.name }}?ref={{ ref }}">{{ entry.name }}</a>
+                        </td>
+                        <td style="padding: 0.5rem; text-align: right; color: var(--color-fg-muted);">
+                            {% if entry.size %}{{ entry.size|filesizeformat }}{% endif %}
+                        </td>
+                    </tr>
+                {% empty %}
+                    <tr>
+                        <td colspan="3" style="padding: 1rem; text-align: center; color: var(--color-fg-muted);">Empty directory</td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    {% elif obj_type == 'blob' %}
+        <div class="blob-container" style="border: 1px solid var(--color-border-default); border-radius: 6px; overflow: hidden;">
+            <div class="blob-header" style="background-color: var(--color-canvas-subtle); padding: 0.5rem 1rem; border-bottom: 1px solid var(--color-border-default);">
+                <code>{{ file_path }}</code>
+            </div>
+            <div class="blob-content" style="padding: 1rem; overflow-x: auto; background-color: var(--color-canvas-default);">
+                <pre style="margin: 0;"><code>{{ blob }}</code></pre>
+            </div>
+        </div>
+    {% endif %}
+</div>
