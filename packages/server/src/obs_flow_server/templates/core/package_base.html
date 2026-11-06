@@ -9,7 +9,8 @@
     <ul>
         <li><a href="{% url 'home' %}">Home</a></li>
         <li><a href="{% url 'package_list' %}">Packages</a></li>
-        <li><a href="{{ package.project.get_absolute_url }}">{{ package.project.name }}</a>/{{ package.name }}</li>
+        <li>{% block crumb_entity %}<a href="{{ package.project.get_absolute_url }}">{{ package.project.name }}</a>/{{ package.name }}{% endblock %}</li>
+        {% block crumb_tail %}{% endblock %}
     </ul>
 </nav>
 
@@ -37,5 +38,5 @@
 {% endblock %}
 
 {% block content %}
-{% block package_content %}{% endblock %}
+{% block package_content %}{% block page_content %}{% endblock %}{% endblock %}
 {% endblock %}

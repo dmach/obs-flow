@@ -441,6 +441,16 @@ class TestPRViews(TransactionTestCase):
         self.assertEqual(client.get(f"/pull-requests/{pkg_pr.id}/").status_code, 404)
         self.assertEqual(client.get("/packages/suse:obs-flow/bash/pull-requests/99/").status_code, 404)
 
+        for pr, tab_href, crumb in (
+            (pkg_pr, "/packages/suse:obs-flow/bash/pull-requests/", "suse:obs-flow/bash"),
+            (proj_pr, "/projects/suse:obs-flow/pull-requests/", "suse:obs-flow"),
+        ):
+            res = client.get(pr.get_absolute_url())
+            self.assertContains(res, 'aria-label="Subnav"')
+            self.assertContains(res, f'<a href="{tab_href}" aria-current="page">')
+            self.assertContains(res, f"{crumb}</a>")
+            self.assertContains(res, "<li>#1</li>")
+
         listing = client.get("/packages/suse:obs-flow/bash/pull-requests/")
         self.assertContains(listing, 'href="/packages/suse:obs-flow/bash/pull-requests/1/"')
 

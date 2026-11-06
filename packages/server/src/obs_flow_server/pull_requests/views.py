@@ -162,7 +162,7 @@ def package_pr_list(request, project_name, package_name):
 
 
 def get_pr_or_404(project_name, number, package_name=None):
-    qs = PullRequest.objects.select_related("project", "project__org", "package", "author")
+    qs = PullRequest.objects.select_related("project", "project__org", "package", "package__project", "author")
     if package_name is None:
         return get_object_or_404(qs, project__name=project_name, package__isnull=True, number=number)
     return get_object_or_404(qs, project__name=project_name, package__name=package_name, number=number)
@@ -178,6 +178,9 @@ def pr_detail(request, project_name, number, package_name=None):
         "pull_requests/pr_detail.html",
         {
             "pr": pr,
+            "project": pr.project,
+            "package": pr.package,
+            "active_tab": "pull_requests",
             "revisions": revisions,
             "latest_revision": latest_revision,
             "reviews": reviews,

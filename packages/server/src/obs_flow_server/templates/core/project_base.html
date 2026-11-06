@@ -9,7 +9,8 @@
     <ul>
         <li><a href="{% url 'home' %}">Home</a></li>
         <li><a href="{% url 'project_list' %}">Projects</a></li>
-        <li>{{ project.name }}</li>
+        <li>{% block crumb_entity %}{{ project.name }}{% endblock %}</li>
+        {% block crumb_tail %}{% endblock %}
     </ul>
 </nav>
 
@@ -49,5 +50,5 @@
 {% endblock %}
 
 {% block content %}
-{% block project_content %}{% endblock %}
+{% block project_content %}{% block page_content %}{% endblock %}{% endblock %}
 {% endblock %}
