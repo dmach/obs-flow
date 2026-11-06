@@ -419,20 +419,25 @@ header summary:hover {
 }
 
 /* Section tabs (GitHub UnderlineNav). */
-nav[aria-label="Main"] {
+nav[aria-label="Main"],
+nav[aria-label="Subnav"] {
 	padding-inline: 0.5rem;
 }
-nav[aria-label="Main"] > ul {
+nav[aria-label="Main"] > ul,
+nav[aria-label="Subnav"] > ul {
 	flex-wrap: wrap;
 }
-nav[aria-label="Main"] li {
+nav[aria-label="Main"] li,
+nav[aria-label="Subnav"] li {
 	padding-bottom: 0.5rem;
 	border-bottom: 2px solid transparent;
 }
-nav[aria-label="Main"] li:has(> [aria-current="page"]) {
+nav[aria-label="Main"] li:has(> [aria-current="page"]),
+nav[aria-label="Subnav"] li:has(> [aria-current="page"]) {
 	border-bottom-color: var(--flow-fg-accent);
 }
-nav[aria-label="Main"] [aria-current="page"] {
+nav[aria-label="Main"] [aria-current="page"],
+nav[aria-label="Subnav"] [aria-current="page"] {
 	font-weight: 600;
 }
 
