@@ -44,11 +44,21 @@ class ProjectDetail(msgspec.Struct):
 
 
 class ProjectListRequest(msgspec.Struct):
-    pass
+    name: str | None = None
+    org: str | None = None
+    workflow_type: str | None = None
 
 
 class ProjectListResponse(msgspec.Struct):
     projects: list[ProjectDetail]
+
+
+class ProjectShowRequest(msgspec.Struct):
+    name: str
+
+
+class ProjectShowResponse(msgspec.Struct):
+    project: ProjectDetail
 
 
 class ProjectCreateRequest(msgspec.Struct):
@@ -80,10 +90,20 @@ class PackageDetail(msgspec.Struct):
 
 class PackageListRequest(msgspec.Struct):
     project: str | None = None
+    name: str | None = None
 
 
 class PackageListResponse(msgspec.Struct):
     packages: list[PackageDetail]
+
+
+class PackageShowRequest(msgspec.Struct):
+    project: str
+    name: str
+
+
+class PackageShowResponse(msgspec.Struct):
+    package: PackageDetail
 
 
 class PackageCreateRequest(msgspec.Struct):
