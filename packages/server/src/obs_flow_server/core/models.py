@@ -4,6 +4,7 @@ from django.core.exceptions import ValidationError
 from django.db import models
 from django.db.models import Q, F
 from django.db.models.functions import Lower
+from django.urls import reverse
 
 SHARED_NAME_REGEX = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._+:-]{0,199}$")
 PERSONAL_ORG_NAME_REGEX = re.compile(r"^~[A-Za-z0-9][A-Za-z0-9._+:-]{0,198}$")
@@ -147,6 +148,9 @@ class Project(models.Model):
             return self.review_debounce_minutes
         return settings.REVIEW_DEBOUNCE_MINUTES
 
+    def get_absolute_url(self):
+        return reverse("project_detail", args=[self.name])
+
     def __str__(self):
         return self.name
 
@@ -178,6 +182,9 @@ class Package(models.Model):
                 raise ValidationError("Renaming a package is forbidden.")
         self.clean()
         super().save(*args, **kwargs)
+
+    def get_absolute_url(self):
+        return reverse("package_detail", args=[self.project.name, self.name])
 
     def __str__(self):
         return f"{self.project.name}/{self.name}"

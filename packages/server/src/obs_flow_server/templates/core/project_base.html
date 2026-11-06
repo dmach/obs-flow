@@ -13,7 +13,7 @@
     </ul>
 </nav>
 
-<h1>{{ project.name }} <small>#{{ project.id }}</small></h1>
+<h1>{{ project.name }}</h1>
 <p>
     <mark data-state="{% if project.workflow_type == 'staging' %}staging{% else %}open{% endif %}">
         {{ project.get_workflow_type_display }}
@@ -29,17 +29,17 @@
 <nav aria-label="Subnav">
     <ul>
         <li>
-            <a href="{% url 'project_detail' project.id %}"{% if active_tab == 'overview' %} aria-current="page"{% endif %}>
+            <a href="{{ project.get_absolute_url }}"{% if active_tab == 'overview' %} aria-current="page"{% endif %}>
                 <img class="icon" src="{% static 'vendor/octicons/package-16.svg' %}" /> Packages
             </a>
         </li>
         <li>
-            <a href="{% url 'project_pr_list' project.id %}"{% if active_tab == 'pull_requests' %} aria-current="page"{% endif %}>
+            <a href="{% url 'project_pr_list' project.name %}"{% if active_tab == 'pull_requests' %} aria-current="page"{% endif %}>
                 <img class="icon" src="{% static 'vendor/octicons/git-pull-request-16.svg' %}" /> Pull Requests
             </a>
         </li>
         <li>
-            <a href="{% url 'project_staging_list' project.id %}"{% if active_tab == 'staging' %} aria-current="page"{% endif %}>
+            <a href="{% url 'project_staging_list' project.name %}"{% if active_tab == 'staging' %} aria-current="page"{% endif %}>
                 <img class="icon" src="{% static 'vendor/octicons/iterations-16.svg' %}" /> Staging Batches
             </a>
         </li>

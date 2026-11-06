@@ -164,8 +164,8 @@ def staging_list(request):
     return render(request, "staging/staging_list.html", context)
 
 
-def project_staging_list(request, project_id):
-    project = get_object_or_404(Project.objects.select_related("org"), id=project_id)
+def project_staging_list(request, project_name):
+    project = get_object_or_404(Project.objects.select_related("org"), name=project_name)
     qs = StagingBatch.objects.select_related("project", "author").filter(project=project)
     context = get_staging_list_context(request, qs)
     context["project"] = project

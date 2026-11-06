@@ -461,13 +461,13 @@ class TestCoreUIViews(TestCase):
         self.assertNotContains(response, "openSUSE:Factory")
 
     def test_project_detail_view(self):
-        response = self.client.get(f"/projects/{self.proj.id}/")
+        response = self.client.get(f"/projects/{self.proj.name}/")
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "openSUSE:Factory")
         self.assertContains(response, "bash")
 
         # 404 for missing project
-        response = self.client.get("/projects/99999/")
+        response = self.client.get("/projects/Nonexistent/")
         self.assertEqual(response.status_code, 404)
 
     def test_package_list_view(self):
@@ -481,14 +481,30 @@ class TestCoreUIViews(TestCase):
         self.assertNotContains(response, "bash")
 
     def test_package_detail_view(self):
-        response = self.client.get(f"/packages/{self.pkg.id}/")
+        response = self.client.get(f"/packages/{self.proj.name}/{self.pkg.name}/")
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "bash")
         self.assertContains(response, "openSUSE:Factory")
 
         # 404 for missing package
-        response = self.client.get("/packages/99999/")
+        response = self.client.get("/packages/openSUSE:Factory/nonexistent/")
         self.assertEqual(response.status_code, 404)
+
+    def test_urls_are_human_readable(self):
+        self.assertEqual(self.proj.get_absolute_url(), "/projects/openSUSE:Factory/")
+        self.assertEqual(self.pkg.get_absolute_url(), "/packages/openSUSE:Factory/bash/")
+        response = self.client.get("/projects/openSUSE:Factory/")
+        self.assertContains(response, 'href="/packages/openSUSE:Factory/bash/"')
+        self.assertContains(response, 'href="/projects/openSUSE:Factory/pull-requests/"')
+
+    def test_same_package_name_in_two_projects(self):
+        other = Project.objects.create(name="openSUSE:Leap", org=self.org, branch_name="leap")
+        Package.objects.create(project=other, name="bash")
+        response = self.client.get("/packages/openSUSE:Leap/bash/")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context["package"].project, other)
+        response = self.client.get("/packages/openSUSE:Factory/bash/")
+        self.assertEqual(response.context["package"].project, self.proj)
 
     def test_project_pr_list_view(self):
         from accounts.models import User
@@ -498,7 +514,7 @@ class TestCoreUIViews(TestCase):
         PullRequest.objects.create(project=self.proj, package=self.pkg, number=1, author=user, title="Fix bash bug")
         PullRequest.objects.create(project=other_proj, number=1, author=user, title="Leap core change")
 
-        response = self.client.get(f"/projects/{self.proj.id}/pull-requests/")
+        response = self.client.get(f"/projects/{self.proj.name}/pull-requests/")
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Fix bash bug")
         self.assertNotContains(response, "Leap core change")
@@ -511,7 +527,7 @@ class TestCoreUIViews(TestCase):
         StagingBatch.objects.create(project=self.proj, author=user, title="Factory batch 1")
         StagingBatch.objects.create(project=other_proj, author=user, title="TW batch 1")
 
-        response = self.client.get(f"/projects/{self.proj.id}/staging/")
+        response = self.client.get(f"/projects/{self.proj.name}/staging/")
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Factory batch 1")
         self.assertNotContains(response, "TW batch 1")
@@ -524,7 +540,7 @@ class TestCoreUIViews(TestCase):
         PullRequest.objects.create(project=self.proj, package=self.pkg, number=1, author=user, title="Bash specific PR")
         PullRequest.objects.create(project=self.proj, package=pkg2, number=2, author=user, title="Zsh specific PR")
 
-        response = self.client.get(f"/packages/{self.pkg.id}/pull-requests/")
+        response = self.client.get(f"/packages/{self.proj.name}/{self.pkg.name}/pull-requests/")
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Bash specific PR")
         self.assertNotContains(response, "Zsh specific PR")

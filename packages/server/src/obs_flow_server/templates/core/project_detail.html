@@ -17,11 +17,11 @@
                         {% for pkg in packages %}
                             <tr>
                                 <th scope="row" data-label="Package">
-                                    <a href="{% url 'package_detail' pkg.id %}">{{ pkg.name }}</a>
+                                    <a href="{{ pkg.get_absolute_url }}">{{ pkg.name }}</a>
                                 </th>
                                 <td data-label="Forked From">
                                     {% if pkg.forked_from %}
-                                        <a href="{% url 'package_detail' pkg.forked_from.id %}">{{ pkg.forked_from }}</a>
+                                        <a href="{{ pkg.forked_from.get_absolute_url }}">{{ pkg.forked_from }}</a>
                                     {% else %}
                                         -
                                     {% endif %}

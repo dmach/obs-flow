@@ -24,12 +24,6 @@
         <thead>
             <tr>
                 <th>
-                    <a href="?sort={% if current_sort == 'id' %}-id{% else %}id{% endif %}{{ base_query }}">
-                        ID
-                        {% if current_sort == 'id' %}▲{% elif current_sort == '-id' %}▼{% endif %}
-                    </a>
-                </th>
-                <th>
                     <a href="?sort={% if current_sort == 'name' %}-name{% else %}name{% endif %}{{ base_query }}">
                         Name
                         {% if current_sort == 'name' %}▲{% elif current_sort == '-name' %}▼{% endif %}
@@ -58,9 +52,8 @@
         <tbody>
             {% for project in page_obj %}
                 <tr>
-                    <td data-label="ID">{{ project.id }}</td>
                     <th scope="row" data-label="Name">
-                        <a href="{% url 'project_detail' project.id %}">{{ project.name }}</a>
+                        <a href="{{ project.get_absolute_url }}">{{ project.name }}</a>
                     </th>
                     <td data-label="Organization">{{ project.org.name|default:"-" }}</td>
                     <td data-label="Branch"><code>{{ project.branch_name|default:"-" }}</code></td>
