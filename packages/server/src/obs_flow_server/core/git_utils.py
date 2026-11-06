@@ -3,6 +3,15 @@ from pathlib import Path
 from typing import TypedDict, Literal
 
 
+class GitCommit(TypedDict):
+    sha: str
+    short_sha: str
+    author_name: str
+    author_email: str
+    date: str
+    title: str
+
+
 class GitTreeEntry(TypedDict):
     mode: str
     type: Literal["blob", "tree", "commit"]
@@ -112,3 +121,43 @@ def get_git_type(repo_path: Path, ref: str, path: str) -> Literal["blob", "tree"
     except subprocess.CalledProcessError:
         pass
     return None
+
+
+def get_git_commits(repo_path: Path, ref: str = "HEAD", limit: int = 50) -> list[GitCommit]:
+    if not repo_path.exists():
+        return []
+    try:
+        proc = subprocess.run(
+            [
+                "git",
+                "log",
+                f"-n{limit}",
+                "--format=%H%x00%h%x00%an%x00%ae%x00%cd%x00%s",
+                "--date=format:%Y-%m-%d %H:%M:%S",
+                ref,
+            ],
+            cwd=str(repo_path),
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+    except subprocess.CalledProcessError:
+        return []
+
+    commits: list[GitCommit] = []
+    for line in proc.stdout.splitlines():
+        if not line:
+            continue
+        parts = line.split("\x00")
+        if len(parts) == 6:
+            full_sha, short_sha, author_name, author_email, date_str, title = parts
+            commits.append({
+                "sha": full_sha,
+                "short_sha": short_sha,
+                "author_name": author_name,
+                "author_email": author_email,
+                "date": date_str,
+                "title": title,
+            })
+    return commits
+
