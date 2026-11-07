@@ -1,4 +1,7 @@
+import base64
+import hashlib
 from django.contrib.auth.models import AbstractBaseUser, BaseUserManager
+from django.core.exceptions import ValidationError
 from django.db import models
 
 
@@ -149,6 +152,35 @@ class UserPreferences(models.Model):
 
     def __str__(self):
         return f"Preferences for {self.user.username}"
+
+
+class SSHKey(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="ssh_keys")
+    name = models.CharField(max_length=255)
+    public_key = models.TextField()
+    fingerprint = models.CharField(max_length=128, unique=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def clean(self):
+        super().clean()
+        key_parts = self.public_key.strip().split()
+        if len(key_parts) < 2:
+            raise ValidationError("Invalid SSH public key format (expected '<type> <base64-key>')")
+        _key_type, b64_key = key_parts[0], key_parts[1]
+        try:
+            key_bytes = base64.b64decode(b64_key)
+            fp = hashlib.sha256(key_bytes).digest()
+            self.fingerprint = f"SHA256:{base64.b64encode(fp).decode('ascii').rstrip('=')}"
+        except Exception as e:
+            raise ValidationError(f"Invalid SSH public key: {e}")
+
+    def save(self, *args, **kwargs):
+        if not self.fingerprint:
+            self.clean()
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"{self.user.username} - {self.name} ({self.fingerprint})"
 
 
 from django.db.models.signals import post_save

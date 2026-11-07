@@ -25,7 +25,7 @@ dbshell: ## Open a database shell
 .PHONY: test
 test: ## Run all tests (pytest and Django tests)
 	uv run --all-packages pytest
-	PYTHONPATH=packages/server/src/obs_flow_server uv run --all-packages python packages/server/src/obs_flow_server/manage.py test accounts core reviews pull_requests staging bookmarks
+	PYTHONPATH=packages/server/src/obs_flow_server uv run --all-packages python packages/server/src/obs_flow_server/manage.py test accounts core reviews pull_requests staging bookmarks git_transport
 
 .PHONY: completions
 completions: ## Generate shell completion scripts for obs-flow-cli

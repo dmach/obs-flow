@@ -445,3 +445,226 @@ class GitTransportLiveServerTests(LiveServerTestCase):
         self.assertIn("staging workflow", res_staging_push.stderr)
 
 
+class TestSSHTransport(TestCase):
+    def setUp(self):
+        import tempfile
+        from django.test import override_settings
+
+        self.tmpdir = tempfile.TemporaryDirectory()
+        self.settings_override = override_settings(GIT_FORGE_ROOT=Path(self.tmpdir.name))
+        self.settings_override.enable()
+
+        self.user = User.objects.create_user(
+            username="sshuser",
+            password="password123",
+            is_local_account=True,
+        )
+        self.org = Org.objects.create(name="sshorg")
+        self.project = Project.objects.create(
+            name="sshproject",
+            org=self.org,
+            branch_name="main",
+            workflow_type=Project.WorkflowType.DIRECT,
+        )
+        self.package = Package.objects.create(
+            project=self.project,
+            name="sshpkg",
+        )
+
+        from accounts.models import SSHKey
+        # Dummy ed25519 public key (32 bytes base64)
+        raw_key = base64.b64encode(b"A" * 32).decode("ascii")
+        self.ssh_key = SSHKey.objects.create(
+            user=self.user,
+            name="laptop",
+            public_key=f"ssh-ed25519 {raw_key} user@host",
+        )
+
+    def tearDown(self):
+        self.settings_override.disable()
+        self.tmpdir.cleanup()
+
+    def test_ssh_key_fingerprint_generated(self):
+        self.assertTrue(self.ssh_key.fingerprint.startswith("SHA256:"))
+
+    def test_parse_ssh_command_valid(self):
+        from git_transport.ssh import parse_ssh_command
+
+        cmd, proj, pkg = parse_ssh_command("git-upload-pack 'sshproject/sshpkg.git'")
+        self.assertEqual(cmd, "git-upload-pack")
+        self.assertEqual(proj, "sshproject")
+        self.assertEqual(pkg, "sshpkg")
+
+        cmd, proj, pkg = parse_ssh_command("git-receive-pack 'sshproject.git'")
+        self.assertEqual(cmd, "git-receive-pack")
+        self.assertEqual(proj, "sshproject")
+        self.assertIsNone(pkg)
+
+        cmd, proj, pkg = parse_ssh_command("git-upload-pack /packages/sshproject/sshpkg.git")
+        self.assertEqual(cmd, "git-upload-pack")
+        self.assertEqual(proj, "sshproject")
+        self.assertEqual(pkg, "sshpkg")
+
+    def test_parse_ssh_command_invalid(self):
+        from git_transport.ssh import parse_ssh_command
+
+        with self.assertRaises(ValueError):
+            parse_ssh_command("rm -rf /")
+
+        with self.assertRaises(ValueError):
+            parse_ssh_command("")
+
+    def test_handle_ssh_command_execution(self):
+        import io
+        from git_transport.ssh import handle_ssh_command
+
+        err_buf = io.StringIO()
+        # Test nonexistent user
+        ret = handle_ssh_command("nonexistent", "git-upload-pack 'sshproject/sshpkg.git'", stderr=err_buf)
+        self.assertNotEqual(ret, 0)
+        self.assertIn("does not exist", err_buf.getvalue())
+
+        # Test invalid command
+        err_buf = io.StringIO()
+        ret = handle_ssh_command("sshuser", "bash -i", stderr=err_buf)
+        self.assertNotEqual(ret, 0)
+        self.assertIn("not permitted", err_buf.getvalue())
+
+    def test_authorized_keys_management_command(self):
+        from io import StringIO
+        from django.core.management import call_command
+
+        out = StringIO()
+        call_command("authorized_keys", "--user", "sshuser", stdout=out)
+        output = out.getvalue()
+        self.assertIn('command="python manage.py git_shell sshuser"', output)
+        self.assertIn(self.ssh_key.public_key.strip(), output)
+
+
+class TestGitLFSTransport(TestCase):
+    def setUp(self):
+        import tempfile
+        from django.test import override_settings
+
+        self.tmpdir = tempfile.TemporaryDirectory()
+        self.settings_override = override_settings(
+            GIT_FORGE_ROOT=Path(self.tmpdir.name),
+            GIT_LFS_ROOT=Path(self.tmpdir.name) / "lfs",
+        )
+        self.settings_override.enable()
+
+        self.user = User.objects.create_user(
+            username="lfsuser",
+            password="lfspassword",
+            is_local_account=True,
+        )
+        self.org = Org.objects.create(name="lfsprojorg")
+        self.project = Project.objects.create(
+            name="lfsproject",
+            org=self.org,
+            branch_name="main",
+            workflow_type=Project.WorkflowType.DIRECT,
+        )
+        self.package = Package.objects.create(
+            project=self.project,
+            name="lfspkg",
+        )
+        self.client = Client()
+        self.auth = _make_basic_auth("lfsuser", "lfspassword")
+
+    def tearDown(self):
+        self.settings_override.disable()
+        self.tmpdir.cleanup()
+
+    def test_lfs_batch_unauthenticated_upload_rejected(self):
+        url = "/package/lfsproject/lfspkg/info/lfs/objects/batch"
+        payload = {
+            "operation": "upload",
+            "transfers": ["basic"],
+            "objects": [{"oid": "a" * 64, "size": 100}],
+        }
+        res = self.client.post(url, data=payload, content_type="application/vnd.git-lfs+json")
+        self.assertEqual(res.status_code, 401)
+
+    def test_lfs_batch_upload_negotiation(self):
+        url = "/package/lfsproject/lfspkg/info/lfs/objects/batch"
+        oid = "b" * 64
+        payload = {
+            "operation": "upload",
+            "transfers": ["basic"],
+            "objects": [{"oid": oid, "size": 123}],
+        }
+        res = self.client.post(url, data=payload, content_type="application/vnd.git-lfs+json", **self.auth)
+        self.assertEqual(res.status_code, 200)
+        data = res.json()
+        self.assertEqual(data["transfer"], "basic")
+        self.assertEqual(len(data["objects"]), 1)
+        obj = data["objects"][0]
+        self.assertEqual(obj["oid"], oid)
+        self.assertIn("actions", obj)
+        self.assertIn("upload", obj["actions"])
+        self.assertIn(f"/info/lfs/objects/{oid}", obj["actions"]["upload"]["href"])
+
+    def test_lfs_object_upload_and_download(self):
+        import hashlib
+
+        content = b"Binary LFS source archive data content."
+        oid = hashlib.sha256(content).hexdigest()
+        size = len(content)
+
+        upload_url = f"/package/lfsproject/lfspkg/info/lfs/objects/{oid}"
+
+        # 1. Upload with wrong checksum fails
+        res_fail = self.client.put(
+            upload_url,
+            data=b"Wrong content",
+            content_type="application/octet-stream",
+            **self.auth,
+        )
+        self.assertEqual(res_fail.status_code, 400)
+        self.assertIn("SHA256 mismatch", res_fail.content.decode("utf-8"))
+
+        # 2. Upload with valid content succeeds
+        res_ok = self.client.put(
+            upload_url,
+            data=content,
+            content_type="application/octet-stream",
+            **self.auth,
+        )
+        self.assertEqual(res_ok.status_code, 200)
+
+        # 3. Batch API recognizes object is now uploaded (no actions required)
+        batch_url = "/package/lfsproject/lfspkg/info/lfs/objects/batch"
+        res_batch = self.client.post(
+            batch_url,
+            data={"operation": "upload", "objects": [{"oid": oid, "size": size}]},
+            content_type="application/vnd.git-lfs+json",
+            **self.auth,
+        )
+        self.assertEqual(res_batch.status_code, 200)
+        batch_obj = res_batch.json()["objects"][0]
+        self.assertNotIn("actions", batch_obj)
+
+        # 4. Batch API download request returns download action
+        res_dl_batch = self.client.post(
+            batch_url,
+            data={"operation": "download", "objects": [{"oid": oid, "size": size}]},
+            content_type="application/vnd.git-lfs+json",
+        )
+        self.assertEqual(res_dl_batch.status_code, 200)
+        dl_obj = res_dl_batch.json()["objects"][0]
+        self.assertIn("download", dl_obj["actions"])
+
+        # 5. GET download returns identical binary content
+        res_dl = self.client.get(upload_url)
+        self.assertEqual(res_dl.status_code, 200)
+        self.assertEqual(b"".join(res_dl.streaming_content), content)
+
+    def test_lfs_download_nonexistent_object(self):
+        fake_oid = "f" * 64
+        url = f"/package/lfsproject/lfspkg/info/lfs/objects/{fake_oid}"
+        res = self.client.get(url)
+        self.assertEqual(res.status_code, 404)
+
+
+

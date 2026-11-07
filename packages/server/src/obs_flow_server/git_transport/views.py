@@ -180,3 +180,34 @@ def project_upload_pack(request: HttpRequest, project: str) -> HttpResponse:
 @csrf_exempt
 def project_receive_pack(request: HttpRequest, project: str) -> HttpResponse:
     return _receive_pack_handler(request, project, None)
+
+
+# --- Git LFS views ---
+def package_lfs_batch(request: HttpRequest, project: str, package: str) -> HttpResponse:
+    from .lfs import lfs_batch_handler
+    return lfs_batch_handler(request, project, package)
+
+
+def package_lfs_object(request: HttpRequest, project: str, package: str, oid: str) -> HttpResponse:
+    from .lfs import lfs_object_handler
+    return lfs_object_handler(request, project, package, oid)
+
+
+def package_lfs_verify(request: HttpRequest, project: str, package: str) -> HttpResponse:
+    from .lfs import lfs_verify_handler
+    return lfs_verify_handler(request, project, package)
+
+
+def project_lfs_batch(request: HttpRequest, project: str) -> HttpResponse:
+    from .lfs import lfs_batch_handler
+    return lfs_batch_handler(request, project, None)
+
+
+def project_lfs_object(request: HttpRequest, project: str, oid: str) -> HttpResponse:
+    from .lfs import lfs_object_handler
+    return lfs_object_handler(request, project, None, oid)
+
+
+def project_lfs_verify(request: HttpRequest, project: str) -> HttpResponse:
+    from .lfs import lfs_verify_handler
+    return lfs_verify_handler(request, project, None)

@@ -136,6 +136,7 @@ import os
 from pathlib import Path
 GIT_FORGE_ROOT = Path(os.environ.get("GIT_FORGE_ROOT", BASE_DIR / "git_repos"))
 GIT_HOOKS_SOCKET_PATH = Path(os.environ.get("GIT_HOOKS_SOCKET_PATH", GIT_FORGE_ROOT / ".hooks.sock"))
+GIT_LFS_ROOT = Path(os.environ.get("GIT_LFS_ROOT", GIT_FORGE_ROOT / "lfs"))
 GITEA_URL = os.environ.get("GITEA_URL")
 GITEA_TOKEN = os.environ.get("GITEA_TOKEN")
 
