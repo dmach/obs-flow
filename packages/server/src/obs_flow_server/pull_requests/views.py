@@ -169,11 +169,36 @@ def get_pr_or_404(project_name, number, package_name=None):
     return get_object_or_404(qs, project__name=project_name, package__name=package_name, number=number)
 
 
+def _get_pr_git_context(pr):
+    from core.git_utils import ensure_pr_git_refs, get_git_commits, get_git_diff
+
+    try:
+        repo_path, target_ref, source_ref = ensure_pr_git_refs(pr)
+        commits = get_git_commits(repo_path, ref=f"{target_ref}..{source_ref}")
+        files = get_git_diff(repo_path, base_ref=target_ref, head_ref=source_ref)
+    except Exception:
+        commits = []
+        files = []
+
+    total_additions = sum(f.get("additions", 0) for f in files)
+    total_deletions = sum(f.get("deletions", 0) for f in files)
+
+    return {
+        "commits": commits,
+        "commits_count": len(commits),
+        "files": files,
+        "files_count": len(files),
+        "total_additions": total_additions,
+        "total_deletions": total_deletions,
+    }
+
+
 def pr_detail(request, project_name, number, package_name=None):
     pr = get_pr_or_404(project_name, number, package_name)
     revisions = pr.revisions.all().order_by("-revision_number")
     latest_revision = revisions.first()
     reviews = latest_revision.reviews.all() if latest_revision else []
+    git_ctx = _get_pr_git_context(pr)
     return render(
         request,
         "pull_requests/pr_detail.html",
@@ -182,9 +207,57 @@ def pr_detail(request, project_name, number, package_name=None):
             "project": pr.project,
             "package": pr.package,
             "active_tab": "pull_requests",
+            "active_subtab": "overview",
             "revisions": revisions,
             "latest_revision": latest_revision,
             "reviews": reviews,
+            **git_ctx,
+        },
+    )
+
+
+def pr_commits(request, project_name, number, package_name=None):
+    pr = get_pr_or_404(project_name, number, package_name)
+    revisions = pr.revisions.all().order_by("-revision_number")
+    latest_revision = revisions.first()
+    reviews = latest_revision.reviews.all() if latest_revision else []
+    git_ctx = _get_pr_git_context(pr)
+    return render(
+        request,
+        "pull_requests/pr_detail.html",
+        {
+            "pr": pr,
+            "project": pr.project,
+            "package": pr.package,
+            "active_tab": "pull_requests",
+            "active_subtab": "commits",
+            "revisions": revisions,
+            "latest_revision": latest_revision,
+            "reviews": reviews,
+            **git_ctx,
+        },
+    )
+
+
+def pr_files_changed(request, project_name, number, package_name=None):
+    pr = get_pr_or_404(project_name, number, package_name)
+    revisions = pr.revisions.all().order_by("-revision_number")
+    latest_revision = revisions.first()
+    reviews = latest_revision.reviews.all() if latest_revision else []
+    git_ctx = _get_pr_git_context(pr)
+    return render(
+        request,
+        "pull_requests/pr_detail.html",
+        {
+            "pr": pr,
+            "project": pr.project,
+            "package": pr.package,
+            "active_tab": "pull_requests",
+            "active_subtab": "files_changed",
+            "revisions": revisions,
+            "latest_revision": latest_revision,
+            "reviews": reviews,
+            **git_ctx,
         },
     )
 

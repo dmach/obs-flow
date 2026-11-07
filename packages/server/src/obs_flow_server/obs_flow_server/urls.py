@@ -23,6 +23,8 @@ import staging.views as staging_views
 
 PR_ROUTES = [
     ("", pr_views.pr_detail, "pr_detail"),
+    ("commits/", pr_views.pr_commits, "pr_commits"),
+    ("files/", pr_views.pr_files_changed, "pr_files_changed"),
     ("draft-status/", pr_views.pr_draft_status, "pr_draft_status"),
     ("ready-for-review/", pr_views.pr_ready_for_review, "pr_ready_for_review"),
     ("cancel-timeout/", pr_views.pr_cancel_timeout, "pr_cancel_timeout"),
