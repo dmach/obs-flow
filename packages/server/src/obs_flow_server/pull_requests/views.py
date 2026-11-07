@@ -176,7 +176,7 @@ def _get_pr_git_context(pr, revision=None):
 
     try:
         repo_path, default_target_ref, default_source_ref = ensure_pr_git_refs(pr)
-        if revision and revision.head_sha and revision.base_sha:
+        if revision and revision.head_sha and revision.base_sha and revision.head_sha != "0"*40 and revision.base_sha != "0"*40:
             target_ref = revision.base_sha
             source_ref = revision.head_sha
         else:
