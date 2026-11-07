@@ -853,6 +853,9 @@ article > footer {
 article > header > * {
 	margin-bottom: 0;
 }
+article > header form {
+	margin: 0;
+}
 article[data-empty] {
 	padding: 2rem;
 	color: var(--flow-fg-muted);
@@ -1147,6 +1150,20 @@ table[data-diff] tr[data-thread] article {
 table[data-diff] tr[data-thread] article article {
 	margin-top: 0.5rem;
 	background: var(--flow-bg);
+}
+table[data-diff] tr[data-thread] article > form {
+	margin-top: 1rem;
+	margin-bottom: 0;
+}
+table[data-diff] tr[data-thread] article > form textarea {
+	width: 100%;
+	box-sizing: border-box;
+	margin-bottom: 0.5rem;
+}
+table[data-diff] tr[data-thread] article > form > footer {
+	margin-top: 0;
+	padding-top: 0;
+	border-top: 0;
 }
 table[data-diff] td > details {
 	display: inline-block;
