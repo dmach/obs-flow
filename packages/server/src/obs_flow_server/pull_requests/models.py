@@ -100,6 +100,14 @@ class PullRequest(models.Model):
         return self.url_for("pr_detail")
 
     @property
+    def commits_url(self) -> str:
+        return self.url_for("pr_commits")
+
+    @property
+    def files_changed_url(self) -> str:
+        return self.url_for("pr_files_changed")
+
+    @property
     def formatted_id(self) -> str:
         return f"{self.target_owner}/{self.target_repo}#{self.number}"
 

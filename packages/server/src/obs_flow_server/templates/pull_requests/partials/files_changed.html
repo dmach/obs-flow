@@ -1,0 +1,84 @@
+{% load static %}
+
+<div class="files-changed-container">
+    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.5rem; padding: 0.75rem 1rem; background: var(--flow-bg-subtle); border: 1px solid var(--flow-border); border-radius: var(--flow-radius);">
+        <div>
+            <strong>{{ files_count }} changed file{{ files_count|pluralize }}</strong>
+            with <span style="color: var(--flow-fg-success); font-weight: 600;">+{{ total_additions }}</span> and <span style="color: var(--flow-fg-danger); font-weight: 600;">-{{ total_deletions }}</span>
+        </div>
+    </div>
+
+    {% for file in files %}
+        <div class="file-diff-card" style="margin-bottom: 2rem; border: 1px solid var(--flow-border); border-radius: var(--flow-radius); overflow: hidden;">
+            <div class="file-diff-header" style="display: flex; align-items: center; justify-content: space-between; padding: 0.5rem 1rem; background: var(--flow-bg-subtle); border-bottom: 1px solid var(--flow-border);">
+                <div style="display: flex; align-items: center; gap: 0.5rem; font-family: var(--flow-mono); font-size: 0.9rem;">
+                    <img class="icon" src="{% static 'vendor/octicons/file-16.svg' %}" alt="" style="width: 1rem; height: 1rem;" />
+                    {% if file.status == "renamed" %}
+                        <span style="color: var(--flow-fg-muted);">{{ file.old_path }} &rarr;</span>
+                    {% endif %}
+                    <strong>{{ file.path }}</strong>
+                    {% if file.status == "added" %}
+                        <mark data-variant="success" style="font-size: 0.75rem; text-transform: uppercase;">added</mark>
+                    {% elif file.status == "deleted" %}
+                        <mark data-variant="danger" style="font-size: 0.75rem; text-transform: uppercase;">deleted</mark>
+                    {% elif file.status == "renamed" %}
+                        <mark data-variant="warning" style="font-size: 0.75rem; text-transform: uppercase;">renamed</mark>
+                    {% endif %}
+                </div>
+                <div style="font-family: var(--flow-mono); font-size: 0.857rem; display: flex; gap: 0.5rem;">
+                    {% if not file.is_binary %}
+                        <span style="color: var(--flow-fg-success); font-weight: 600;">+{{ file.additions }}</span>
+                        <span style="color: var(--flow-fg-danger); font-weight: 600;">-{{ file.deletions }}</span>
+                    {% endif %}
+                </div>
+            </div>
+
+            <div class="file-diff-content" style="overflow-x: auto; background: var(--flow-bg);">
+                {% if file.is_binary %}
+                    <div style="padding: 1.5rem; text-align: center; color: var(--flow-fg-muted); font-size: 0.9rem;">
+                        Binary file not shown.
+                    </div>
+                {% elif file.lines %}
+                    <table style="width: 100%; border-collapse: collapse; font-family: var(--flow-mono); font-size: 0.857rem; line-height: 1.45;">
+                        <tbody>
+                            {% for line in file.lines %}
+                                {% if line.type == 'hunk' %}
+                                    <tr style="background-color: var(--flow-bg-subtle); color: var(--flow-fg-muted);">
+                                        <td colspan="2" style="width: 70px; text-align: center; user-select: none; padding: 0.15rem 0.5rem; border-right: 1px solid var(--flow-border-muted);">...</td>
+                                        <td style="padding: 0.15rem 0.75rem; font-style: italic;">{{ line.text }}</td>
+                                    </tr>
+                                {% elif line.type == 'add' %}
+                                    <tr style="background-color: var(--flow-bg-success); color: var(--flow-fg);">
+                                        <td style="width: 35px; text-align: right; user-select: none; padding: 0.1rem 0.35rem; color: var(--flow-fg-muted);"></td>
+                                        <td style="width: 35px; text-align: right; user-select: none; padding: 0.1rem 0.35rem; color: var(--flow-fg-muted); border-right: 1px solid var(--flow-border-muted);">{{ line.new_no }}</td>
+                                        <td style="padding: 0.1rem 0.75rem; white-space: pre-wrap; word-break: break-all;"><span style="user-select: none; margin-right: 0.5rem; color: var(--flow-fg-success); font-weight: bold;">+</span>{{ line.text }}</td>
+                                    </tr>
+                                {% elif line.type == 'del' %}
+                                    <tr style="background-color: var(--flow-bg-danger); color: var(--flow-fg);">
+                                        <td style="width: 35px; text-align: right; user-select: none; padding: 0.1rem 0.35rem; color: var(--flow-fg-muted);">{{ line.old_no }}</td>
+                                        <td style="width: 35px; text-align: right; user-select: none; padding: 0.1rem 0.35rem; color: var(--flow-fg-muted); border-right: 1px solid var(--flow-border-muted);"></td>
+                                        <td style="padding: 0.1rem 0.75rem; white-space: pre-wrap; word-break: break-all;"><span style="user-select: none; margin-right: 0.5rem; color: var(--flow-fg-danger); font-weight: bold;">-</span>{{ line.text }}</td>
+                                    </tr>
+                                {% else %}
+                                    <tr style="color: var(--flow-fg);">
+                                        <td style="width: 35px; text-align: right; user-select: none; padding: 0.1rem 0.35rem; color: var(--flow-fg-muted);">{{ line.old_no }}</td>
+                                        <td style="width: 35px; text-align: right; user-select: none; padding: 0.1rem 0.35rem; color: var(--flow-fg-muted); border-right: 1px solid var(--flow-border-muted);">{{ line.new_no }}</td>
+                                        <td style="padding: 0.1rem 0.75rem; white-space: pre-wrap; word-break: break-all;"><span style="user-select: none; margin-right: 0.5rem; visibility: hidden;"> </span>{{ line.text }}</td>
+                                    </tr>
+                                {% endif %}
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                {% else %}
+                    <div style="padding: 1.5rem; text-align: center; color: var(--flow-fg-muted); font-size: 0.9rem;">
+                        Empty file or no changes.
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    {% empty %}
+        <article data-empty style="text-align: center; padding: 3rem;">
+            <p>No changed files found for this pull request.</p>
+        </article>
+    {% endfor %}
+</div>
