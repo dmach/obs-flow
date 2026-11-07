@@ -1148,14 +1148,14 @@ table[data-diff] tr[data-thread] article article {
 	margin-top: 0.5rem;
 	background: var(--flow-bg);
 }
-table[data-diff] td details {
+table[data-diff] td > details {
 	display: inline-block;
 	margin: 0;
 	position: absolute;
 	top: 0.1rem;
 	left: 0.1rem;
 }
-table[data-diff] td details summary {
+table[data-diff] td > details > summary {
 	display: inline-flex;
 	align-items: center;
 	justify-content: center;
@@ -1174,23 +1174,23 @@ table[data-diff] td details summary {
 	opacity: 0;
 	transition: opacity 0.1s ease;
 }
-table[data-diff] tr:hover td details summary {
+table[data-diff] tr:hover td > details > summary {
 	opacity: 1;
 }
-table[data-diff] td details[open] summary {
+table[data-diff] td > details[open] > summary {
 	opacity: 1;
 }
-table[data-diff] td details summary::-webkit-details-marker {
+table[data-diff] td > details > summary::-webkit-details-marker {
 	display: none;
 }
-table[data-diff] td details summary:hover {
+table[data-diff] td > details > summary:hover {
 	background: var(--flow-fg-accent);
 	color: var(--flow-on-solid);
 }
-table[data-diff] td details[open] {
-	position: relative;
+table[data-diff] td > details[open] {
+	position: absolute;
 }
-table[data-diff] td details[open] > form {
+table[data-diff] td > details[open] > form {
 	position: absolute;
 	left: 0;
 	z-index: 50;
@@ -1202,7 +1202,7 @@ table[data-diff] td details[open] > form {
 	box-shadow: var(--flow-shadow);
 	text-align: left;
 }
-table[data-diff] td details[open] > form textarea {
+table[data-diff] td > details[open] > form textarea {
 	width: 100%;
 	box-sizing: border-box;
 	margin-bottom: 0.5rem;
