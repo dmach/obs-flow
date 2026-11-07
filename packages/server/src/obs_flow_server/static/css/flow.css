@@ -1116,6 +1116,7 @@ table[data-diff] td:nth-child(2) {
 	text-align: right;
 	user-select: none;
 	color: var(--flow-fg-muted);
+	position: relative;
 }
 table[data-diff] td:nth-child(2) {
 	border-right: 1px solid var(--flow-border-muted);
@@ -1150,6 +1151,9 @@ table[data-diff] tr[data-thread] article article {
 table[data-diff] td details {
 	display: inline-block;
 	margin: 0;
+	position: absolute;
+	top: 0.1rem;
+	left: 0.1rem;
 }
 table[data-diff] td details summary {
 	display: inline-flex;
@@ -1167,6 +1171,14 @@ table[data-diff] td details summary {
 	user-select: none;
 	list-style: none;
 	vertical-align: middle;
+	opacity: 0;
+	transition: opacity 0.1s ease;
+}
+table[data-diff] tr:hover td details summary {
+	opacity: 1;
+}
+table[data-diff] td details[open] summary {
+	opacity: 1;
 }
 table[data-diff] td details summary::-webkit-details-marker {
 	display: none;
