@@ -24,10 +24,15 @@ from obs_flow_common.messages import (
     PackageShowResponse,
     PackageCreateRequest,
     PackageCreateResponse,
+    CommentDTO,
+    CommentAddRequest,
+    CommentAddResponse,
+    CommentListRequest,
+    CommentListResponse,
 )
 from obs_flow_server.api import api
 from accounts.models import User
-from core.models import Project, Package, Org
+from core.models import Project, Package, Org, Comment
 
 
 def org_to_detail(org: Org) -> OrgDetail:
@@ -232,3 +237,92 @@ def create_package(payload: PackageCreateRequest):
 
     res = PackageCreateResponse(package=package_to_detail(package))
     return msgspec.structs.asdict(res)
+
+
+def _resolve_comment_target(target_type: str, target_id: str):
+    target_type = target_type.lower().strip()
+    if target_type in ("pull_request", "pr"):
+        from pull_requests.models import PullRequest
+        if "#" in target_id:
+            repo, num_str = target_id.rsplit("#", 1)
+            num = int(num_str)
+            parts = repo.split("/")
+            if len(parts) == 2:
+                proj_name, pkg_name = parts[0], parts[1]
+                return PullRequest.objects.get(project__name=proj_name, package__name=pkg_name, number=num)
+            else:
+                return PullRequest.objects.get(project__name=repo, package__isnull=True, number=num)
+        elif target_id.isdigit():
+            pr = PullRequest.objects.filter(id=int(target_id)).first()
+            if pr:
+                return pr
+            return PullRequest.objects.get(number=int(target_id))
+        else:
+            raise ValueError(f"Invalid pull request identifier: '{target_id}'")
+    elif target_type in ("staging_batch", "staging", "batch"):
+        from staging.models import StagingBatch
+        if target_id.isdigit():
+            return StagingBatch.objects.get(id=int(target_id))
+        else:
+            raise ValueError(f"Invalid staging batch identifier: '{target_id}'")
+    else:
+        raise ValueError(f"Unsupported comment target_type: '{target_type}'")
+
+
+def comment_to_dto(c: Comment) -> CommentDTO:
+    is_pr = c.content_type.model == "pullrequest"
+    target_type = "pull_request" if is_pr else "staging_batch"
+    if is_pr and hasattr(c.content_object, "formatted_id"):
+        target_id = c.content_object.formatted_id
+    else:
+        target_id = str(c.object_id)
+
+    return CommentDTO(
+        id=c.id,
+        target_type=target_type,
+        target_id=target_id,
+        author=c.author.username,
+        body=c.body,
+        created_at=c.created_at.isoformat(),
+        updated_at=c.updated_at.isoformat(),
+        path=c.path,
+        line_number=c.line_number,
+    )
+
+
+@api.post("/api/v1/comment/add")
+@sync_to_async
+@transaction.atomic
+def add_comment(payload: CommentAddRequest):
+    target = _resolve_comment_target(payload.target_type, payload.target_id)
+    user, _ = User.objects.get_or_create(
+        username=payload.author,
+        defaults={"username_lower": payload.author.lower(), "account_type": User.AccountType.HUMAN},
+    )
+    from django.contrib.contenttypes.models import ContentType
+
+    ct = ContentType.objects.get_for_model(target)
+    comment = Comment.objects.create(
+        content_type=ct,
+        object_id=target.id,
+        author=user,
+        body=payload.body.strip(),
+        path=payload.path,
+        line_number=payload.line_number,
+    )
+    res = CommentAddResponse(comment=comment_to_dto(comment))
+    return msgspec.structs.asdict(res)
+
+
+@api.post("/api/v1/comment/list")
+@sync_to_async
+def list_comments(payload: CommentListRequest):
+    target = _resolve_comment_target(payload.target_type, payload.target_id)
+    from django.contrib.contenttypes.models import ContentType
+
+    ct = ContentType.objects.get_for_model(target)
+    comments = Comment.objects.filter(content_type=ct, object_id=target.id).select_related("author").order_by("created_at")
+    dtos = [comment_to_dto(c) for c in comments]
+    res = CommentListResponse(comments=dtos)
+    return msgspec.structs.asdict(res)
+

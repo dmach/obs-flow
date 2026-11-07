@@ -1,5 +1,7 @@
 import re
 from django.conf import settings
+from django.contrib.contenttypes.fields import GenericForeignKey
+from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import ValidationError
 from django.db import models
 from django.db.models import Q
@@ -224,3 +226,41 @@ class Issue(models.Model):
 
     def __str__(self):
         return f"{self.issue_tracker.name}:{self.name}"
+
+
+class Comment(models.Model):
+    content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE)
+    object_id = models.PositiveBigIntegerField()
+    content_object = GenericForeignKey("content_type", "object_id")
+
+    author = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="comments",
+    )
+    parent = models.ForeignKey(
+        "self",
+        null=True,
+        blank=True,
+        on_delete=models.CASCADE,
+        related_name="replies",
+    )
+    body = models.TextField()
+
+    # Optional fields for diff / code comments
+    path = models.CharField(max_length=1024, null=True, blank=True)
+    line_number = models.PositiveIntegerField(null=True, blank=True)
+    old_line_number = models.PositiveIntegerField(null=True, blank=True)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["created_at"]
+        indexes = [
+            models.Index(fields=["content_type", "object_id", "created_at"]),
+        ]
+
+    def __str__(self):
+        return f"Comment #{self.id} by {self.author.username} on {self.content_object}"
+

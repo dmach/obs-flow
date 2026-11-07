@@ -30,8 +30,12 @@ This document tracks missing features and planned enhancements for the OBS Flow 
 - [ ] **Review Threads & Resolutions:**
   - Conversation threads attached to code diff lines.
   - Ability to mark review threads as "Resolved" and require all threads to be resolved before merging.
-- [ ] **General PR Discussion Timeline:**
-  - Interactive timeline in PR Overview for comments, review submissions, and state transitions.
+- [x] **Shared Discussion Comments (PRs & Staging Batches):**
+  - Polymorphic Comment model in `core` using `GenericForeignKey` and `GenericRelation`.
+  - HTMX in-place commenting and deletion for both Pull Requests and Staging Batches.
+  - RPC API endpoints (`/api/v1/comment/add`, `/api/v1/comment/list`) and CLI commands (`flow pr comment add/list`, `flow staging comment add/list`).
+- [ ] **General PR Discussion Timeline & Activity Stream:**
+  - Interactive timeline in PR Overview combining comments, review submissions, and state transitions.
   - User mentions (`@user`) and cross-referencing of issues (`#123`, `BUG#456`).
 - [ ] **Suggested Changes:**
   - Reviewers can propose inline code changes within comments.

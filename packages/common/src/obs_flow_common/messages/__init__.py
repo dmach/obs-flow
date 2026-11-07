@@ -105,7 +105,20 @@ from obs_flow_common.messages.staging import (
     StagingReviewReopenRequest,
 )
 
+from obs_flow_common.messages.comments import (
+    CommentDTO,
+    CommentAddRequest,
+    CommentAddResponse,
+    CommentListRequest,
+    CommentListResponse,
+)
+
 __all__ = [
+    "CommentDTO",
+    "CommentAddRequest",
+    "CommentAddResponse",
+    "CommentListRequest",
+    "CommentListResponse",
     "BookmarkDTO",
     "BookmarkListRequest",
     "BookmarkListResponse",

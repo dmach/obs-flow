@@ -1,5 +1,6 @@
 from core.models import Issue, Project
 from django.conf import settings
+from django.contrib.contenttypes.fields import GenericRelation
 from django.db import models
 from django.db.models import Q
 from django.urls import reverse
@@ -39,6 +40,8 @@ class PullRequest(models.Model):
     source_owner = models.CharField(max_length=255)
     source_repo = models.CharField(max_length=255)
     source_branch = models.CharField(max_length=255)
+
+    comments = GenericRelation("core.Comment", related_query_name="pull_request")
 
     class Meta:
         constraints = [

@@ -315,6 +315,12 @@ echo "--- 5. Opening Native Pull Requests ---"
     --source-branch master
 
 echo ""
+echo "--- 6. Adding Discussion Comments ---"
+"${FLOW_BIN}" pr comment add --pr 1 --author geeko --body "Looks good! Did upstream backport the GIL fixes in 3.13.2?"
+"${FLOW_BIN}" pr comment add --pr 1 --author tux --body "Yes, all upstream GIL fixes are included in this tarball."
+"${FLOW_BIN}" staging comment add --batch 1 --author tux --body "Staging batch is collecting packages for Factory release tests."
+
+echo ""
 echo "=== Test data population complete! ==="
 if [[ "${AUTO_STARTED_SERVER}" -eq 1 ]]; then
     if [[ "${KEEP_SERVER}" -eq 1 ]]; then

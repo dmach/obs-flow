@@ -278,3 +278,82 @@ def test_cli_package_show_and_list_filter():
         assert req.name == "bash"
 
 
+def test_cli_pr_comment_add_and_list():
+    from obs_flow_common.messages import CommentDTO, CommentAddResponse, CommentListResponse
+
+    runner = CliRunner()
+    mock_comment = CommentDTO(
+        id=1,
+        target_type="pull_request",
+        target_id="1",
+        author="alice",
+        body="LGTM!",
+        created_at="2026-11-07T12:00:00",
+        updated_at="2026-11-07T12:00:00",
+    )
+
+    with patch("obs_flow_client.comment_add") as mock_add:
+        mock_add.return_value = CommentAddResponse(comment=mock_comment)
+        res = runner.invoke(main, ["pr", "comment", "add", "--pr", "1", "--author", "alice", "--body", "LGTM!"])
+        assert res.exit_code == 0
+        assert "LGTM!" in res.output
+        assert "alice" in res.output
+        mock_add.assert_called_once()
+        req = mock_add.call_args[0][1]
+        assert req.target_type == "pull_request"
+        assert req.target_id == "1"
+        assert req.author == "alice"
+        assert req.body == "LGTM!"
+
+    with patch("obs_flow_client.comment_list") as mock_list:
+        mock_list.return_value = CommentListResponse(comments=[mock_comment])
+        res = runner.invoke(main, ["pr", "comment", "list", "--pr", "1"])
+        assert res.exit_code == 0
+        assert "LGTM!" in res.output
+        assert "alice" in res.output
+        mock_list.assert_called_once()
+        req = mock_list.call_args[0][1]
+        assert req.target_type == "pull_request"
+        assert req.target_id == "1"
+
+
+def test_cli_staging_comment_add_and_list():
+    from obs_flow_common.messages import CommentDTO, CommentAddResponse, CommentListResponse
+
+    runner = CliRunner()
+    mock_comment = CommentDTO(
+        id=42,
+        target_type="staging_batch",
+        target_id="5",
+        author="bob",
+        body="Batch verification started.",
+        created_at="2026-11-07T13:00:00",
+        updated_at="2026-11-07T13:00:00",
+    )
+
+    with patch("obs_flow_client.comment_add") as mock_add:
+        mock_add.return_value = CommentAddResponse(comment=mock_comment)
+        res = runner.invoke(main, ["staging", "comment", "add", "--batch", "5", "--author", "bob", "--body", "Batch verification started."])
+        assert res.exit_code == 0
+        assert "Batch verification started." in res.output
+        assert "bob" in res.output
+        mock_add.assert_called_once()
+        req = mock_add.call_args[0][1]
+        assert req.target_type == "staging_batch"
+        assert req.target_id == "5"
+        assert req.author == "bob"
+        assert req.body == "Batch verification started."
+
+    with patch("obs_flow_client.comment_list") as mock_list:
+        mock_list.return_value = CommentListResponse(comments=[mock_comment])
+        res = runner.invoke(main, ["staging", "comment", "list", "--batch", "5"])
+        assert res.exit_code == 0
+        assert "Batch verification started." in res.output
+        assert "bob" in res.output
+        mock_list.assert_called_once()
+        req = mock_list.call_args[0][1]
+        assert req.target_type == "staging_batch"
+        assert req.target_id == "5"
+
+
+

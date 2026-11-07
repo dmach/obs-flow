@@ -1,9 +1,13 @@
 import urllib.parse
+from django.contrib.contenttypes.models import ContentType
 from django.core.paginator import Paginator
+from django.http import HttpResponse, Http404, HttpResponseBadRequest, HttpResponseForbidden
 from django.shortcuts import render, get_object_or_404
 from django.views.decorators.csrf import ensure_csrf_cookie
+from django.views.decorators.http import require_POST
 
-from core.models import Project, Package
+from accounts.models import User
+from core.models import Project, Package, Comment
 from core.forms import ProjectFilterForm, PackageFilterForm
 
 
@@ -167,7 +171,6 @@ def package_detail(request, project_name, package_name):
         },
     )
 
-from django.http import Http404
 from .git_forge import get_repo_path, ensure_git_repo
 from .git_utils import get_git_tree, get_git_blob, get_git_type, get_git_commits
 
@@ -257,7 +260,6 @@ def package_code(request, project_name, package_name, file_path=""):
         
     return render(request, "core/package_code.html", context)
 
-from django.http import HttpResponse
 
 def project_raw(request, project_name, file_path=""):
     project = get_object_or_404(Project.objects.select_related("org"), name=project_name)
@@ -336,4 +338,82 @@ def package_commits(request, project_name, package_name):
         "commits": commits,
     }
     return render(request, "core/package_commits.html", context)
+
+
+@require_POST
+def comment_add(request):
+    target_type_str = request.POST.get("content_type", "").lower()
+    object_id_str = request.POST.get("object_id", "")
+    body = request.POST.get("body", "").strip()
+
+    if not body:
+        return HttpResponseBadRequest("Comment body cannot be empty.\n")
+
+    if target_type_str in ("pull_request", "pullrequest", "pr"):
+        from pull_requests.models import PullRequest
+        target = get_object_or_404(PullRequest, id=object_id_str)
+        target_type_canonical = "pull_request"
+    elif target_type_str in ("staging_batch", "stagingbatch", "staging", "batch"):
+        from staging.models import StagingBatch
+        target = get_object_or_404(StagingBatch, id=object_id_str)
+        target_type_canonical = "staging_batch"
+    else:
+        return HttpResponseBadRequest(f"Invalid target type '{target_type_str}'.\n")
+
+    if request.user.is_authenticated:
+        author = request.user
+    else:
+        author_name = request.POST.get("author") or "anonymous"
+        author, _ = User.objects.get_or_create(
+            username=author_name,
+            defaults={"username_lower": author_name.lower(), "account_type": User.AccountType.HUMAN},
+        )
+
+    ct = ContentType.objects.get_for_model(target)
+    Comment.objects.create(
+        content_type=ct,
+        object_id=target.id,
+        author=author,
+        body=body,
+    )
+
+    comments = target.comments.select_related("author").order_by("created_at")
+    return render(
+        request,
+        "core/_comments_section.html",
+        {
+            "comments": comments,
+            "comment_target": target,
+            "comment_target_type": target_type_canonical,
+            "comment_target_id": target.id,
+            "user": request.user,
+        },
+    )
+
+
+@require_POST
+def comment_delete(request, comment_id):
+    comment = get_object_or_404(Comment, id=comment_id)
+    target = comment.content_object
+    target_type_canonical = "pull_request" if comment.content_type.model == "pullrequest" else "staging_batch"
+
+    if request.user.is_authenticated and not (request.user == comment.author or request.user.is_superuser):
+        return HttpResponseForbidden("Not authorized to delete this comment.\n")
+
+    target_id = comment.object_id
+    comment.delete()
+
+    comments = target.comments.select_related("author").order_by("created_at") if target else []
+    return render(
+        request,
+        "core/_comments_section.html",
+        {
+            "comments": comments,
+            "comment_target": target,
+            "comment_target_type": target_type_canonical,
+            "comment_target_id": target_id,
+            "user": request.user,
+        },
+    )
+
 

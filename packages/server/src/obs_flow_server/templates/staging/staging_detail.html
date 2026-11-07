@@ -79,6 +79,8 @@
                 <article data-empty><p>No revisions found.</p></article>
             {% endif %}
         </section>
+
+        {% include "core/_comments_section.html" with comment_target=batch comment_target_type="staging_batch" comment_target_id=batch.id comments=comments %}
     </div>
 
     <aside>

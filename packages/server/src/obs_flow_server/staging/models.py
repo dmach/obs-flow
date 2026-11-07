@@ -1,6 +1,7 @@
+from django.conf import settings
+from django.contrib.contenttypes.fields import GenericRelation
 from django.db import models
 from django.db.models import Q
-from django.conf import settings
 
 from core.models import Project
 from pull_requests.models import PullRequestRevision
@@ -32,6 +33,8 @@ class StagingBatch(models.Model):
     collecting_until = models.DateTimeField(null=True, blank=True)
     release_date = models.DateTimeField(null=True, blank=True)
     embargo_date = models.DateTimeField(null=True, blank=True)
+
+    comments = GenericRelation("core.Comment", related_query_name="staging_batch")
 
     class Meta:
         constraints = [

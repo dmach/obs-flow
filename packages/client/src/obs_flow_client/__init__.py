@@ -11,6 +11,10 @@ from obs_flow_client.bookmarks import (
     bookmark_list,
     bookmark_remove,
 )
+from obs_flow_client.comments import (
+    comment_add,
+    comment_list,
+)
 from obs_flow_client.org import (
     org_list,
     org_create,
@@ -70,6 +74,8 @@ __all__ = [
     "bookmark_import",
     "bookmark_list",
     "bookmark_remove",
+    "comment_add",
+    "comment_list",
     "create_connection",
     "org_list",
     "org_create",

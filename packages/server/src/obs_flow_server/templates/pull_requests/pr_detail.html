@@ -89,6 +89,8 @@
                     <article data-empty><p>No revisions found.</p></article>
                 {% endif %}
             </section>
+
+            {% include "core/_comments_section.html" with comment_target=pr comment_target_type="pull_request" comment_target_id=pr.id comments=comments %}
         </div>
 
         <aside>

@@ -199,6 +199,7 @@ def pr_detail(request, project_name, number, package_name=None):
     latest_revision = revisions.first()
     reviews = latest_revision.reviews.all() if latest_revision else []
     git_ctx = _get_pr_git_context(pr)
+    comments = pr.comments.select_related("author").order_by("created_at")
     return render(
         request,
         "pull_requests/pr_detail.html",
@@ -211,6 +212,7 @@ def pr_detail(request, project_name, number, package_name=None):
             "revisions": revisions,
             "latest_revision": latest_revision,
             "reviews": reviews,
+            "comments": comments,
             **git_ctx,
         },
     )

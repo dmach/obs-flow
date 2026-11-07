@@ -168,6 +168,8 @@ def staging_detail(request, batch_id):
     reviews = latest_revision.reviews.all() if latest_revision else []
     can_merge = validate_staging_merge(batch) == []
 
+    comments = batch.comments.select_related("author").order_by("created_at")
+
     return render(
         request,
         "staging/staging_detail.html",
@@ -178,6 +180,7 @@ def staging_detail(request, batch_id):
             "pull_requests_data": pull_requests_data,
             "reviews": reviews,
             "can_merge": can_merge,
+            "comments": comments,
         },
     )
 

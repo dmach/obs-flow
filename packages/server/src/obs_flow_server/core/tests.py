@@ -767,3 +767,145 @@ class TestCodeBrowserViews(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "first")
         self.assertContains(response, f"?ref={commit1_sha}")
+
+
+class TestCommentsAPIAndUI(TransactionTestCase):
+    def setUp(self):
+        self.org = Org.objects.create(name="commentorg")
+        self.proj = Project.objects.create(
+            name="commentproject",
+            org=self.org,
+            branch_name="main",
+            workflow_type=Project.WorkflowType.DIRECT,
+        )
+        self.pkg = Package.objects.create(project=self.proj, name="commentpkg")
+        from pull_requests.models import PullRequest
+        from staging.models import StagingBatch
+        from accounts.models import User
+
+        self.user = User.objects.create_user(
+            username="commenter",
+            password="password",
+            is_local_account=True,
+        )
+        self.pr = PullRequest.objects.create(
+            project=self.proj,
+            package=self.pkg,
+            number=1,
+            title="Fix bug in commentpkg",
+            author=self.user,
+            source_owner="commentorg",
+            source_repo="commentpkg",
+            source_branch="dev",
+        )
+        self.batch = StagingBatch.objects.create(
+            project=self.proj,
+            title="Test Batch 1",
+            author=self.user,
+        )
+
+    def test_comment_api_pull_request(self):
+        payload = {
+            "target_type": "pull_request",
+            "target_id": "commentproject/commentpkg#1",
+            "author": "commenter",
+            "body": "This is a PR review comment.",
+        }
+        with TestClient(api) as client:
+            res = client.post("/api/v1/comment/add", content=json.dumps(payload))
+        self.assertEqual(res.status_code, 200)
+        data = res.json()
+        self.assertEqual(data["comment"]["author"], "commenter")
+        self.assertEqual(data["comment"]["body"], "This is a PR review comment.")
+        self.assertEqual(data["comment"]["target_type"], "pull_request")
+
+        # List comments
+        list_payload = {
+            "target_type": "pull_request",
+            "target_id": "commentproject/commentpkg#1",
+        }
+        with TestClient(api) as client:
+            res_list = client.post("/api/v1/comment/list", content=json.dumps(list_payload))
+        self.assertEqual(res_list.status_code, 200)
+        list_data = res_list.json()
+        self.assertEqual(len(list_data["comments"]), 1)
+        self.assertEqual(list_data["comments"][0]["body"], "This is a PR review comment.")
+
+    def test_comment_api_staging_batch(self):
+        payload = {
+            "target_type": "staging_batch",
+            "target_id": str(self.batch.id),
+            "author": "commenter",
+            "body": "This is a staging batch comment.",
+        }
+        with TestClient(api) as client:
+            res = client.post("/api/v1/comment/add", content=json.dumps(payload))
+        self.assertEqual(res.status_code, 200)
+        data = res.json()
+        self.assertEqual(data["comment"]["author"], "commenter")
+        self.assertEqual(data["comment"]["body"], "This is a staging batch comment.")
+        self.assertEqual(data["comment"]["target_type"], "staging_batch")
+
+        # List comments
+        list_payload = {
+            "target_type": "staging_batch",
+            "target_id": str(self.batch.id),
+        }
+        with TestClient(api) as client:
+            res_list = client.post("/api/v1/comment/list", content=json.dumps(list_payload))
+        self.assertEqual(res_list.status_code, 200)
+        list_data = res_list.json()
+        self.assertEqual(len(list_data["comments"]), 1)
+        self.assertEqual(list_data["comments"][0]["body"], "This is a staging batch comment.")
+
+    def test_comment_htmx_views_pr(self):
+        # 1. Add comment via HTMX endpoint
+        res = self.client.post(
+            "/comments/add/",
+            data={
+                "content_type": "pull_request",
+                "object_id": str(self.pr.id),
+                "author": "commenter",
+                "body": "First HTMX PR comment!",
+            },
+        )
+        self.assertEqual(res.status_code, 200)
+        self.assertContains(res, "First HTMX PR comment!")
+        self.assertContains(res, "commenter")
+
+        # 2. View PR detail page includes comments section
+        res_detail = self.client.get(f"/packages/{self.proj.name}/{self.pkg.name}/pull-requests/{self.pr.number}/")
+        self.assertEqual(res_detail.status_code, 200)
+        self.assertContains(res_detail, "First HTMX PR comment!")
+        self.assertContains(res_detail, "Discussion")
+
+        # 3. Delete comment via HTMX endpoint
+        from core.models import Comment
+        comment = Comment.objects.first()
+        self.client.force_login(self.user)
+        res_del = self.client.post(f"/comments/{comment.id}/delete/")
+        self.assertEqual(res_del.status_code, 200)
+        self.assertNotContains(res_del, "First HTMX PR comment!")
+        self.assertContains(res_del, "No comments yet.")
+
+    def test_comment_htmx_views_staging(self):
+        # 1. Add comment via HTMX endpoint
+        res = self.client.post(
+            "/comments/add/",
+            data={
+                "content_type": "staging_batch",
+                "object_id": str(self.batch.id),
+                "author": "commenter",
+                "body": "First HTMX Staging comment!",
+            },
+        )
+        self.assertEqual(res.status_code, 200)
+        self.assertContains(res, "First HTMX Staging comment!")
+        self.assertContains(res, "commenter")
+
+        # 2. View Staging detail page includes comments section
+        res_detail = self.client.get(f"/staging/{self.batch.id}/")
+        self.assertEqual(res_detail.status_code, 200)
+        self.assertContains(res_detail, "First HTMX Staging comment!")
+        self.assertContains(res_detail, "Discussion")
+

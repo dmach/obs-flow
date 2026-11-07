@@ -99,5 +99,7 @@ urlpatterns = [
         staging_views.staging_ui_modal_confirm_add,
         name="staging_ui_modal_confirm_add",
     ),
+    path("comments/add/", core_views.comment_add, name="comment_add"),
+    path("comments/<int:comment_id>/delete/", core_views.comment_delete, name="comment_delete"),
     path("", include("git_transport.urls")),
 ]
