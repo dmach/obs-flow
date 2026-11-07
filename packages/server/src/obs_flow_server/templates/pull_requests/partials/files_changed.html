@@ -68,7 +68,7 @@
                                         {% if user.is_authenticated %}
                                             <details>
                                                 <summary title="Add inline comment">+</summary>
-                                                <form hx-post="{% url 'pr_inline_comment_add' %}" hx-target="closest tr" hx-swap="afterend">
+                                                <form hx-post="{% url 'pr_inline_comment_add' %}" hx-target="closest tr" hx-swap="afterend" onsubmit="this.closest('details').removeAttribute('open'); this.reset();">
                                                     {% csrf_token %}
                                                     <input type="hidden" name="pr_id" value="{{ pr.id }}">
                                                     <input type="hidden" name="revision_id" value="{{ current_revision.id }}">
@@ -91,7 +91,7 @@
                                         {% if user.is_authenticated %}
                                             <details>
                                                 <summary title="Add inline comment">+</summary>
-                                                <form hx-post="{% url 'pr_inline_comment_add' %}" hx-target="closest tr" hx-swap="afterend">
+                                                <form hx-post="{% url 'pr_inline_comment_add' %}" hx-target="closest tr" hx-swap="afterend" onsubmit="this.closest('details').removeAttribute('open'); this.reset();">
                                                     {% csrf_token %}
                                                     <input type="hidden" name="pr_id" value="{{ pr.id }}">
                                                     <input type="hidden" name="revision_id" value="{{ current_revision.id }}">
@@ -116,7 +116,7 @@
                                         {% if user.is_authenticated %}
                                             <details>
                                                 <summary title="Add inline comment">+</summary>
-                                                <form hx-post="{% url 'pr_inline_comment_add' %}" hx-target="closest tr" hx-swap="afterend">
+                                                <form hx-post="{% url 'pr_inline_comment_add' %}" hx-target="closest tr" hx-swap="afterend" onsubmit="this.closest('details').removeAttribute('open'); this.reset();">
                                                     {% csrf_token %}
                                                     <input type="hidden" name="pr_id" value="{{ pr.id }}">
                                                     <input type="hidden" name="revision_id" value="{{ current_revision.id }}">
