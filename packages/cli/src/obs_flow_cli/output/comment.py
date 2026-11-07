@@ -21,6 +21,15 @@ class CommentRenderer(Renderer):
     created_at = Field(
         label="Created At",
     )
+    path = Field(
+        label="Path",
+    )
+    line_number = Field(
+        label="Line",
+    )
+    revision_id = Field(
+        label="Revision",
+    )
     body = Field(
         label="Comment",
     )

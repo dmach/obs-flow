@@ -1130,6 +1130,72 @@ table[data-diff] td[colspan] {
 	border-right: 1px solid var(--flow-border-muted);
 }
 
+/* Inline diff threads & triggers */
+table[data-diff] tr[data-thread] {
+	background-color: var(--flow-bg);
+}
+table[data-diff] tr[data-thread] > td {
+	padding: 0.75rem 1rem;
+	border-right: 0;
+	text-align: left;
+}
+table[data-diff] tr[data-thread] article {
+	margin: 0;
+	background: var(--flow-bg-subtle);
+}
+table[data-diff] tr[data-thread] article article {
+	margin-top: 0.5rem;
+	background: var(--flow-bg);
+}
+table[data-diff] td details {
+	display: inline-block;
+	margin: 0;
+}
+table[data-diff] td details summary {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 1.15rem;
+	height: 1.15rem;
+	padding: 0;
+	border-radius: var(--flow-radius);
+	background: var(--flow-bg-hover);
+	color: var(--flow-fg-muted);
+	font-size: 0.857rem;
+	font-weight: 600;
+	cursor: pointer;
+	user-select: none;
+	list-style: none;
+	vertical-align: middle;
+}
+table[data-diff] td details summary::-webkit-details-marker {
+	display: none;
+}
+table[data-diff] td details summary:hover {
+	background: var(--flow-fg-accent);
+	color: var(--flow-on-solid);
+}
+table[data-diff] td details[open] {
+	position: relative;
+}
+table[data-diff] td details[open] > form {
+	position: absolute;
+	left: 0;
+	z-index: 50;
+	width: 24rem;
+	padding: 0.75rem;
+	border: 1px solid var(--flow-border);
+	border-radius: var(--flow-radius);
+	background: var(--flow-bg);
+	box-shadow: var(--flow-shadow);
+	text-align: left;
+}
+table[data-diff] td details[open] > form textarea {
+	width: 100%;
+	box-sizing: border-box;
+	margin-bottom: 0.5rem;
+}
+
 /* Discussion comments */
 section#comments-section {
 	margin-top: 2rem;

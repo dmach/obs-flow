@@ -24,12 +24,12 @@ This document tracks missing features and planned enhancements for the OBS Flow 
 ---
 
 ## 2. Advanced Code Review & Pull Request Features
-- [ ] **Inline Code Comments:**
-  - Comment on specific lines or hunk ranges in the "Files Changed" diff view.
-  - Multi-line commenting support.
-- [ ] **Review Threads & Resolutions:**
-  - Conversation threads attached to code diff lines.
-  - Ability to mark review threads as "Resolved" and require all threads to be resolved before merging.
+- [x] **Inline Code Comments:**
+  - Comment on specific lines in the "Files Changed" diff view with explicit revision context.
+  - Multi-line / hunk comment threads attached to revisions.
+- [x] **Review Threads & Resolutions:**
+  - Conversation threads attached to code diff lines with multi-revision lifecycle (current vs outdated).
+  - Ability to mark review threads as "Resolved" or reopen them.
 - [x] **Shared Discussion Comments (PRs & Staging Batches):**
   - Polymorphic Comment model in `core` using `GenericForeignKey` and `GenericRelation`.
   - HTMX in-place commenting and deletion for both Pull Requests and Staging Batches.

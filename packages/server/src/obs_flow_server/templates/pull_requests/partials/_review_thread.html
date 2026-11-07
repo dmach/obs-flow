@@ -1,0 +1,53 @@
+{% load static %}
+<article id="thread-{{ thread.id }}">
+    <header>
+        <div>
+            <img class="icon" src="{% static 'vendor/octicons/comment-16.svg' %}" alt="" />
+            <strong>{{ thread.path }}:{{ thread.line_number }}</strong>
+            <small>(Rev {{ thread.original_revision.revision_number }})</small>
+            {% if thread.is_resolved %}
+                <data data-variant="success" value="resolved">Resolved</data>
+            {% else %}
+                <data data-variant="warning" value="open">Open</data>
+            {% endif %}
+        </div>
+        <div>
+            {% if user.is_authenticated %}
+                <form hx-post="{% url 'pr_thread_resolve' thread.id %}" hx-target="#thread-{{ thread.id }}" hx-swap="outerHTML">
+                    {% csrf_token %}
+                    <button type="submit">
+                        {% if thread.is_resolved %}Reopen{% else %}Resolve{% endif %}
+                    </button>
+                </form>
+            {% endif %}
+        </div>
+    </header>
+
+    {% for comment in thread.comments.all %}
+        <article id="comment-{{ comment.id }}">
+            <header>
+                <div>
+                    <img class="icon" src="{% static 'vendor/octicons/person-16.svg' %}" alt="" />
+                    <strong>{{ comment.author.username }}</strong>
+                    <small>commented on {{ comment.created_at|date:"Y-m-d H:i" }}</small>
+                </div>
+            </header>
+            <p>{{ comment.body }}</p>
+        </article>
+    {% endfor %}
+
+    {% if user.is_authenticated %}
+        <form hx-post="{% url 'pr_inline_comment_add' %}" hx-target="#thread-{{ thread.id }}" hx-swap="outerHTML">
+            {% csrf_token %}
+            <input type="hidden" name="pr_id" value="{{ pr.id }}">
+            <input type="hidden" name="thread_id" value="{{ thread.id }}">
+            <input type="hidden" name="revision_id" value="{{ current_revision.id }}">
+            <input type="hidden" name="path" value="{{ thread.path }}">
+            <input type="hidden" name="line_number" value="{{ thread.line_number }}">
+            <textarea name="body" placeholder="Reply..." rows="2" required></textarea>
+            <footer>
+                <button type="submit" data-variant="primary">Reply</button>
+            </footer>
+        </form>
+    {% endif %}
+</article>

@@ -191,3 +191,30 @@ class PullRequestReview(BaseReview):
     def __str__(self):
         reviewer = self.reviewer_user or self.reviewer_group or self.dynamic_role
         return f"Review for {self.revision}: {reviewer} ({self.state})"
+
+
+class ReviewThread(models.Model):
+    pull_request = models.ForeignKey(PullRequest, on_delete=models.CASCADE, related_name="review_threads")
+    original_revision = models.ForeignKey(PullRequestRevision, on_delete=models.CASCADE, related_name="review_threads")
+    original_commit_sha = models.CharField(max_length=64)
+    path = models.CharField(max_length=1024)
+    line_number = models.IntegerField()
+    is_resolved = models.BooleanField(default=False)
+    resolved_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="resolved_threads",
+    )
+    resolved_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    comments = GenericRelation("core.Comment", related_query_name="review_thread")
+
+    class Meta:
+        ordering = ["created_at"]
+
+    def __str__(self):
+        return f"Thread on {self.pull_request} ({self.path}:{self.line_number})"
+

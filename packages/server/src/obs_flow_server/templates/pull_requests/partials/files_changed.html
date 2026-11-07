@@ -2,8 +2,24 @@
 
 <div>
     <div role="status">
-        <strong>{{ files_count }} changed file{{ files_count|pluralize }}</strong>
-        with <data data-variant="success">+{{ total_additions }}</data> and <data data-variant="danger">-{{ total_deletions }}</data>
+        <div>
+            <strong>{{ files_count }} changed file{{ files_count|pluralize }}</strong>
+            with <data data-variant="success">+{{ total_additions }}</data> and <data data-variant="danger">-{{ total_deletions }}</data>
+        </div>
+        {% if revisions and revisions|length > 1 %}
+            <div>
+                <form method="get" action="{{ pr.files_changed_url }}">
+                    <label for="rev-select">Revision: </label>
+                    <select id="rev-select" name="rev" onchange="this.form.submit()">
+                        {% for rev in revisions %}
+                            <option value="{{ rev.revision_number }}" {% if rev.id == current_revision.id %}selected{% endif %}>
+                                Rev {{ rev.revision_number }} ({{ rev.fingerprint|slice:":8" }}){% if forloop.first %} (latest){% endif %}
+                            </option>
+                        {% endfor %}
+                    </select>
+                </form>
+            </div>
+        {% endif %}
     </div>
 
     {% for file in files %}
@@ -47,22 +63,91 @@
                             {% elif line.type == 'add' %}
                                 <tr data-line="add">
                                     <td></td>
-                                    <td>{{ line.new_no }}</td>
+                                    <td>
+                                        {{ line.new_no }}
+                                        {% if user.is_authenticated %}
+                                            <details>
+                                                <summary title="Add inline comment">+</summary>
+                                                <form hx-post="{% url 'pr_inline_comment_add' %}" hx-target="closest tr" hx-swap="afterend">
+                                                    {% csrf_token %}
+                                                    <input type="hidden" name="pr_id" value="{{ pr.id }}">
+                                                    <input type="hidden" name="revision_id" value="{{ current_revision.id }}">
+                                                    <input type="hidden" name="path" value="{{ file.path }}">
+                                                    <input type="hidden" name="line_number" value="{{ line.new_no }}">
+                                                    <textarea name="body" placeholder="Comment on line {{ line.new_no }}..." rows="3" required></textarea>
+                                                    <footer>
+                                                        <button type="submit" data-variant="primary">Comment</button>
+                                                    </footer>
+                                                </form>
+                                            </details>
+                                        {% endif %}
+                                    </td>
                                     <td>+ {{ line.text }}</td>
                                 </tr>
                             {% elif line.type == 'del' %}
                                 <tr data-line="del">
-                                    <td>{{ line.old_no }}</td>
+                                    <td>
+                                        {{ line.old_no }}
+                                        {% if user.is_authenticated %}
+                                            <details>
+                                                <summary title="Add inline comment">+</summary>
+                                                <form hx-post="{% url 'pr_inline_comment_add' %}" hx-target="closest tr" hx-swap="afterend">
+                                                    {% csrf_token %}
+                                                    <input type="hidden" name="pr_id" value="{{ pr.id }}">
+                                                    <input type="hidden" name="revision_id" value="{{ current_revision.id }}">
+                                                    <input type="hidden" name="path" value="{{ file.path }}">
+                                                    <input type="hidden" name="line_number" value="{{ line.old_no }}">
+                                                    <textarea name="body" placeholder="Comment on line {{ line.old_no }}..." rows="3" required></textarea>
+                                                    <footer>
+                                                        <button type="submit" data-variant="primary">Comment</button>
+                                                    </footer>
+                                                </form>
+                                            </details>
+                                        {% endif %}
+                                    </td>
                                     <td></td>
                                     <td>- {{ line.text }}</td>
                                 </tr>
                             {% else %}
                                 <tr>
                                     <td>{{ line.old_no }}</td>
-                                    <td>{{ line.new_no }}</td>
+                                    <td>
+                                        {{ line.new_no }}
+                                        {% if user.is_authenticated %}
+                                            <details>
+                                                <summary title="Add inline comment">+</summary>
+                                                <form hx-post="{% url 'pr_inline_comment_add' %}" hx-target="closest tr" hx-swap="afterend">
+                                                    {% csrf_token %}
+                                                    <input type="hidden" name="pr_id" value="{{ pr.id }}">
+                                                    <input type="hidden" name="revision_id" value="{{ current_revision.id }}">
+                                                    <input type="hidden" name="path" value="{{ file.path }}">
+                                                    <input type="hidden" name="line_number" value="{{ line.new_no }}">
+                                                    <textarea name="body" placeholder="Comment on line {{ line.new_no }}..." rows="3" required></textarea>
+                                                    <footer>
+                                                        <button type="submit" data-variant="primary">Comment</button>
+                                                    </footer>
+                                                </form>
+                                            </details>
+                                        {% endif %}
+                                    </td>
                                     <td>  {{ line.text }}</td>
                                 </tr>
                             {% endif %}
+
+                            {% for thread in line.threads %}
+                                <tr data-thread>
+                                    <td colspan="3">
+                                        {% if thread.is_outdated %}
+                                            <details>
+                                                <summary><small>Outdated comment on Rev {{ thread.original_revision.revision_number }}</small></summary>
+                                                {% include "pull_requests/partials/_review_thread.html" %}
+                                            </details>
+                                        {% else %}
+                                            {% include "pull_requests/partials/_review_thread.html" %}
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                            {% endfor %}
                         {% endfor %}
                     </tbody>
                 </table>

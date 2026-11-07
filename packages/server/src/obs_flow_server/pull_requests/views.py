@@ -3,6 +3,7 @@ import urllib.parse
 from django.contrib import messages
 from django.core.paginator import Paginator
 from django.db.models import Q
+from django.http import HttpResponse
 from django.shortcuts import render, get_object_or_404, redirect
 from django.utils import timezone
 from django.views.decorators.csrf import ensure_csrf_cookie
@@ -10,7 +11,7 @@ from django.views.decorators.http import require_POST
 
 from core.htmx import close_modal_and_refresh
 from core.models import Project
-from pull_requests.models import PullRequest
+from pull_requests.models import PullRequest, PullRequestReview, ReviewThread
 from pull_requests.forms import PullRequestFilterForm
 from pull_requests.workflows import execute_pr_merge, mark_draft, mark_ready_for_review, validate_pr_merge
 
@@ -169,16 +170,60 @@ def get_pr_or_404(project_name, number, package_name=None):
     return get_object_or_404(qs, project__name=project_name, package__name=package_name, number=number)
 
 
-def _get_pr_git_context(pr):
+def _get_pr_git_context(pr, revision=None):
+    import subprocess
     from core.git_utils import ensure_pr_git_refs, get_git_commits, get_git_diff
 
     try:
-        repo_path, target_ref, source_ref = ensure_pr_git_refs(pr)
+        repo_path, default_target_ref, default_source_ref = ensure_pr_git_refs(pr)
+        if revision and revision.head_sha and revision.base_sha:
+            target_ref = revision.base_sha
+            source_ref = revision.head_sha
+        else:
+            target_ref = default_target_ref
+            source_ref = default_source_ref
+
         commits = get_git_commits(repo_path, ref=f"{target_ref}..{source_ref}")
         files = get_git_diff(repo_path, base_ref=target_ref, head_ref=source_ref)
     except Exception:
         commits = []
         files = []
+        repo_path = None
+
+    threads = list(
+        pr.review_threads.all()
+        .prefetch_related("comments__author", "original_revision")
+        .order_by("created_at")
+    )
+    for file in files:
+        file_path = file.get("path")
+        file_threads = [t for t in threads if t.path == file_path]
+        for thread in file_threads:
+            is_outdated = False
+            if revision and thread.original_revision_id != revision.id and repo_path:
+                try:
+                    diff_proc = subprocess.run(
+                        ["git", "diff", f"{thread.original_commit_sha}..{revision.head_sha}", "--", file_path],
+                        cwd=str(repo_path),
+                        capture_output=True,
+                        text=True,
+                    )
+                    if diff_proc.stdout.strip():
+                        is_outdated = True
+                except Exception:
+                    is_outdated = True
+            thread.is_outdated = is_outdated
+
+            matched = False
+            for line in file.get("lines", []):
+                if line.get("new_no") == thread.line_number or (
+                    not line.get("new_no") and line.get("old_no") == thread.line_number
+                ):
+                    line.setdefault("threads", []).append(thread)
+                    matched = True
+                    break
+            if not matched and file.get("lines"):
+                file["lines"][0].setdefault("threads", []).append(thread)
 
     total_additions = sum(f.get("additions", 0) for f in files)
     total_deletions = sum(f.get("deletions", 0) for f in files)
@@ -190,6 +235,7 @@ def _get_pr_git_context(pr):
         "files_count": len(files),
         "total_additions": total_additions,
         "total_deletions": total_deletions,
+        "review_threads": threads,
     }
 
 
@@ -198,7 +244,7 @@ def pr_detail(request, project_name, number, package_name=None):
     revisions = pr.revisions.all().order_by("-revision_number")
     latest_revision = revisions.first()
     reviews = latest_revision.reviews.all() if latest_revision else []
-    git_ctx = _get_pr_git_context(pr)
+    git_ctx = _get_pr_git_context(pr, revision=latest_revision)
     comments = pr.comments.select_related("author").order_by("created_at")
     return render(
         request,
@@ -211,6 +257,7 @@ def pr_detail(request, project_name, number, package_name=None):
             "active_subtab": "overview",
             "revisions": revisions,
             "latest_revision": latest_revision,
+            "current_revision": latest_revision,
             "reviews": reviews,
             "comments": comments,
             **git_ctx,
@@ -223,7 +270,7 @@ def pr_commits(request, project_name, number, package_name=None):
     revisions = pr.revisions.all().order_by("-revision_number")
     latest_revision = revisions.first()
     reviews = latest_revision.reviews.all() if latest_revision else []
-    git_ctx = _get_pr_git_context(pr)
+    git_ctx = _get_pr_git_context(pr, revision=latest_revision)
     return render(
         request,
         "pull_requests/pr_detail.html",
@@ -235,6 +282,7 @@ def pr_commits(request, project_name, number, package_name=None):
             "active_subtab": "commits",
             "revisions": revisions,
             "latest_revision": latest_revision,
+            "current_revision": latest_revision,
             "reviews": reviews,
             **git_ctx,
         },
@@ -244,9 +292,18 @@ def pr_commits(request, project_name, number, package_name=None):
 def pr_files_changed(request, project_name, number, package_name=None):
     pr = get_pr_or_404(project_name, number, package_name)
     revisions = pr.revisions.all().order_by("-revision_number")
-    latest_revision = revisions.first()
-    reviews = latest_revision.reviews.all() if latest_revision else []
-    git_ctx = _get_pr_git_context(pr)
+    rev_param = request.GET.get("rev")
+    if rev_param:
+        current_revision = (
+            pr.revisions.filter(revision_number=rev_param).first()
+            or pr.revisions.filter(id=rev_param).first()
+            or revisions.first()
+        )
+    else:
+        current_revision = revisions.first()
+
+    reviews = current_revision.reviews.all() if current_revision else []
+    git_ctx = _get_pr_git_context(pr, revision=current_revision)
     return render(
         request,
         "pull_requests/pr_detail.html",
@@ -257,9 +314,99 @@ def pr_files_changed(request, project_name, number, package_name=None):
             "active_tab": "pull_requests",
             "active_subtab": "files_changed",
             "revisions": revisions,
-            "latest_revision": latest_revision,
+            "latest_revision": revisions.first(),
+            "current_revision": current_revision,
             "reviews": reviews,
             **git_ctx,
+        },
+    )
+
+
+@require_POST
+def pr_inline_comment_add(request):
+    if not request.user.is_authenticated:
+        return HttpResponse("Unauthorized", status=401)
+    pr_id = request.POST.get("pr_id")
+    pr = get_object_or_404(PullRequest, id=pr_id)
+    revision_id = request.POST.get("revision_id")
+    path = request.POST.get("path", "").strip()
+    line_number_raw = request.POST.get("line_number", 0)
+    line_number = int(line_number_raw) if str(line_number_raw).isdigit() else 0
+    body = request.POST.get("body", "").strip()
+    thread_id = request.POST.get("thread_id")
+
+    if not body:
+        return HttpResponse("Comment body cannot be empty", status=400)
+
+    if thread_id:
+        thread = get_object_or_404(ReviewThread, id=thread_id, pull_request=pr)
+    else:
+        if not path or not line_number:
+            return HttpResponse("Missing path or line number", status=400)
+
+        if revision_id:
+            rev = (
+                pr.revisions.filter(id=revision_id).first()
+                or pr.revisions.filter(revision_number=revision_id).first()
+            )
+        else:
+            rev = pr.revisions.order_by("-revision_number").first()
+
+        if not rev:
+            return HttpResponse("No valid revision found for PR", status=400)
+
+        thread = pr.review_threads.filter(path=path, line_number=line_number, is_resolved=False).first()
+        if not thread:
+            thread = ReviewThread.objects.create(
+                pull_request=pr,
+                original_revision=rev,
+                original_commit_sha=rev.head_sha,
+                path=path,
+                line_number=line_number,
+            )
+
+    from django.contrib.contenttypes.models import ContentType
+    from core.models import Comment
+    ct = ContentType.objects.get_for_model(ReviewThread)
+    Comment.objects.create(
+        content_type=ct,
+        object_id=str(thread.id),
+        author=request.user,
+        body=body,
+        path=thread.path,
+        line_number=thread.line_number,
+    )
+
+    return render(
+        request,
+        "pull_requests/partials/_review_thread.html",
+        {
+            "thread": thread,
+            "pr": pr,
+            "current_revision": thread.original_revision,
+            "user": request.user,
+        },
+    )
+
+
+@require_POST
+def pr_thread_resolve(request, thread_id):
+    if not request.user.is_authenticated:
+        return HttpResponse("Unauthorized", status=401)
+    thread = get_object_or_404(ReviewThread, id=thread_id)
+    thread.is_resolved = not thread.is_resolved
+    thread.resolved_by = request.user if thread.is_resolved else None
+    thread.resolved_at = timezone.now() if thread.is_resolved else None
+    thread.save()
+
+    return render(
+        request,
+        "pull_requests/partials/_review_thread.html",
+        {
+            "thread": thread,
+            "pr": thread.pull_request,
+            "current_revision": thread.original_revision,
+            "user": request.user,
         },
     )
 

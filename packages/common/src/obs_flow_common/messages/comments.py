@@ -11,6 +11,7 @@ class CommentDTO(msgspec.Struct):
     updated_at: str
     path: str | None = None
     line_number: int | None = None
+    revision_id: int | None = None
 
 
 class CommentAddRequest(msgspec.Struct):
@@ -20,6 +21,7 @@ class CommentAddRequest(msgspec.Struct):
     body: str
     path: str | None = None
     line_number: int | None = None
+    revision_id: int | None = None
 
 
 class CommentAddResponse(msgspec.Struct):

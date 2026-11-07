@@ -101,5 +101,7 @@ urlpatterns = [
     ),
     path("comments/add/", core_views.comment_add, name="comment_add"),
     path("comments/<int:comment_id>/delete/", core_views.comment_delete, name="comment_delete"),
+    path("pull-requests/comments/inline/", pr_views.pr_inline_comment_add, name="pr_inline_comment_add"),
+    path("pull-requests/threads/<int:thread_id>/resolve/", pr_views.pr_thread_resolve, name="pr_thread_resolve"),
     path("", include("git_transport.urls")),
 ]

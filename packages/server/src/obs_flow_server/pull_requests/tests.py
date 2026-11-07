@@ -1907,6 +1907,8 @@ class TestPRTabsAndDiffViews(TestCase):
         subprocess.run(["git", "add", "foo.txt"], cwd=str(work_dir), check=True)
         subprocess.run(["git", "commit", "-m", "Initial commit"], cwd=str(work_dir), check=True, capture_output=True)
         subprocess.run(["git", "push", "origin", "main"], cwd=str(work_dir), check=True, capture_output=True)
+        base_proc = subprocess.run(["git", "rev-parse", "HEAD"], cwd=str(work_dir), capture_output=True, text=True, check=True)
+        self.base_sha = base_proc.stdout.strip()
 
         # In work_dir, checkout feat, add changes, and push to source repo
         subprocess.run(["git", "remote", "add", "source", str(self.source_repo)], cwd=str(work_dir), check=True)
@@ -1916,6 +1918,9 @@ class TestPRTabsAndDiffViews(TestCase):
         subprocess.run(["git", "add", "foo.txt", "bar.spec"], cwd=str(work_dir), check=True)
         subprocess.run(["git", "commit", "-m", "feat: Add bar.spec and update foo.txt"], cwd=str(work_dir), check=True, capture_output=True)
         subprocess.run(["git", "push", "source", "feat"], cwd=str(work_dir), check=True, capture_output=True)
+        head_proc = subprocess.run(["git", "rev-parse", "HEAD"], cwd=str(work_dir), capture_output=True, text=True, check=True)
+        self.head_sha = head_proc.stdout.strip()
+        self.work_dir = work_dir
 
         self.pr = PullRequest.objects.create(
             project=self.project,
@@ -1930,8 +1935,8 @@ class TestPRTabsAndDiffViews(TestCase):
         self.rev = PullRequestRevision.objects.create(
             pull_request=self.pr,
             revision_number=1,
-            head_sha="0" * 40,
-            base_sha="0" * 40,
+            head_sha=self.head_sha,
+            base_sha=self.base_sha,
             fingerprint="fp1",
             is_draft=False,
         )
@@ -1993,5 +1998,152 @@ deleted file mode 100644
         self.assertEqual(diffs[1]["path"], "deleted.txt")
         self.assertEqual(diffs[1]["status"], "deleted")
         self.assertEqual(diffs[1]["deletions"], 1)
+
+    def test_inline_comment_create_and_render(self):
+        from django.urls import reverse
+        client = Client()
+        client.force_login(self.user)
+        rev = self.pr.revisions.first()
+
+        # Post inline comment
+        res = client.post(
+            reverse("pr_inline_comment_add"),
+            {
+                "pr_id": self.pr.id,
+                "revision_id": rev.id,
+                "path": "foo.txt",
+                "line_number": 2,
+                "body": "Need tests for foo.txt changes",
+            },
+        )
+        self.assertEqual(res.status_code, 200)
+        self.assertContains(res, "Need tests for foo.txt changes")
+        self.assertContains(res, "foo.txt:2")
+
+        # Verify ReviewThread created
+        from pull_requests.models import ReviewThread
+        thread = ReviewThread.objects.get(pull_request=self.pr, path="foo.txt", line_number=2)
+        self.assertEqual(thread.original_revision, rev)
+        self.assertEqual(thread.original_commit_sha, rev.head_sha)
+        self.assertFalse(thread.is_resolved)
+        self.assertEqual(thread.comments.count(), 1)
+        self.assertEqual(thread.comments.first().body, "Need tests for foo.txt changes")
+
+        # Verify rendered in files_changed view
+        res = client.get(self.pr.files_changed_url)
+        self.assertEqual(res.status_code, 200)
+        self.assertContains(res, "Need tests for foo.txt changes")
+        self.assertContains(res, "foo.txt:2")
+
+        # Resolve thread
+        res = client.post(reverse("pr_thread_resolve", kwargs={"thread_id": thread.id}))
+        self.assertEqual(res.status_code, 200)
+        thread.refresh_from_db()
+        self.assertTrue(thread.is_resolved)
+        self.assertEqual(thread.resolved_by, self.user)
+        self.assertIsNotNone(thread.resolved_at)
+
+        # Reopen thread
+        res = client.post(reverse("pr_thread_resolve", kwargs={"thread_id": thread.id}))
+        self.assertEqual(res.status_code, 200)
+        thread.refresh_from_db()
+        self.assertFalse(thread.is_resolved)
+        self.assertIsNone(thread.resolved_by)
+
+    def test_multi_revision_inline_comment_outdated(self):
+        client = Client()
+        client.force_login(self.user)
+        rev1 = self.pr.revisions.first()
+
+        # Comment on rev1
+        import subprocess
+        from pull_requests.models import ReviewThread, PullRequestRevision
+        from core.models import Comment
+        from django.contrib.contenttypes.models import ContentType
+
+        thread = ReviewThread.objects.create(
+            pull_request=self.pr,
+            original_revision=rev1,
+            original_commit_sha=rev1.head_sha,
+            path="foo.txt",
+            line_number=2,
+        )
+        Comment.objects.create(
+            content_type=ContentType.objects.get_for_model(ReviewThread),
+            object_id=str(thread.id),
+            author=self.user,
+            body="Rev 1 comment",
+            path="foo.txt",
+            line_number=2,
+        )
+
+        # Create rev2 by committing and pushing changes to foo.txt
+        (self.work_dir / "foo.txt").write_text("initial line\nupdated second line\nthird line\n")
+        subprocess.run(["git", "add", "foo.txt"], cwd=str(self.work_dir), check=True)
+        subprocess.run(["git", "commit", "-m", "update foo"], cwd=str(self.work_dir), check=True, capture_output=True)
+        subprocess.run(["git", "push", "source", "feat"], cwd=str(self.work_dir), check=True, capture_output=True)
+        rev2_head = subprocess.run(["git", "rev-parse", "HEAD"], cwd=str(self.work_dir), capture_output=True, text=True, check=True).stdout.strip()
+
+        rev2 = PullRequestRevision.objects.create(
+            pull_request=self.pr,
+            revision_number=2,
+            head_sha=rev2_head,
+            base_sha=self.base_sha,
+            fingerprint="rev2fingerprint",
+        )
+
+        # Viewing latest (rev2): foo.txt changed between rev1's head_sha and rev2's head_sha
+        res = client.get(self.pr.files_changed_url)
+        self.assertEqual(res.status_code, 200)
+        self.assertContains(res, "Outdated comment on Rev 1")
+        self.assertContains(res, "Rev 1 comment")
+
+        # Viewing rev1 explicitly via ?rev=1
+        res = client.get(f"{self.pr.files_changed_url}?rev=1")
+        self.assertEqual(res.status_code, 200)
+        self.assertNotContains(res, "Outdated comment on Rev 1")
+        self.assertContains(res, "Rev 1 comment")
+
+    def test_rpc_api_inline_comment_with_revision(self):
+        from django_bolt.testing import TestClient
+        from core.api import api
+        rev = self.pr.revisions.first()
+
+        payload = {
+            "target_type": "pull_request",
+            "target_id": self.pr.formatted_id,
+            "author": self.user.username,
+            "body": "API inline comment",
+            "path": "bar.spec",
+            "line_number": 1,
+            "revision_id": rev.id,
+        }
+        with TestClient(api) as client:
+            res = client.post(
+                "/api/v1/comment/add",
+                content=json.dumps(payload),
+            )
+            self.assertEqual(res.status_code, 200)
+            data = res.json()
+            self.assertEqual(data["comment"]["path"], "bar.spec")
+            self.assertEqual(data["comment"]["line_number"], 1)
+            self.assertEqual(data["comment"]["revision_id"], rev.id)
+
+            # List comments
+            list_payload = {
+                "target_type": "pull_request",
+                "target_id": self.pr.formatted_id,
+            }
+            res = client.post(
+                "/api/v1/comment/list",
+                content=json.dumps(list_payload),
+            )
+            self.assertEqual(res.status_code, 200)
+            comments = res.json()["comments"]
+            inline_c = next((c for c in comments if c["path"] == "bar.spec"), None)
+            self.assertIsNotNone(inline_c)
+            self.assertEqual(inline_c["body"], "API inline comment")
+            self.assertEqual(inline_c["revision_id"], rev.id)
+
 
 

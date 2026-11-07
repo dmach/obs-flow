@@ -1,6 +1,7 @@
 import msgspec
 from asgiref.sync import sync_to_async
 from django.db import transaction
+from django.db.models import Q
 
 from obs_flow_common.messages import (
     OrgDetail,
@@ -248,10 +249,21 @@ def _resolve_comment_target(target_type: str, target_id: str):
             num = int(num_str)
             parts = repo.split("/")
             if len(parts) == 2:
-                proj_name, pkg_name = parts[0], parts[1]
-                return PullRequest.objects.get(project__name=proj_name, package__name=pkg_name, number=num)
+                owner_or_proj, pkg_name = parts[0], parts[1]
+                pr = PullRequest.objects.filter(
+                    Q(project__org__name=owner_or_proj) | Q(project__name=owner_or_proj),
+                    package__name=pkg_name,
+                    number=num,
+                ).first()
+                if pr:
+                    return pr
+                return PullRequest.objects.get(project__name=owner_or_proj, package__name=pkg_name, number=num)
             else:
-                return PullRequest.objects.get(project__name=repo, package__isnull=True, number=num)
+                return PullRequest.objects.get(
+                    Q(project__org__name=repo) | Q(project__name=repo),
+                    package__isnull=True,
+                    number=num,
+                )
         elif target_id.isdigit():
             pr = PullRequest.objects.filter(id=int(target_id)).first()
             if pr:
@@ -271,11 +283,23 @@ def _resolve_comment_target(target_type: str, target_id: str):
 
 def comment_to_dto(c: Comment) -> CommentDTO:
     is_pr = c.content_type.model == "pullrequest"
-    target_type = "pull_request" if is_pr else "staging_batch"
-    if is_pr and hasattr(c.content_object, "formatted_id"):
+    is_thread = c.content_type.model == "reviewthread"
+    target_type = "pull_request" if (is_pr or is_thread) else "staging_batch"
+    revision_id = None
+    if is_thread and c.content_object:
+        thread = c.content_object
+        target_id = thread.pull_request.formatted_id
+        revision_id = thread.original_revision_id
+        path = thread.path
+        line_number = thread.line_number
+    elif is_pr and hasattr(c.content_object, "formatted_id"):
         target_id = c.content_object.formatted_id
+        path = c.path
+        line_number = c.line_number
     else:
         target_id = str(c.object_id)
+        path = c.path
+        line_number = c.line_number
 
     return CommentDTO(
         id=c.id,
@@ -285,8 +309,9 @@ def comment_to_dto(c: Comment) -> CommentDTO:
         body=c.body,
         created_at=c.created_at.isoformat(),
         updated_at=c.updated_at.isoformat(),
-        path=c.path,
-        line_number=c.line_number,
+        path=path,
+        line_number=line_number,
+        revision_id=revision_id,
     )
 
 
@@ -299,12 +324,33 @@ def add_comment(payload: CommentAddRequest):
         username=payload.author,
         defaults={"username_lower": payload.author.lower(), "account_type": User.AccountType.HUMAN},
     )
+
+    if target.__class__.__name__ == "PullRequest" and payload.path and payload.line_number:
+        from pull_requests.models import ReviewThread
+        if payload.revision_id:
+            rev = target.revisions.filter(id=payload.revision_id).first() or target.revisions.filter(revision_number=payload.revision_id).first()
+        else:
+            rev = target.revisions.order_by("-revision_number").first()
+        if not rev:
+            raise ValueError(f"No revision found for pull request {target.id}")
+
+        thread = target.review_threads.filter(path=payload.path, line_number=payload.line_number, is_resolved=False).first()
+        if not thread:
+            thread = ReviewThread.objects.create(
+                pull_request=target,
+                original_revision=rev,
+                original_commit_sha=rev.head_sha,
+                path=payload.path,
+                line_number=payload.line_number,
+            )
+        target = thread
+
     from django.contrib.contenttypes.models import ContentType
 
     ct = ContentType.objects.get_for_model(target)
     comment = Comment.objects.create(
         content_type=ct,
-        object_id=target.id,
+        object_id=str(target.id),
         author=user,
         body=payload.body.strip(),
         path=payload.path,
@@ -321,7 +367,15 @@ def list_comments(payload: CommentListRequest):
     from django.contrib.contenttypes.models import ContentType
 
     ct = ContentType.objects.get_for_model(target)
-    comments = Comment.objects.filter(content_type=ct, object_id=target.id).select_related("author").order_by("created_at")
+    comments = list(Comment.objects.filter(content_type=ct, object_id=str(target.id)).select_related("author"))
+    if target.__class__.__name__ == "PullRequest":
+        from pull_requests.models import ReviewThread
+        thread_ct = ContentType.objects.get_for_model(ReviewThread)
+        thread_ids = list(target.review_threads.values_list("id", flat=True))
+        if thread_ids:
+            thread_comments = list(Comment.objects.filter(content_type=thread_ct, object_id__in=[str(tid) for tid in thread_ids]).select_related("author"))
+            comments.extend(thread_comments)
+    comments.sort(key=lambda c: c.created_at)
     dtos = [comment_to_dto(c) for c in comments]
     res = CommentListResponse(comments=dtos)
     return msgspec.structs.asdict(res)
