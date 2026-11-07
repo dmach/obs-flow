@@ -213,10 +213,32 @@ def create_pull_request_endpoint(payload: PRCreateRequest):
         rev_draft_expires_at = timezone.now() + timedelta(minutes=timeout_minutes)
 
     target_branch = target_project.branch_name or "main"
+    head_sha = payload.head_sha
+    base_sha = payload.base_sha
+    if not head_sha or not base_sha:
+        try:
+            import subprocess
+            from core.git_forge import get_repo_path
+            target_repo = get_repo_path(target_project.org.name if target_project.org else "", target_package.name if target_package else None)
+            source_repo = get_repo_path(payload.source_owner, payload.source_repo)
+            if not base_sha and target_repo.exists():
+                p = subprocess.run(["git", "rev-parse", target_branch], cwd=str(target_repo), capture_output=True, text=True)
+                if p.returncode == 0 and p.stdout.strip():
+                    base_sha = p.stdout.strip()
+            if not head_sha and source_repo.exists():
+                p = subprocess.run(["git", "rev-parse", payload.source_branch], cwd=str(source_repo), capture_output=True, text=True)
+                if p.returncode == 0 and p.stdout.strip():
+                    head_sha = p.stdout.strip()
+        except Exception:
+            pass
+
+    resolved_head = head_sha or "0" * 40
+    resolved_base = base_sha or "0" * 40
+
     from pull_requests.fingerprint import PRRevisionPayload
     pr_payload = PRRevisionPayload(
-        head_sha=payload.head_sha or "0" * 40,
-        base_sha=payload.base_sha or "0" * 40,
+        head_sha=resolved_head,
+        base_sha=resolved_base,
         target_branch=target_branch,
     )
     computed_fingerprint = pr_payload.compute_fingerprint()
@@ -224,8 +246,8 @@ def create_pull_request_endpoint(payload: PRCreateRequest):
     rev = PullRequestRevision.objects.create(
         pull_request=pr,
         revision_number=1,
-        head_sha=payload.head_sha or "0" * 40,
-        base_sha=payload.base_sha or "0" * 40,
+        head_sha=resolved_head,
+        base_sha=resolved_base,
         fingerprint=computed_fingerprint,
         is_draft=rev_is_draft,
         draft_expires_at=rev_draft_expires_at,

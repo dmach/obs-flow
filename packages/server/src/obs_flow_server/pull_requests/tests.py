@@ -1871,3 +1871,127 @@ class TestNativePRCreation(TransactionTestCase):
             pr.refresh_from_db()
             self.assertEqual(pr.state, PullRequest.State.MERGED)
 
+
+class TestPRTabsAndDiffViews(TestCase):
+    def setUp(self):
+        import tempfile
+        import subprocess
+        from pathlib import Path
+        from django.test import override_settings
+
+        self.tmpdir = tempfile.TemporaryDirectory()
+        self.settings_override = override_settings(GIT_FORGE_ROOT=Path(self.tmpdir.name))
+        self.settings_override.enable()
+
+        self.org = Org.objects.create(name="distro")
+        self.user = User.objects.create(username="dev", username_lower="dev", account_type=User.AccountType.HUMAN)
+        self.user_org = self.user.implicit_personal_org
+        self.project = Project.objects.create(
+            name="distro:main", org=self.org, branch_name="main", workflow_type=Project.WorkflowType.DIRECT
+        )
+        self.package = Package.objects.create(project=self.project, name="mypkg")
+
+        # Create git repo and commits
+        from core.git_forge import get_repo_path, ensure_git_repo
+        self.target_repo = ensure_git_repo("distro", "mypkg", initial_branch="main")
+        self.source_repo = ensure_git_repo("~dev", "mypkg", initial_branch="feat")
+
+        # Seed target repo main branch
+        work_dir = Path(self.tmpdir.name) / "work"
+        subprocess.run(["git", "clone", str(self.target_repo), str(work_dir)], check=True, capture_output=True)
+        subprocess.run(["git", "config", "user.name", "Tester"], cwd=str(work_dir), check=True)
+        subprocess.run(["git", "config", "user.email", "tester@example.com"], cwd=str(work_dir), check=True)
+        subprocess.run(["git", "checkout", "-B", "main"], cwd=str(work_dir), check=True, capture_output=True)
+
+        (work_dir / "foo.txt").write_text("initial line\n")
+        subprocess.run(["git", "add", "foo.txt"], cwd=str(work_dir), check=True)
+        subprocess.run(["git", "commit", "-m", "Initial commit"], cwd=str(work_dir), check=True, capture_output=True)
+        subprocess.run(["git", "push", "origin", "main"], cwd=str(work_dir), check=True, capture_output=True)
+
+        # In work_dir, checkout feat, add changes, and push to source repo
+        subprocess.run(["git", "remote", "add", "source", str(self.source_repo)], cwd=str(work_dir), check=True)
+        subprocess.run(["git", "checkout", "-B", "feat"], cwd=str(work_dir), check=True, capture_output=True)
+        (work_dir / "foo.txt").write_text("initial line\nsecond line\n")
+        (work_dir / "bar.spec").write_text("Name: bar\nVersion: 1.0\n")
+        subprocess.run(["git", "add", "foo.txt", "bar.spec"], cwd=str(work_dir), check=True)
+        subprocess.run(["git", "commit", "-m", "feat: Add bar.spec and update foo.txt"], cwd=str(work_dir), check=True, capture_output=True)
+        subprocess.run(["git", "push", "source", "feat"], cwd=str(work_dir), check=True, capture_output=True)
+
+        self.pr = PullRequest.objects.create(
+            project=self.project,
+            package=self.package,
+            number=1,
+            author=self.user,
+            title="Add bar.spec feature",
+            source_owner="~dev",
+            source_repo="mypkg",
+            source_branch="feat",
+        )
+        self.rev = PullRequestRevision.objects.create(
+            pull_request=self.pr,
+            revision_number=1,
+            head_sha="0" * 40,
+            base_sha="0" * 40,
+            fingerprint="fp1",
+            is_draft=False,
+        )
+
+    def tearDown(self):
+        self.settings_override.disable()
+        self.tmpdir.cleanup()
+
+    def test_pr_overview_tab(self):
+        client = Client()
+        res = client.get(self.pr.get_absolute_url())
+        self.assertEqual(res.status_code, 200)
+        self.assertContains(res, "Add bar.spec feature")
+        self.assertContains(res, 'aria-label="PR-Subnav"')
+        self.assertContains(res, "Overview")
+        self.assertContains(res, "Commits")
+        self.assertContains(res, "Files Changed")
+        self.assertContains(res, 'aria-current="page">')
+        self.assertContains(res, "Reviews")
+
+    def test_pr_commits_tab(self):
+        client = Client()
+        res = client.get(self.pr.commits_url)
+        self.assertEqual(res.status_code, 200)
+        self.assertContains(res, "feat: Add bar.spec and update foo.txt")
+        self.assertContains(res, res.context["commits"][0]["author_name"])
+        self.assertContains(res, "&lt;&gt;")  # Browse code at commit button
+
+    def test_pr_files_changed_tab(self):
+        client = Client()
+        res = client.get(self.pr.files_changed_url)
+        self.assertEqual(res.status_code, 200)
+        self.assertContains(res, "2 changed files")
+        self.assertContains(res, "bar.spec")
+        self.assertContains(res, "foo.txt")
+        self.assertContains(res, "second line")
+
+    def test_parse_git_diff_direct(self):
+        from core.git_utils import parse_git_diff
+        raw_diff = """diff --git a/new.txt b/new.txt
+new file mode 100644
+--- /dev/null
++++ b/new.txt
+@@ -0,0 +1,2 @@
++line 1
++line 2
+diff --git a/deleted.txt b/deleted.txt
+deleted file mode 100644
+--- a/deleted.txt
++++ /dev/null
+@@ -1,1 +0,0 @@
+-old line
+"""
+        diffs = parse_git_diff(raw_diff)
+        self.assertEqual(len(diffs), 2)
+        self.assertEqual(diffs[0]["path"], "new.txt")
+        self.assertEqual(diffs[0]["status"], "added")
+        self.assertEqual(diffs[0]["additions"], 2)
+        self.assertEqual(diffs[1]["path"], "deleted.txt")
+        self.assertEqual(diffs[1]["status"], "deleted")
+        self.assertEqual(diffs[1]["deletions"], 1)
+
+

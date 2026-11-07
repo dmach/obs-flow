@@ -20,8 +20,12 @@ echo "CLI wrapper:   ${FLOW_BIN}"
 
 AUTO_STARTED_SERVER=0
 SERVER_PID=""
+TMP_WORK=""
 
 cleanup() {
+    if [[ -n "${TMP_WORK}" && -d "${TMP_WORK}" ]]; then
+        rm -rf "${TMP_WORK}"
+    fi
     if [[ "${AUTO_STARTED_SERVER}" -eq 1 && "${KEEP_SERVER}" -eq 0 && -n "${SERVER_PID}" ]]; then
         echo "Stopping temporary background server (PID ${SERVER_PID})..."
         kill "${SERVER_PID}" 2>/dev/null || true
@@ -123,9 +127,140 @@ echo "--- 3. Creating Packages and Native Git Repositories ---"
 
 echo ""
 echo "--- 4. Configuring Reviewers ---"
-"${FLOW_BIN}" config review add --project openSUSE:Factory --type project --user admin
-"${FLOW_BIN}" config review add --project openSUSE:Factory --type package --user dimstar
-"${FLOW_BIN}" config review add --project devel:system --type project --user darix
+"${FLOW_BIN}" config review add --project openSUSE:Factory --type project --user admin || true
+"${FLOW_BIN}" config review add --project openSUSE:Factory --type package --user dimstar || true
+"${FLOW_BIN}" config review add --project devel:system --type project --user darix || true
+
+echo ""
+echo "--- 4b. Seeding Git Commits and Branches for PR Demonstration ---"
+GIT_ROOT="${ROOT_DIR}/packages/server/src/obs_flow_server/git_repos"
+FACTORY_REPO="${GIT_ROOT}/openSUSE/python3.git"
+TUX_REPO="${GIT_ROOT}/~tux/python3.git"
+
+TMP_WORK="$(mktemp -d)"
+
+if [[ -d "${FACTORY_REPO}" && -d "${TUX_REPO}" ]]; then
+    # 1. Seed base commit in Factory python3 repo
+    git clone "${FACTORY_REPO}" "${TMP_WORK}/factory_python3" 2>/dev/null || (mkdir -p "${TMP_WORK}/factory_python3" && cd "${TMP_WORK}/factory_python3" && git init && git remote add origin "${FACTORY_REPO}")
+    pushd "${TMP_WORK}/factory_python3" > /dev/null
+    git checkout -B factory
+    cat << 'EOF' > python3.spec
+Name:           python3
+Version:        3.13.1
+Release:        0
+Summary:        Python 3 Interpreter
+License:        Python-2.0
+URL:            https://www.python.org/
+Source0:        Python-%{version}.tar.xz
+BuildRequires:  gcc
+BuildRequires:  openssl-devel
+
+%description
+Python 3 is an interpreted, interactive, object-oriented programming language.
+
+%prep
+%setup -q -n Python-%{version}
+
+%build
+%configure
+%make_build
+
+%install
+%make_install
+
+%files
+%{_bindir}/python3
+EOF
+
+    cat << 'EOF' > python3.changes
+-------------------------------------------------------------------
+Wed Dec 04 12:00:00 UTC 2024 - maintainer@opensuse.org
+
+- Update to 3.13.1:
+  * Maintenance release of Python 3.13
+EOF
+
+    cat << 'EOF' > README.md
+# Python 3 Packaging for openSUSE:Factory
+
+This repository contains the RPM packaging sources for Python 3 in openSUSE.
+EOF
+
+    git config user.name "Factory Maintainer"
+    git config user.email "factory@opensuse.org"
+    git add python3.spec python3.changes README.md
+    git commit -m "python3: Initial package import for 3.13.1"
+    git push origin factory
+    popd > /dev/null
+
+    # 2. Clone Tux personal repo, pull from factory, add commits
+    git clone "${TUX_REPO}" "${TMP_WORK}/tux_python3" 2>/dev/null || (mkdir -p "${TMP_WORK}/tux_python3" && cd "${TMP_WORK}/tux_python3" && git init && git remote add origin "${TUX_REPO}")
+    pushd "${TMP_WORK}/tux_python3" > /dev/null
+    git checkout -B dev
+    git pull "${FACTORY_REPO}" factory > /dev/null 2>&1 || true
+
+    # Commit 1: Version bump to 3.13.2 in spec and changes
+    sed -i 's/Version:        3.13.1/Version:        3.13.2/' python3.spec
+    cat << 'EOF' > python3.changes
+-------------------------------------------------------------------
+Fri Feb 07 10:00:00 UTC 2025 - tux@opensuse.org
+
+- Update to 3.13.2:
+  * Security and bugfix release
+  * Includes fix for CVE-2025-XXXX
+
+-------------------------------------------------------------------
+Wed Dec 04 12:00:00 UTC 2024 - maintainer@opensuse.org
+
+- Update to 3.13.1:
+  * Maintenance release of Python 3.13
+EOF
+    git config user.name "Tux Penguin"
+    git config user.email "tux@opensuse.org"
+    git add python3.spec python3.changes
+    git commit -m "python3: Update to version 3.13.2"
+
+    # Commit 2: Add SSL threading patch
+    cat << 'EOF' > 0001-fix-ssl-threading.patch
+From 11223344556677889900aabbccddeeff11223344 Mon Sep 17 00:00:00 2001
+Subject: [PATCH] Fix race condition in SSL socket initialization
+
+Signed-off-by: Tux Penguin <tux@opensuse.org>
+---
+ Modules/_ssl.c | 4 ++++
+ 1 file changed, 4 insertions(+)
+
+diff --git a/Modules/_ssl.c b/Modules/_ssl.c
+index 1234567..89abcdef 100644
+--- a/Modules/_ssl.c
++++ b/Modules/_ssl.c
+@@ -100,6 +100,10 @@ static int ssl_init(void) {
++    /* Ensure mutex lock before context init */
++    PySSL_LOCK();
+     SSL_library_init();
++    PySSL_UNLOCK();
+     return 0;
+ }
+-- 
+2.48.1
+EOF
+    sed -i '/Source0:/a Patch0:         0001-fix-ssl-threading.patch' python3.spec
+    git add 0001-fix-ssl-threading.patch python3.spec
+    git commit -m "python3: Add 0001-fix-ssl-threading.patch for multi-threaded SSL"
+
+    # Commit 3: Update documentation
+    cat << 'EOF' >> README.md
+
+## Upstream 3.13.2 Notes
+Upstream release 3.13.2 addresses several thread safety issues under GIL-disabled configurations.
+EOF
+    git add README.md
+    git commit -m "docs: Add packaging notes for 3.13.2 GIL behavior"
+
+    git push -u origin dev
+    popd > /dev/null
+    echo "Successfully seeded 3 commits and 4 changed files for PR 1 demo."
+fi
 
 echo ""
 echo "--- 5. Opening Native Pull Requests ---"
