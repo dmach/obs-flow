@@ -1,47 +1,45 @@
 {% load static %}
 
-<div class="commits-container">
-    <table class="table" style="width: 100%; border-collapse: collapse;">
-        <thead>
-            <tr style="border-bottom: 2px solid var(--color-border-default); text-align: left;">
-                <th style="padding: 0.5rem;">Commit</th>
-                <th style="padding: 0.5rem;">Author</th>
-                <th style="padding: 0.5rem; text-align: right;">Date</th>
-                <th style="padding: 0.5rem; text-align: right;">Hash</th>
-                <th style="padding: 0.5rem; text-align: right; width: 60px;"></th>
+<table>
+    <thead>
+        <tr>
+            <th scope="col">Commit</th>
+            <th scope="col">Author</th>
+            <th scope="col">Date</th>
+            <th scope="col">Hash</th>
+            <th scope="col" aria-label="Actions"></th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for commit in commits %}
+            <tr>
+                <td data-label="Commit">
+                    <strong>{{ commit.title }}</strong>
+                </td>
+                <td data-label="Author">
+                    <small>{{ commit.author_name }}</small>
+                </td>
+                <td data-label="Date">
+                    <small>{{ commit.date }}</small>
+                </td>
+                <td data-label="Hash">
+                    <code>{{ commit.short_sha }}</code>
+                    <button type="button" onclick="navigator.clipboard.writeText('{{ commit.sha }}')" title="Copy full SHA" aria-label="Copy full SHA">
+                        <img class="icon" src="{% static 'vendor/octicons/copy-16.svg' %}" alt="Copy SHA" />
+                    </button>
+                </td>
+                <td data-label="Actions">
+                    <a role="button" href="{{ base_code_url }}?ref={{ commit.sha }}" title="Browse repository at this point" aria-label="Browse code at this commit">&lt;&gt;</a>
+                </td>
             </tr>
-        </thead>
-        <tbody>
-            {% for commit in commits %}
-                <tr style="border-bottom: 1px solid var(--color-border-default);">
-                    <td style="padding: 0.5rem; font-weight: 500;">
-                        {{ commit.title }}
-                    </td>
-                    <td style="padding: 0.5rem; color: var(--color-fg-muted);">
-                        {{ commit.author_name }}
-                    </td>
-                    <td style="padding: 0.5rem; text-align: right; color: var(--color-fg-muted); white-space: nowrap;">
-                        {{ commit.date }}
-                    </td>
-                    <td style="padding: 0.5rem; text-align: right; white-space: nowrap;">
-                        <span style="display: inline-flex; align-items: center; gap: 0.25rem;">
-                            <code>{{ commit.short_sha }}</code>
-                            <button type="button" onclick="navigator.clipboard.writeText('{{ commit.sha }}')" title="Copy full SHA" aria-label="Copy full SHA" style="padding: 0.15rem 0.35rem; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; line-height: 1;">
-                                <img class="icon" src="{% static 'vendor/octicons/copy-16.svg' %}" alt="Copy SHA" style="width: 1rem; height: 1rem;" />
-                            </button>
-                        </span>
-                    </td>
-                    <td style="padding: 0.5rem; text-align: right; white-space: nowrap;">
-                        <a href="{{ base_code_url }}?ref={{ commit.sha }}" title="Browse repository at this point" aria-label="Browse code at this commit" role="button" style="padding: 0.15rem 0.45rem; display: inline-flex; align-items: center; justify-content: center; font-family: monospace; font-weight: bold; font-size: 0.9em; text-decoration: none;">&lt;&gt;</a>
-                    </td>
-                </tr>
-            {% empty %}
-                <tr>
-                    <td colspan="5" style="padding: 2rem; text-align: center; color: var(--color-fg-muted);">
-                        No commits found.
-                    </td>
-                </tr>
-            {% endfor %}
-        </tbody>
-    </table>
-</div>
+        {% empty %}
+            <tr>
+                <td colspan="5">
+                    <article data-empty>
+                        <p>No commits found.</p>
+                    </article>
+                </td>
+            </tr>
+        {% endfor %}
+    </tbody>
+</table>

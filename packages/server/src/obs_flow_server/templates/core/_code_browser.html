@@ -1,74 +1,89 @@
 {% load static %}
 
-<div class="code-browser">
-    <div class="code-browser-header" style="margin-bottom: 1rem; display: flex; align-items: center; gap: 0.5rem; font-size: 1.1em;">
-        <strong><a href="{{ base_code_url }}{{ ref_param }}">{{ repo_name }}</a></strong>
-        {% if ref_param %}
-            <span style="font-size: 0.85em; color: var(--color-fg-muted); font-family: monospace;">@{{ ref|slice:":7" }}</span>
-        {% endif %}
-        {% if path_parts %}
-            <span style="color: var(--color-fg-muted);">/</span>
-            <span>{% for part in path_parts %}{% if not forloop.first %}<span style="color: var(--color-fg-muted);">/</span>{% endif %}{% if forloop.last and obj_type == 'blob' %}<span>{{ part.name }}</span>{% else %}<a href="{{ base_code_url }}{{ part.path }}{{ ref_param }}">{{ part.name }}</a>{% endif %}{% endfor %}</span>
-            <button type="button" onclick="navigator.clipboard.writeText('{{ file_path }}')" title="Copy path" aria-label="Copy path" style="padding: 0.15rem 0.35rem; display: inline-flex; align-items: center; justify-content: center; line-height: 1; cursor: pointer;">
-                <img class="icon" src="{% static 'vendor/octicons/copy-16.svg' %}" alt="Copy path" style="width: 1rem; height: 1rem;" />
+<div>
+    <nav aria-label="breadcrumb">
+        <ul>
+            <li><strong><a href="{{ base_code_url }}{{ ref_param }}">{{ repo_name }}</a></strong>{% if ref_param %} <small>@{{ ref|slice:":7" }}</small>{% endif %}</li>
+            {% for part in path_parts %}
+                {% if forloop.last and obj_type == 'blob' %}
+                    <li>{{ part.name }}</li>
+                {% else %}
+                    <li><a href="{{ base_code_url }}{{ part.path }}{{ ref_param }}">{{ part.name }}</a></li>
+                {% endif %}
+            {% endfor %}
+        </ul>
+        {% if file_path %}
+            <button type="button" onclick="navigator.clipboard.writeText('{{ file_path }}')" title="Copy path" aria-label="Copy path">
+                <img class="icon" src="{% static 'vendor/octicons/copy-16.svg' %}" alt="Copy path" />
             </button>
         {% endif %}
-    </div>
+    </nav>
 
     {% if obj_type == 'tree' %}
-        <table class="table" style="width: 100%; border-collapse: collapse;">
+        <table>
+            <thead>
+                <tr>
+                    <th scope="col" aria-label="Type"></th>
+                    <th scope="col">Name</th>
+                    <th scope="col">Last commit</th>
+                    <th scope="col">Date</th>
+                    <th scope="col">Size</th>
+                </tr>
+            </thead>
             <tbody>
                 {% if file_path %}
-                    <tr style="border-bottom: 1px solid var(--color-border-default);">
-                        <td style="width: 24px; padding: 0.5rem;">
-                            <img class="icon" src="{% static 'vendor/octicons/file-directory-16.svg' %}" style="color: var(--color-icon-directory);" />
+                    <tr>
+                        <td data-label="Type">
+                            <img class="icon" src="{% static 'vendor/octicons/file-directory-16.svg' %}" alt="" />
                         </td>
-                        <td style="padding: 0.5rem;">
+                        <td data-label="Name">
                             <a href="{{ base_code_url }}{{ parent_path }}{{ ref_param }}">..</a>
                         </td>
-                        <td style="padding: 0.5rem;"></td>
-                        <td style="padding: 0.5rem;"></td>
-                        <td style="padding: 0.5rem;"></td>
+                        <td data-label="Last commit"></td>
+                        <td data-label="Date"></td>
+                        <td data-label="Size"></td>
                     </tr>
                 {% endif %}
                 {% for entry in tree %}
-                    <tr style="border-bottom: 1px solid var(--color-border-default);">
-                        <td style="width: 24px; padding: 0.5rem;">
+                    <tr>
+                        <td data-label="Type">
                             {% if entry.type == 'tree' %}
-                                <img class="icon" src="{% static 'vendor/octicons/file-directory-16.svg' %}" style="color: var(--color-icon-directory);" />
+                                <img class="icon" src="{% static 'vendor/octicons/file-directory-16.svg' %}" alt="" />
                             {% else %}
-                                <img class="icon" src="{% static 'vendor/octicons/file-16.svg' %}" style="color: var(--color-icon-default);" />
+                                <img class="icon" src="{% static 'vendor/octicons/file-16.svg' %}" alt="" />
                             {% endif %}
                         </td>
-                        <td style="padding: 0.5rem;">
+                        <td data-label="Name">
                             <a href="{{ base_code_url }}{% if file_path %}{{ file_path }}/{% endif %}{{ entry.name }}{{ ref_param }}">{{ entry.name }}</a>
                         </td>
-                        <td style="padding: 0.5rem; color: var(--color-fg-muted); max-width: 300px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
-                            {% if entry.commit_msg %}{{ entry.commit_msg }}{% endif %}
+                        <td data-label="Last commit">
+                            <small>{{ entry.commit_msg|default:"" }}</small>
                         </td>
-                        <td style="padding: 0.5rem; text-align: right; color: var(--color-fg-muted); white-space: nowrap;">
-                            {% if entry.commit_date %}{{ entry.commit_date }}{% endif %}
+                        <td data-label="Date">
+                            <small>{{ entry.commit_date|default:"" }}</small>
                         </td>
-                        <td style="padding: 0.5rem; text-align: right; color: var(--color-fg-muted); white-space: nowrap;">
-                            {% if entry.size is not None %}{{ entry.size|filesizeformat }}{% endif %}
+                        <td data-label="Size">
+                            <small>{% if entry.size is not None %}{{ entry.size|filesizeformat }}{% endif %}</small>
                         </td>
                     </tr>
                 {% empty %}
                     <tr>
-                        <td colspan="5" style="padding: 1rem; text-align: center; color: var(--color-fg-muted);">Empty directory</td>
+                        <td colspan="5">
+                            <article data-empty>
+                                <p>Empty directory</p>
+                            </article>
+                        </td>
                     </tr>
                 {% endfor %}
             </tbody>
         </table>
     {% elif obj_type == 'blob' %}
-        <div class="blob-container" style="border: 1px solid var(--color-border-default); border-radius: 6px; overflow: hidden;">
-            <div class="blob-header" style="background-color: var(--color-canvas-subtle); padding: 0.5rem 1rem; border-bottom: 1px solid var(--color-border-default); display: flex; justify-content: space-between; align-items: center;">
+        <article>
+            <header>
                 <span>{{ file_path }}</span>
-                <a href="{{ base_raw_url }}{% if file_path %}{{ file_path }}{% endif %}{{ ref_param }}" class="btn btn-sm">Raw</a>
-            </div>
-            <div class="blob-content" style="padding: 1rem; overflow-x: auto; background-color: var(--color-canvas-default);">
-                <pre style="margin: 0;"><code>{{ blob }}</code></pre>
-            </div>
-        </div>
+                <a role="button" href="{{ base_raw_url }}{% if file_path %}{{ file_path }}{% endif %}{{ ref_param }}">Raw</a>
+            </header>
+            <pre><code>{{ blob }}</code></pre>
+        </article>
     {% endif %}
 </div>

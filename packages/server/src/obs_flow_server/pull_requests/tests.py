@@ -1945,7 +1945,7 @@ class TestPRTabsAndDiffViews(TestCase):
         res = client.get(self.pr.get_absolute_url())
         self.assertEqual(res.status_code, 200)
         self.assertContains(res, "Add bar.spec feature")
-        self.assertContains(res, 'aria-label="PR-Subnav"')
+        self.assertContains(res, 'aria-label="Subnav"')
         self.assertContains(res, "Overview")
         self.assertContains(res, "Commits")
         self.assertContains(res, "Files Changed")

@@ -89,7 +89,7 @@
             <form hx-post="{% url 'staging_ui_modal_check_merge' %}" hx-target="#modal-container">
                 {% csrf_token %}
                 <input type="hidden" name="selected_batches" value="{{ batch.id }}">
-                <button type="submit" data-variant="primary" style="width: 100%;">Merge Staging Batch</button>
+                <button type="submit" data-variant="primary">Merge Staging Batch</button>
             </form>
         </section>
         {% endif %}

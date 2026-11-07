@@ -18,26 +18,26 @@
     <small><strong>{{ pr.author.username }}</strong> wants to merge into <code>{{ pr.target_branch }}</code> from <code>{{ pr.source_owner }}/{{ pr.source_repo }}:{{ pr.source_branch }}</code></small>
 </p>
 
-<nav aria-label="PR-Subnav" style="margin-top: 1.25rem; margin-bottom: 1.5rem; border-bottom: 1px solid var(--flow-border);">
-    <ul style="display: flex; gap: 0.5rem; list-style: none; padding: 0; margin: 0;">
-        <li style="margin-bottom: -1px; border-bottom: 2px solid {% if active_subtab == 'overview' %}var(--flow-fg-accent){% else %}transparent{% endif %};">
-            <a href="{{ pr.get_absolute_url }}" {% if active_subtab == 'overview' %}aria-current="page"{% endif %} style="display: inline-flex; align-items: center; gap: 0.35rem; padding: 0.5rem 0.75rem; text-decoration: none; color: var(--flow-fg); font-weight: {% if active_subtab == 'overview' %}600{% else %}400{% endif %};">
-                <img class="icon" src="{% static 'vendor/octicons/git-pull-request-16.svg' %}" alt="" style="width: 1rem; height: 1rem;" />
+<nav aria-label="Subnav">
+    <ul>
+        <li>
+            <a href="{{ pr.get_absolute_url }}"{% if active_subtab == 'overview' %} aria-current="page"{% endif %}>
+                <img class="icon" src="{% static 'vendor/octicons/git-pull-request-16.svg' %}" alt="" />
                 Overview
             </a>
         </li>
-        <li style="margin-bottom: -1px; border-bottom: 2px solid {% if active_subtab == 'commits' %}var(--flow-fg-accent){% else %}transparent{% endif %};">
-            <a href="{{ pr.commits_url }}" {% if active_subtab == 'commits' %}aria-current="page"{% endif %} style="display: inline-flex; align-items: center; gap: 0.35rem; padding: 0.5rem 0.75rem; text-decoration: none; color: var(--flow-fg); font-weight: {% if active_subtab == 'commits' %}600{% else %}400{% endif %};">
-                <img class="icon" src="{% static 'vendor/octicons/git-commit-16.svg' %}" alt="" style="width: 1rem; height: 1rem;" />
+        <li>
+            <a href="{{ pr.commits_url }}"{% if active_subtab == 'commits' %} aria-current="page"{% endif %}>
+                <img class="icon" src="{% static 'vendor/octicons/git-commit-16.svg' %}" alt="" />
                 Commits
-                <span style="background: var(--flow-bg-hover); padding: 0.1rem 0.45rem; border-radius: 10px; font-size: 0.75rem; font-weight: 600;">{{ commits_count }}</span>
+                <data value="{{ commits_count }}">{{ commits_count }}</data>
             </a>
         </li>
-        <li style="margin-bottom: -1px; border-bottom: 2px solid {% if active_subtab == 'files_changed' %}var(--flow-fg-accent){% else %}transparent{% endif %};">
-            <a href="{{ pr.files_changed_url }}" {% if active_subtab == 'files_changed' %}aria-current="page"{% endif %} style="display: inline-flex; align-items: center; gap: 0.35rem; padding: 0.5rem 0.75rem; text-decoration: none; color: var(--flow-fg); font-weight: {% if active_subtab == 'files_changed' %}600{% else %}400{% endif %};">
-                <img class="icon" src="{% static 'vendor/octicons/file-16.svg' %}" alt="" style="width: 1rem; height: 1rem;" />
+        <li>
+            <a href="{{ pr.files_changed_url }}"{% if active_subtab == 'files_changed' %} aria-current="page"{% endif %}>
+                <img class="icon" src="{% static 'vendor/octicons/file-16.svg' %}" alt="" />
                 Files Changed
-                <span style="background: var(--flow-bg-hover); padding: 0.1rem 0.45rem; border-radius: 10px; font-size: 0.75rem; font-weight: 600;">{{ files_count }}</span>
+                <data value="{{ files_count }}">{{ files_count }}</data>
             </a>
         </li>
     </ul>
@@ -100,7 +100,7 @@
                         <form hx-post="{% url 'pr_ui_modal_check_merge' %}" hx-target="#modal-container">
                             {% csrf_token %}
                             <input type="hidden" name="selected_prs" value="{{ pr.id }}">
-                            <button type="submit" data-variant="primary" style="width: 100%;">Merge Pull Request</button>
+                            <button type="submit" data-variant="primary">Merge Pull Request</button>
                         </form>
                     </section>
                 {% elif pr.target_project.workflow_type == "staging" %}
@@ -139,7 +139,7 @@
             {% if latest_revision %}
             <section>
                 <h4>Fingerprint</h4>
-                <p style="word-break: break-all;"><code>{{ latest_revision.fingerprint }}</code></p>
+                <p><code>{{ latest_revision.fingerprint }}</code></p>
             </section>
             {% endif %}
             <section>
