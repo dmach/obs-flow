@@ -53,6 +53,7 @@
                 </article>
             {% elif file.lines %}
                 <table data-diff>
+                    <colgroup><col><col><col></colgroup>
                     <tbody>
                         {% for line in file.lines %}
                             {% if line.type == 'hunk' %}
@@ -68,7 +69,7 @@
                                         {% if user.is_authenticated %}
                                             <details>
                                                 <summary title="Add inline comment">+</summary>
-                                                <form hx-post="{% url 'pr_inline_comment_add' %}" hx-target="closest tr" hx-swap="afterend" onsubmit="this.closest('details').removeAttribute('open'); this.reset();">
+                                                <form hx-post="{% url 'pr_inline_comment_add' %}" hx-target="closest tr" hx-swap="afterend" hx-on::after:swap="this.reset(); this.closest('details').removeAttribute('open')">
                                                     {% csrf_token %}
                                                     <input type="hidden" name="pr_id" value="{{ pr.id }}">
                                                     <input type="hidden" name="revision_id" value="{{ current_revision.id }}">
@@ -91,7 +92,7 @@
                                         {% if user.is_authenticated %}
                                             <details>
                                                 <summary title="Add inline comment">+</summary>
-                                                <form hx-post="{% url 'pr_inline_comment_add' %}" hx-target="closest tr" hx-swap="afterend" onsubmit="this.closest('details').removeAttribute('open'); this.reset();">
+                                                <form hx-post="{% url 'pr_inline_comment_add' %}" hx-target="closest tr" hx-swap="afterend" hx-on::after:swap="this.reset(); this.closest('details').removeAttribute('open')">
                                                     {% csrf_token %}
                                                     <input type="hidden" name="pr_id" value="{{ pr.id }}">
                                                     <input type="hidden" name="revision_id" value="{{ current_revision.id }}">
@@ -109,14 +110,14 @@
                                     <td>- {{ line.text }}</td>
                                 </tr>
                             {% else %}
-                                <tr>
+                                <tr data-line="ctx">
                                     <td>{{ line.old_no }}</td>
                                     <td>
                                         {{ line.new_no }}
                                         {% if user.is_authenticated %}
                                             <details>
                                                 <summary title="Add inline comment">+</summary>
-                                                <form hx-post="{% url 'pr_inline_comment_add' %}" hx-target="closest tr" hx-swap="afterend" onsubmit="this.closest('details').removeAttribute('open'); this.reset();">
+                                                <form hx-post="{% url 'pr_inline_comment_add' %}" hx-target="closest tr" hx-swap="afterend" hx-on::after:swap="this.reset(); this.closest('details').removeAttribute('open')">
                                                     {% csrf_token %}
                                                     <input type="hidden" name="pr_id" value="{{ pr.id }}">
                                                     <input type="hidden" name="revision_id" value="{{ current_revision.id }}">

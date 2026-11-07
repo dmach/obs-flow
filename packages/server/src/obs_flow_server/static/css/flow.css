@@ -838,6 +838,11 @@ article > pre {
 article:has(> table) {
 	overflow: hidden;
 }
+/* Diff tables: never clip — inline comment popups must be able to escape
+   the article and table boxes. */
+article:has(> table[data-diff]) {
+	overflow: visible;
+}
 article > table {
 	margin-inline: -1rem;
 	margin-bottom: -1rem;
@@ -1096,6 +1101,13 @@ table[data-diff] {
 	font-family: var(--flow-mono);
 	font-size: 0.857rem;
 	line-height: 1.45;
+	/* Generic table rule clips overflow; popup must escape the table box. */
+	overflow: visible;
+	/* Fixed gutters: same line-number column width in every file. */
+	table-layout: fixed;
+}
+table[data-diff] col:nth-child(-n + 2) {
+	width: 3.5rem;
 }
 table[data-diff] tr[data-line="hunk"] {
 	background-color: var(--flow-bg-subtle);
@@ -1112,9 +1124,15 @@ table[data-diff] tr[data-line="del"] {
 	background-color: var(--flow-bg-danger);
 	color: var(--flow-fg);
 }
+/* Generic table hover rule (tbody tr:hover > *) must not wash out diff rows. */
+table[data-diff] tr[data-line="add"]:hover > td {
+	background-color: var(--flow-bg-success);
+}
+table[data-diff] tr[data-line="del"]:hover > td {
+	background-color: var(--flow-bg-danger);
+}
 table[data-diff] td:first-child,
 table[data-diff] td:nth-child(2) {
-	width: 3rem;
 	padding: 0.1rem 0.4rem;
 	text-align: right;
 	user-select: none;
@@ -1134,14 +1152,33 @@ table[data-diff] td[colspan] {
 	border-right: 1px solid var(--flow-border-muted);
 }
 
+/* Stub hunk header: keep it readable, not centered like data cells. */
+table[data-diff] tr[data-line="hunk"] td[colspan] {
+	text-align: left;
+}
+
 /* Inline diff threads & triggers */
 table[data-diff] tr[data-thread] {
 	background-color: var(--flow-bg);
 }
+/* The thread cell is both :first-child and :last-child, so it would inherit
+   the line-number and code cell rules; reset them. */
 table[data-diff] tr[data-thread] > td {
 	padding: 0.75rem 1rem;
 	border-right: 0;
+	background: var(--flow-bg);
+	color: var(--flow-fg);
+	font-family: var(--flow-font);
+	font-size: 1rem;
+	line-height: 1.5;
 	text-align: left;
+	white-space: normal;
+	word-break: normal;
+	user-select: text;
+	position: static;
+}
+table[data-diff] tr[data-thread]:hover > td {
+	background: var(--flow-bg);
 }
 table[data-diff] tr[data-thread] article {
 	margin: 0;
@@ -1150,6 +1187,27 @@ table[data-diff] tr[data-thread] article {
 table[data-diff] tr[data-thread] article article {
 	margin-top: 0.5rem;
 	background: var(--flow-bg);
+}
+table[data-diff] tr[data-thread] article p {
+	margin-bottom: 0;
+	white-space: pre-wrap;
+}
+/* Generic `td button` shrinks buttons for table rows; restore normal size. */
+table[data-diff] tr[data-thread] button {
+	display: inline-block;
+	padding: 0.3125rem 0.75rem;
+	font-size: 1rem;
+	line-height: 1.5;
+}
+table[data-diff] tr[data-thread] article > header button {
+	padding: 0.25rem 0.5rem;
+	font-size: 0.857rem;
+}
+table[data-diff] tr[data-thread] details {
+	margin: 0;
+}
+table[data-diff] tr[data-thread] details > summary {
+	cursor: pointer;
 }
 table[data-diff] tr[data-thread] article > form {
 	margin-top: 1rem;
@@ -1165,14 +1223,14 @@ table[data-diff] tr[data-thread] article > form > footer {
 	padding-top: 0;
 	border-top: 0;
 }
-table[data-diff] td > details {
+table[data-diff] tr[data-line] > td > details {
 	display: inline-block;
 	margin: 0;
 	position: absolute;
 	top: 0.1rem;
 	left: 0.1rem;
 }
-table[data-diff] td > details > summary {
+table[data-diff] tr[data-line] > td > details > summary {
 	display: inline-flex;
 	align-items: center;
 	justify-content: center;
@@ -1191,27 +1249,31 @@ table[data-diff] td > details > summary {
 	opacity: 0;
 	transition: opacity 0.1s ease;
 }
-table[data-diff] tr:hover td > details > summary {
+table[data-diff] tr[data-line]:hover td > details > summary {
 	opacity: 1;
 }
-table[data-diff] td > details[open] > summary {
+table[data-diff] tr[data-line] > td > details > summary:focus-within {
 	opacity: 1;
 }
-table[data-diff] td > details > summary::-webkit-details-marker {
+table[data-diff] tr[data-line] > td > details[open] > summary {
+	opacity: 1;
+}
+table[data-diff] tr[data-line] > td > details > summary::-webkit-details-marker {
 	display: none;
 }
-table[data-diff] td > details > summary:hover {
+table[data-diff] tr[data-line] > td > details > summary:hover {
 	background: var(--flow-fg-accent);
 	color: var(--flow-on-solid);
 }
-table[data-diff] td > details[open] {
+table[data-diff] tr[data-line] > td > details[open] {
 	position: absolute;
 }
-table[data-diff] td > details[open] > form {
+table[data-diff] tr[data-line] > td > details[open] > form {
 	position: absolute;
+	top: 1.4rem;
 	left: 0;
 	z-index: 50;
-	width: 24rem;
+	width: min(28rem, 90vw);
 	padding: 0.75rem;
 	border: 1px solid var(--flow-border);
 	border-radius: var(--flow-radius);
@@ -1219,7 +1281,7 @@ table[data-diff] td > details[open] > form {
 	box-shadow: var(--flow-shadow);
 	text-align: left;
 }
-table[data-diff] td > details[open] > form textarea {
+table[data-diff] tr[data-line] > td > details[open] > form textarea {
 	width: 100%;
 	box-sizing: border-box;
 	margin-bottom: 0.5rem;

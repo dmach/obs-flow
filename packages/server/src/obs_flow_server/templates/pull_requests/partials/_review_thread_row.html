@@ -1,0 +1,7 @@
+{% comment %}
+Wrapper row so the thread can be swapped (hx-swap="afterend") directly after a
+diff <tr> inside <tbody>: an <article> alone would be hoisted out of the table.
+{% endcomment %}
+<tr data-thread>
+    <td colspan="3">{% include "pull_requests/partials/_review_thread.html" %}</td>
+</tr>

@@ -379,7 +379,7 @@ def pr_inline_comment_add(request):
 
     return render(
         request,
-        "pull_requests/partials/_review_thread.html",
+        "pull_requests/partials/_review_thread_row.html",
         {
             "thread": thread,
             "pr": pr,
