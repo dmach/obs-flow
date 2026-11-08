@@ -10,7 +10,7 @@ No glass, glows, gradients, display type, web fonts.
 
 - **No Node.js, no build step, no dependencies.** CSS and JS are static files. htmx is vendored in `static/vendor/htmx/`.
 - **No classes in templates.** CSS targets elements, ARIA attributes and structure (parent/child).
-  Exceptions are hooks owned by other code (`htmx-*` classes, `debounce-countdown` / `countdown-timer` JS hooks),
+  Exceptions are hooks owned by other code (`htmx-*` classes, `debounce-countdown` / `countdown-timer` JS hooks; `data-copy`, `data-select-all`, `data-clean-url` data hooks handled in `flow.js`),
   and a few structural helpers where HTML lacks a native element: `.icon` (for SVG sizing), `.tabs` and `.tab-content` (for CSS-only tab panels).
 - **Two extension attributes, nothing else:**
   - `data-variant`: `primary | danger | success | warning`
@@ -64,7 +64,7 @@ Base size is the user's preference (12–20px, default 14px), set as `font-size`
 | `code`, `pre` | 0.857rem mono | 400 |
 
 `<h1>Fix build <small>#123</small></h1>`: `small` inside `h1` inherits the size, weight 300, muted.
-`<small>` is the muted-text element everywhere (metadata, "unknown", "-", help text). Errors: `<small role="alert">` / `<p role="alert">` (red).
+`<small>` is the muted-text element everywhere (metadata, "unknown", an empty value as `<small>-</small>`, help text). `thead` cells always have `scope="col"`. Errors: `<small role="alert">` / `<p role="alert">` (red).
 `p` directly after a page title row is muted (page description).
 
 Spacing: 0.25 / 0.5 / 0.75 / 1 / 1.5 / 2.5rem. Block elements carry `margin-bottom: 1rem`, nothing else adds top margins.
@@ -74,7 +74,7 @@ Spacing: 0.25 / 0.5 / 0.75 / 1 / 1.5 / 2.5rem. Block elements carry `margin-bott
 | Markup | Looks like |
 |---|---|
 | `body > header` | App header bar (below) |
-| `main` | Content column, max 1280px, 1rem side padding |
+| `main` | Content column, max 1280px, 1.5rem side padding |
 | `main > header` | Page title row: `h1` left, actions right |
 | `main > section > h1 + p` | Home intro: large muted line |
 | `main > details` | Filter panel box |
@@ -115,7 +115,7 @@ Spacing: 0.25 / 0.5 / 0.75 / 1 / 1.5 / 2.5rem. Block elements carry `margin-bott
 - **Tabs** (`nav[aria-label=Main]`): links with 16px octicon + text, padding `0.375rem 0.5rem`, radius 6px, hover `--flow-bg-hover`.
   Current tab: `aria-current="page"`, weight 600, 2px accent underline. Wraps onto more rows when too narrow (nothing is ever cut off).
 - **Account dropdown:** `details > summary + ul`, bordered summary, menu is right-aligned, radius 12px, overlay shadow. `▾` is added by CSS.
-- Octicons are black SVGs: inverted in dark mode by a `header img` rule.
+- Octicons are black SVGs: inverted in dark mode by a `.icon` rule (everywhere, not only in the header).
 
 ### Logo
 
@@ -211,7 +211,7 @@ Supports up to 3 tabs via the `~` sibling selector. Labels act as tab headers wi
 
 ### Icons
 
-SVGs use `class="icon"` to set standard sizing (1.15rem × 1.15rem) and `fill: currentColor`.
+SVGs use `class="icon"` to set standard sizing (1.15rem × 1.15rem) and `fill: currentColor`. Decorative icons have `alt=""`; a button with only an icon carries `aria-label`.
 
 ### Filter panel
 
@@ -248,6 +248,13 @@ Disabled items are `<span aria-disabled="true">`. Links show a border on hover.
 `code`: mono 0.857rem, `--flow-bg-hover`, padding `0.2em 0.4em`. `pre > code`: block on `--flow-bg-subtle`, border, scrolls horizontally.
 SHAs: 8 chars, fingerprints: 12.
 
+### Diff viewer
+
+`<table data-diff>` inside an `article` (file box). A `<colgroup>` of three `<col>` fixes the layout (two 3.5rem line-number gutters, code takes the rest), so gutters are identical in every file.
+Rows are marked `data-line="hunk|add|del|ctx"`; review threads are `<tr data-thread><td colspan="3">` and reset the gutter/code cell styling (they are `:first-child` and `:last-child`).
+The `+` comment trigger is a `details > summary` inside a line-number cell, shown on row hover; its form is posted with htmx and the response row is inserted after the line (`hx-swap="afterend"`).
+Revision picker, comment forms and thread actions are htmx only (`hx-on::after:swap` resets the form); no inline JS.
+
 ### Footer
 
 `body > footer`: top border, 2.5rem padding, centred, 0.857rem muted. Links muted, accent on hover. Items separated by `·`.
@@ -274,7 +281,7 @@ SHAs: 8 chars, fingerprints: 12.
 - Update this file in the same commit as any `flow.css` change.
 
 **Don't**
-- No `class` attributes (except htmx and JS hooks), no inline styles, no ids in selectors.
+- No `class` attributes (except htmx and JS hooks), no inline styles or inline event handlers (`onclick`, `onchange`, `onsubmit`), no ids in selectors.
 - No `!important`, `@layer`, `@media` other than the 768px table cards, reduced motion and the dark-mode icon inversion.
 - No gradients, glows, blur, zebra rows, card shadows, web fonts, CDN assets.
 - No green buttons for destructive actions; no blue buttons; no green links.

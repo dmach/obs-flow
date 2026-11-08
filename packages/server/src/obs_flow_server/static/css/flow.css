@@ -152,7 +152,7 @@ a:hover {
 }
 
 :focus-visible {
-B	outline: 2px solid var(--flow-fg-accent);
+	outline: 2px solid var(--flow-fg-accent);
 	outline-offset: 1px;
 }
 
@@ -367,6 +367,12 @@ main,
 body > footer {
 	padding-inline: var(--flow-gutter);
 }
+body > header > *,
+.page-header > *,
+main {
+	max-width: 1280px;
+	margin-inline: auto;
+}
 
 /* Top row: brand left, account right. */
 body > header > div {
@@ -432,11 +438,6 @@ nav[aria-label="Subnav"] {
 	border-bottom: 1px solid var(--flow-border);
 }
 nav[aria-label="Subnav"] > ul {
-	display: flex;
-	gap: 0.25rem;
-	margin: 0;
-	padding: 0;
-	list-style: none;
 	flex-wrap: wrap;
 }
 .page-header nav[aria-label="Subnav"] > ul {
@@ -470,10 +471,6 @@ body > header:has(+ .page-header) {
 .page-header > h1 {
 	margin-bottom: 0.25rem;
 }
-nav[aria-label="Subnav"] {
-	margin-top: 1rem;
-}
-
 /* Account dropdown. */
 header details {
 	position: relative;
@@ -506,15 +503,13 @@ header summary + ul {
 	list-style: none;
 }
 
-/* Invert black octicons in dark mode. */
+/* Octicons are black SVGs: invert them in dark mode. */
 @media (prefers-color-scheme: dark) {
-	:root:not([data-theme="light"]) header img,
-	:root:not([data-theme="light"]) .page-header img {
+	:root:not([data-theme="light"]) .icon {
 		filter: invert(1);
 	}
 }
-:root[data-theme="dark"] header img,
-:root[data-theme="dark"] .page-header img {
+:root[data-theme="dark"] .icon {
 	filter: invert(1);
 }
 
@@ -966,10 +961,6 @@ article > a[role="button"] {
 	margin-left: auto;
 }
 article > form > footer {
-	display: flex;
-	flex-wrap: wrap;
-	justify-content: flex-end;
-	gap: 0.5rem;
 	margin-top: 1.5rem;
 	padding-top: 0.75rem;
 	border-top: 1px solid var(--flow-border-muted);
@@ -1247,7 +1238,6 @@ table[data-diff] tr[data-line] > td > details > summary {
 	list-style: none;
 	vertical-align: middle;
 	opacity: 0;
-	transition: opacity 0.1s ease;
 }
 table[data-diff] tr[data-line]:hover td > details > summary {
 	opacity: 1;
@@ -1288,22 +1278,22 @@ table[data-diff] tr[data-line] > td > details[open] > form textarea {
 }
 
 /* Discussion comments */
-section#comments-section {
+section:has(> h2 > .icon) {
 	margin-top: 2rem;
 }
-section#comments-section > h2 {
+section:has(> h2 > .icon) > h2 {
 	display: flex;
 	align-items: center;
 	gap: 0.5rem;
 	margin-bottom: 1rem;
 }
-section#comments-section > div {
+section:has(> h2 > .icon) > div {
 	display: flex;
 	flex-direction: column;
 	gap: 1rem;
 	margin-bottom: 1.5rem;
 }
-section#comments-section article p {
+section:has(> h2 > .icon) article p {
 	margin-bottom: 0;
 	white-space: pre-wrap;
 	line-height: 1.5;
