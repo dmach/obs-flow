@@ -24,8 +24,8 @@
                 </td>
                 <td data-label="Hash">
                     <code>{{ commit.short_sha }}</code>
-                    <button type="button" onclick="navigator.clipboard.writeText('{{ commit.sha }}')" title="Copy full SHA" aria-label="Copy full SHA">
-                        <img class="icon" src="{% static 'vendor/octicons/copy-16.svg' %}" alt="Copy SHA" />
+                    <button type="button" data-copy="{{ commit.sha }}" title="Copy full SHA" aria-label="Copy full SHA">
+                        <img class="icon" src="{% static 'vendor/octicons/copy-16.svg' %}" alt="" />
                     </button>
                 </td>
                 <td data-label="Actions">

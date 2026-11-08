@@ -13,8 +13,8 @@
             {% endfor %}
         </ul>
         {% if file_path %}
-            <button type="button" onclick="navigator.clipboard.writeText('{{ file_path }}')" title="Copy path" aria-label="Copy path">
-                <img class="icon" src="{% static 'vendor/octicons/copy-16.svg' %}" alt="Copy path" />
+            <button type="button" data-copy="{{ file_path }}" title="Copy path" aria-label="Copy path">
+                <img class="icon" src="{% static 'vendor/octicons/copy-16.svg' %}" alt="" />
             </button>
         {% endif %}
     </nav>

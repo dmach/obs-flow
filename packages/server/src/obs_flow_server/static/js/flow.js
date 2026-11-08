@@ -10,6 +10,15 @@ document.addEventListener('change', (e) => {
     });
 });
 
+// Copy buttons: <button data-copy="TEXT"> puts TEXT on the clipboard. Delegated so it also
+// covers content swapped in by htmx.
+document.addEventListener('click', (e) => {
+    const button = e.target.closest('[data-copy]');
+    if (button) {
+        navigator.clipboard.writeText(button.dataset.copy);
+    }
+});
+
 // Bind event listeners once the DOM is fully loaded
 document.addEventListener('DOMContentLoaded', () => {
     // Submit GET forms without sending empty form fields, which is much cleaner and user-friendly.
