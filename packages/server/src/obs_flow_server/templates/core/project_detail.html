@@ -9,8 +9,8 @@
                 <table>
                     <thead>
                         <tr>
-                            <th>Package</th>
-                            <th>Forked From</th>
+                            <th scope="col">Package</th>
+                            <th scope="col">Forked From</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -23,7 +23,7 @@
                                     {% if pkg.forked_from %}
                                         <a href="{{ pkg.forked_from.get_absolute_url }}">{{ pkg.forked_from }}</a>
                                     {% else %}
-                                        -
+                                        <small>-</small>
                                     {% endif %}
                                 </td>
                             </tr>

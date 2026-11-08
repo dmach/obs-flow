@@ -2,22 +2,22 @@
     <h4>Draft</h4>
     <p>
         {% if batch.is_draft %}
-        yes
-        {% if latest_revision and latest_revision.draft_expires_at %}
-            <span class="debounce-countdown"
-                  data-expires="{{ latest_revision.draft_expires_at|date:'c' }}"
-                  hx-get="{% url 'staging_draft_status' batch.id %}"
-                  hx-trigger="countdown-expired"
-                  hx-target="#staging-draft-section"
-                  hx-swap="outerHTML">
-                (debouncing: <span class="countdown-timer">...</span>)
-            </span>
+            yes
+            {% if latest_revision and latest_revision.draft_expires_at %}
+                <span class="debounce-countdown"
+                      data-expires="{{ latest_revision.draft_expires_at|date:'c' }}"
+                      hx-get="{% url 'staging_draft_status' batch.id %}"
+                      hx-trigger="countdown-expired"
+                      hx-target="#staging-draft-section"
+                      hx-swap="outerHTML">
+                    (debouncing: <span class="countdown-timer">...</span>)
+                </span>
+            {% endif %}
+        {% else %}
+            no
         {% endif %}
-    {% else %}
-        no
-    {% endif %}
-</p>
-{% if batch.is_draft %}
+    </p>
+    {% if batch.is_draft %}
         <form method="post" action="{% url 'staging_ready_for_review' batch.id %}" hx-post="{% url 'staging_ready_for_review' batch.id %}" hx-target="#staging-draft-section" hx-swap="outerHTML">
             {% csrf_token %}
             <button type="submit">Ready for Review</button>
@@ -38,7 +38,7 @@
 
 {% if request.headers.hx_request or request.headers.HX_Request %}
 <section id="staging-reviews-section" hx-swap-oob="true">
-    <h3>Reviews (Latest Revision)</h3>
+    <h2>Staging Reviews <small>(latest revision)</small></h2>
     {% include "staging/partials/reviews_table.html" %}
 </section>
 {% endif %}

@@ -3,22 +3,22 @@
     <h4>Draft</h4>
     <p>
         {% if pr.is_draft %}
-        yes
-        {% if latest_revision and latest_revision.draft_expires_at %}
-            <span class="debounce-countdown"
-                  data-expires="{{ latest_revision.draft_expires_at|date:'c' }}"
-                  hx-get="{% pr_url pr 'pr_draft_status' %}"
-                  hx-trigger="countdown-expired"
-                  hx-target="#pr-draft-section"
-                  hx-swap="outerHTML">
-                (debouncing: <span class="countdown-timer">...</span>)
-            </span>
+            yes
+            {% if latest_revision and latest_revision.draft_expires_at %}
+                <span class="debounce-countdown"
+                      data-expires="{{ latest_revision.draft_expires_at|date:'c' }}"
+                      hx-get="{% pr_url pr 'pr_draft_status' %}"
+                      hx-trigger="countdown-expired"
+                      hx-target="#pr-draft-section"
+                      hx-swap="outerHTML">
+                    (debouncing: <span class="countdown-timer">...</span>)
+                </span>
+            {% endif %}
+        {% else %}
+            no
         {% endif %}
-    {% else %}
-        no
-    {% endif %}
-</p>
-{% if pr.is_draft %}
+    </p>
+    {% if pr.is_draft %}
         <form method="post" action="{% pr_url pr 'pr_ready_for_review' %}" hx-post="{% pr_url pr 'pr_ready_for_review' %}" hx-target="#pr-draft-section" hx-swap="outerHTML">
             {% csrf_token %}
             <button type="submit">Ready for Review</button>
@@ -39,7 +39,7 @@
 
 {% if request.headers.hx_request or request.headers.HX_Request %}
 <section id="pr-reviews-section" hx-swap-oob="true">
-    <h3>Reviews (Latest Revision)</h3>
+    <h2>Reviews <small>(latest revision)</small></h2>
     {% include "pull_requests/partials/reviews_table.html" %}
 </section>
 {% endif %}

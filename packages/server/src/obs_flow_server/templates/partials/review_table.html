@@ -2,12 +2,12 @@
     <table>
         <thead>
             <tr>
-                <th>Reviewer</th>
-                <th>Actor</th>
-                <th>State</th>
-                <th>Date</th>
-                <th>Justification</th>
-                <th>URL</th>
+                <th scope="col">Reviewer</th>
+                <th scope="col">Actor</th>
+                <th scope="col">State</th>
+                <th scope="col">Date</th>
+                <th scope="col">Justification</th>
+                <th scope="col">URL</th>
             </tr>
         </thead>
         <tbody>
@@ -33,7 +33,7 @@
                     </td>
                     <td data-label="State"><mark data-state="{{ review.state }}">{{ review.get_state_display }}</mark></td>
                     <td data-label="Date">{{ review.updated_at|date:"Y-m-d H:i" }}</td>
-                    <td data-label="Justification">{{ review.justification|default:"-" }}</td>
+                    <td data-label="Justification">{% if review.justification %}{{ review.justification }}{% else %}<small>-</small>{% endif %}</td>
                     <td data-label="URL">
                         {% if review.external_review_url %}
                             <a href="{{ review.external_review_url }}" target="_blank" rel="noopener">link</a>

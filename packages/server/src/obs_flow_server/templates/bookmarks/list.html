@@ -18,11 +18,11 @@
     <table>
         <thead>
             <tr>
-                <th>
+                <th scope="col">
                     <input type="checkbox" data-select-all="selected_bookmarks" aria-label="Select all bookmarks">
                 </th>
-                <th>Name</th>
-                <th>URL</th>
+                <th scope="col">Name</th>
+                <th scope="col">URL</th>
                 <th aria-label="Actions"></th>
             </tr>
         </thead>
@@ -32,7 +32,9 @@
             {% empty %}
                 <tr>
                     <td colspan="4">
-                        No bookmarks saved yet.
+                        <article data-empty>
+                            <p>No bookmarks saved yet.</p>
+                        </article>
                     </td>
                 </tr>
             {% endfor %}

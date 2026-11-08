@@ -8,46 +8,42 @@
         {% if not items %}
             <p>No staging batches selected.</p>
         {% else %}
-            <div>
-                {% for item in items %}
-                    <div>
-                        <header>
-                            <h4>Batch #{{ item.batch.id }} ({{ item.batch.project.name }})</h4>
-                            {% if item.can_merge %}
-                                <data data-variant="success" value="ready"><strong>✓ Ready to merge</strong></data>
-                            {% else %}
-                                <data data-variant="danger" value="cannot"><strong>✗ Cannot merge</strong></data>
-                            {% endif %}
-                        </header>
-
-                        {% if not item.can_merge %}
-                            <p role="alert"><small>{{ item.error }}</small></p>
+            {% for item in items %}
+                <article>
+                    <header>
+                        <h4>Batch #{{ item.batch.id }} ({{ item.batch.project.name }})</h4>
+                        {% if item.can_merge %}
+                            <data data-variant="success" value="ready"><strong>✓ Ready to merge</strong></data>
+                        {% else %}
+                            <data data-variant="danger" value="cannot"><strong>✗ Cannot merge</strong></data>
                         {% endif %}
+                    </header>
 
-                        {% if item.reviews %}
-                            <div>
-                                <strong>Reviews:</strong>
-                                <small>
-                                    {% for r in item.reviews %}
-                                        <span>{{ r.reviewer_name }} ({{ r.state }}){% if not forloop.last %}, {% endif %}</span>
-                                    {% endfor %}
-                                </small>
-                            </div>
-                        {% endif %}
+                    {% if not item.can_merge %}
+                        <p role="alert"><small>{{ item.error }}</small></p>
+                    {% endif %}
 
-                        {% if item.prs %}
-                            <div>
-                                <strong>Included PRs ({{ item.prs|length }}):</strong>
-                                <ul>
-                                    {% for pr in item.prs %}
-                                        <li><small>#{{ pr.number }} {{ pr.title|default:"" }} ({{ pr.target_owner }}/{{ pr.target_repo }})</small></li>
-                                    {% endfor %}
-                                </ul>
-                            </div>
-                        {% endif %}
-                    </div>
-                {% endfor %}
-            </div>
+                    {% if item.reviews %}
+                        <p>
+                            <strong>Reviews:</strong>
+                            <small>
+                                {% for r in item.reviews %}
+                                    {{ r.reviewer_name }} ({{ r.state }}){% if not forloop.last %}, {% endif %}
+                                {% endfor %}
+                            </small>
+                        </p>
+                    {% endif %}
+
+                    {% if item.prs %}
+                        <strong>Included PRs ({{ item.prs|length }}):</strong>
+                        <ul>
+                            {% for pr in item.prs %}
+                                <li><small>#{{ pr.number }} {{ pr.title|default:"" }} ({{ pr.target_owner }}/{{ pr.target_repo }})</small></li>
+                            {% endfor %}
+                        </ul>
+                    {% endif %}
+                </article>
+            {% endfor %}
 
             {% if mergeable_batches %}
                 <form id="staging-merge-execute-form" hx-post="{% url 'staging_ui_modal_execute_merge' %}" hx-target="#modal-container">

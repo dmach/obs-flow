@@ -8,9 +8,9 @@
         </div>
         {% if revisions and revisions|length > 1 %}
             <div>
-                <form method="get" action="{{ pr.files_changed_url }}">
+                <form method="get" action="{{ pr.files_changed_url }}" hx-get="{{ pr.files_changed_url }}" hx-trigger="change" hx-target="main" hx-select="main" hx-swap="outerHTML" hx-push-url="true">
                     <label for="rev-select">Revision: </label>
-                    <select id="rev-select" name="rev" onchange="this.form.submit()">
+                    <select id="rev-select" name="rev">
                         {% for rev in revisions %}
                             <option value="{{ rev.revision_number }}" {% if rev.id == current_revision.id %}selected{% endif %}>
                                 Rev {{ rev.revision_number }} ({{ rev.fingerprint|slice:":8" }}){% if forloop.first %} (latest){% endif %}
@@ -66,22 +66,7 @@
                                     <td></td>
                                     <td>
                                         {{ line.new_no }}
-                                        {% if user.is_authenticated %}
-                                            <details>
-                                                <summary title="Add inline comment">+</summary>
-                                                <form hx-post="{% url 'pr_inline_comment_add' %}" hx-target="closest tr" hx-swap="afterend" hx-on::after:swap="this.reset(); this.closest('details').removeAttribute('open')">
-                                                    {% csrf_token %}
-                                                    <input type="hidden" name="pr_id" value="{{ pr.id }}">
-                                                    <input type="hidden" name="revision_id" value="{{ current_revision.id }}">
-                                                    <input type="hidden" name="path" value="{{ file.path }}">
-                                                    <input type="hidden" name="line_number" value="{{ line.new_no }}">
-                                                    <textarea name="body" placeholder="Comment on line {{ line.new_no }}..." rows="3" required></textarea>
-                                                    <footer>
-                                                        <button type="submit" data-variant="primary">Comment</button>
-                                                    </footer>
-                                                </form>
-                                            </details>
-                                        {% endif %}
+                                        {% include "pull_requests/partials/_inline_comment_trigger.html" with line_no=line.new_no %}
                                     </td>
                                     <td>+ {{ line.text }}</td>
                                 </tr>
@@ -89,22 +74,7 @@
                                 <tr data-line="del">
                                     <td>
                                         {{ line.old_no }}
-                                        {% if user.is_authenticated %}
-                                            <details>
-                                                <summary title="Add inline comment">+</summary>
-                                                <form hx-post="{% url 'pr_inline_comment_add' %}" hx-target="closest tr" hx-swap="afterend" hx-on::after:swap="this.reset(); this.closest('details').removeAttribute('open')">
-                                                    {% csrf_token %}
-                                                    <input type="hidden" name="pr_id" value="{{ pr.id }}">
-                                                    <input type="hidden" name="revision_id" value="{{ current_revision.id }}">
-                                                    <input type="hidden" name="path" value="{{ file.path }}">
-                                                    <input type="hidden" name="line_number" value="{{ line.old_no }}">
-                                                    <textarea name="body" placeholder="Comment on line {{ line.old_no }}..." rows="3" required></textarea>
-                                                    <footer>
-                                                        <button type="submit" data-variant="primary">Comment</button>
-                                                    </footer>
-                                                </form>
-                                            </details>
-                                        {% endif %}
+                                        {% include "pull_requests/partials/_inline_comment_trigger.html" with line_no=line.old_no %}
                                     </td>
                                     <td></td>
                                     <td>- {{ line.text }}</td>
@@ -114,22 +84,7 @@
                                     <td>{{ line.old_no }}</td>
                                     <td>
                                         {{ line.new_no }}
-                                        {% if user.is_authenticated %}
-                                            <details>
-                                                <summary title="Add inline comment">+</summary>
-                                                <form hx-post="{% url 'pr_inline_comment_add' %}" hx-target="closest tr" hx-swap="afterend" hx-on::after:swap="this.reset(); this.closest('details').removeAttribute('open')">
-                                                    {% csrf_token %}
-                                                    <input type="hidden" name="pr_id" value="{{ pr.id }}">
-                                                    <input type="hidden" name="revision_id" value="{{ current_revision.id }}">
-                                                    <input type="hidden" name="path" value="{{ file.path }}">
-                                                    <input type="hidden" name="line_number" value="{{ line.new_no }}">
-                                                    <textarea name="body" placeholder="Comment on line {{ line.new_no }}..." rows="3" required></textarea>
-                                                    <footer>
-                                                        <button type="submit" data-variant="primary">Comment</button>
-                                                    </footer>
-                                                </form>
-                                            </details>
-                                        {% endif %}
+                                        {% include "pull_requests/partials/_inline_comment_trigger.html" with line_no=line.new_no %}
                                     </td>
                                     <td>  {{ line.text }}</td>
                                 </tr>

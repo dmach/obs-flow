@@ -31,27 +31,27 @@
     <ul>
         <li>
             <a href="{{ project.get_absolute_url }}"{% if active_tab == 'overview' %} aria-current="page"{% endif %}>
-                <img class="icon" src="{% static 'vendor/octicons/package-16.svg' %}" /> Packages
+                <img class="icon" src="{% static 'vendor/octicons/package-16.svg' %}" alt="" />Packages
             </a>
         </li>
         <li>
             <a href="{% url 'project_code' project.name %}"{% if active_tab == 'code' %} aria-current="page"{% endif %}>
-                <img class="icon" src="{% static 'vendor/octicons/code-16.svg' %}" /> Code
+                <img class="icon" src="{% static 'vendor/octicons/code-16.svg' %}" alt="" />Code
             </a>
         </li>
         <li>
             <a href="{% url 'project_commits' project.name %}"{% if active_tab == 'commits' %} aria-current="page"{% endif %}>
-                <img class="icon" src="{% static 'vendor/octicons/git-commit-16.svg' %}" /> Commits
+                <img class="icon" src="{% static 'vendor/octicons/git-commit-16.svg' %}" alt="" />Commits
             </a>
         </li>
         <li>
             <a href="{% url 'project_pr_list' project.name %}"{% if active_tab == 'pull_requests' %} aria-current="page"{% endif %}>
-                <img class="icon" src="{% static 'vendor/octicons/git-pull-request-16.svg' %}" /> Pull Requests
+                <img class="icon" src="{% static 'vendor/octicons/git-pull-request-16.svg' %}" alt="" />Pull Requests
             </a>
         </li>
         <li>
             <a href="{% url 'project_staging_list' project.name %}"{% if active_tab == 'staging' %} aria-current="page"{% endif %}>
-                <img class="icon" src="{% static 'vendor/octicons/iterations-16.svg' %}" /> Staging Batches
+                <img class="icon" src="{% static 'vendor/octicons/iterations-16.svg' %}" alt="" />Staging Batches
             </a>
         </li>
     </ul>

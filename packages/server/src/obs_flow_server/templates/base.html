@@ -23,10 +23,10 @@
             </a>
             <nav aria-label="Main">
                 <ul>
-                    <li><a href="{% url 'project_list' %}"><img class="icon" src="{% static 'vendor/octicons/project-16.svg' %}" />Projects</a></li>
-                    <li><a href="{% url 'package_list' %}"><img class="icon" src="{% static 'vendor/octicons/package-16.svg' %}" />Packages</a></li>
-                    <li><a href="{% url 'pr_list' %}"><img class="icon" src="{% static 'vendor/octicons/git-pull-request-16.svg' %}" /> Pull Requests</a></li>
-                    <li><a href="{% url 'staging_list' %}"><img class="icon" src="{% static 'vendor/octicons/iterations-16.svg' %}" />Staging Batches</a></li>
+                    <li><a href="{% url 'project_list' %}"><img class="icon" src="{% static 'vendor/octicons/project-16.svg' %}" alt="" />Projects</a></li>
+                    <li><a href="{% url 'package_list' %}"><img class="icon" src="{% static 'vendor/octicons/package-16.svg' %}" alt="" />Packages</a></li>
+                    <li><a href="{% url 'pr_list' %}"><img class="icon" src="{% static 'vendor/octicons/git-pull-request-16.svg' %}" alt="" />Pull Requests</a></li>
+                    <li><a href="{% url 'staging_list' %}"><img class="icon" src="{% static 'vendor/octicons/iterations-16.svg' %}" alt="" />Staging Batches</a></li>
                 </ul>
             </nav>
             <nav aria-label="Account">
@@ -34,7 +34,7 @@
                     {% if user.is_authenticated %}
                         <li>
                             <details>
-                                <summary><img class="icon" src="{% static 'vendor/octicons/person-16.svg' %}" /> {{ user.username }}</summary>
+                                <summary><img class="icon" src="{% static 'vendor/octicons/person-16.svg' %}" alt="" />{{ user.username }}</summary>
                                 <ul>
                                     <li><a href="{% url 'preferences' %}">Preferences</a></li>
                                     <li><a href="{% url 'token_list' %}">Tokens</a></li>

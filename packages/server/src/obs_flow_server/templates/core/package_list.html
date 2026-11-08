@@ -23,19 +23,19 @@
     <table>
         <thead>
             <tr>
-                <th>
+                <th scope="col">
                     <a href="?sort={% if current_sort == 'name' %}-name{% else %}name{% endif %}{{ base_query }}">
                         Package
                         {% if current_sort == 'name' %}▲{% elif current_sort == '-name' %}▼{% endif %}
                     </a>
                 </th>
-                <th>
+                <th scope="col">
                     <a href="?sort={% if current_sort == 'project__name' %}-project__name{% else %}project__name{% endif %}{{ base_query }}">
                         Project
                         {% if current_sort == 'project__name' %}▲{% elif current_sort == '-project__name' %}▼{% endif %}
                     </a>
                 </th>
-                <th>
+                <th scope="col">
                     Forked From
                 </th>
             </tr>
@@ -53,7 +53,7 @@
                         {% if package.forked_from %}
                             <a href="{{ package.forked_from.get_absolute_url }}">{{ package.forked_from }}</a>
                         {% else %}
-                            -
+                            <small>-</small>
                         {% endif %}
                     </td>
                 </tr>

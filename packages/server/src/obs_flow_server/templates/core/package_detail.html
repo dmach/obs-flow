@@ -9,19 +9,19 @@
                 <table>
                     <thead>
                         <tr>
-                            <th>Project</th>
-                            <th>Package</th>
+                            <th scope="col">Package</th>
+                            <th scope="col">Project</th>
                         </tr>
                     </thead>
                     <tbody>
                         {% for fork in forks %}
                             <tr>
-                                <td data-label="Project">
-                                    <a href="{{ fork.project.get_absolute_url }}">{{ fork.project.name }}</a>
-                                </td>
                                 <th scope="row" data-label="Package">
                                     <a href="{{ fork.get_absolute_url }}">{{ fork.name }}</a>
                                 </th>
+                                <td data-label="Project">
+                                    <a href="{{ fork.project.get_absolute_url }}">{{ fork.project.name }}</a>
+                                </td>
                             </tr>
                         {% endfor %}
                     </tbody>
