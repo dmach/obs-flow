@@ -203,11 +203,38 @@ def test_review_renderer():
     renderer = ReviewRenderer(detail)
     with patch("click.echo") as mock_echo:
         renderer.render(fmt="text")
-        mock_echo.assert_any_call("Reviewer : \x1b[1mdarix (Marcus Rueckert <mrueckert@suse.com>)\x1b[0m")
-        mock_echo.assert_any_call("State    : \x1b[32mACCEPTED\x1b[0m")
-        mock_echo.assert_any_call("Actor    : dimstar (Dominique Leuenberger <dimstar@opensuse.org>)")
-        mock_echo.assert_any_call("Date     : 2023-01-01 12:00:00")
-        mock_echo.assert_any_call("Reason   : Looks good")
+        mock_echo.assert_any_call("Reviewer  : \x1b[1mdarix (Marcus Rueckert <mrueckert@suse.com>)\x1b[0m")
+        mock_echo.assert_any_call("State     : \x1b[32mACCEPTED\x1b[0m")
+        mock_echo.assert_any_call("Actor     : dimstar (Dominique Leuenberger <dimstar@opensuse.org>)")
+        mock_echo.assert_any_call("Date      : 2023-01-01 12:00:00")
+        mock_echo.assert_any_call("Reason    : Looks good")
+
+    # Inherited and skipped review
+    detail_inherited = ReviewDetail(
+        reviewer=PersonReviewerDTO(username="darix", full_name="Marcus Rueckert", email="mrueckert@suse.com", is_active=True),
+        state="accepted",
+        scope="code",
+        is_inherited=True,
+    )
+    renderer_inherited = ReviewRenderer(detail_inherited)
+    with patch("click.echo") as mock_echo:
+        renderer_inherited.render(fmt="text")
+        mock_echo.assert_any_call("Reviewer  : \x1b[1mdarix (Marcus Rueckert <mrueckert@suse.com>)\x1b[0m")
+        mock_echo.assert_any_call("Scope     : code")
+        mock_echo.assert_any_call("State     : \x1b[32mACCEPTED\x1b[0m")
+        mock_echo.assert_any_call("Inherited : yes")
+
+    detail_skipped = ReviewDetail(
+        reviewer=PersonReviewerDTO(username="darix", full_name="Marcus Rueckert", email="mrueckert@suse.com", is_active=True),
+        state="skipped",
+        scope="docs",
+        is_inherited=False,
+    )
+    renderer_skipped = ReviewRenderer(detail_skipped)
+    with patch("click.echo") as mock_echo:
+        renderer_skipped.render(fmt="text")
+        mock_echo.assert_any_call("Scope     : docs")
+        mock_echo.assert_any_call("State     : \x1b[33mSKIPPED\x1b[0m")
 
 
 def test_staging_renderer():
@@ -391,4 +418,43 @@ def test_review_renderer_id():
         assert mock_echo.call_args_list == [
             (("alice (ACCEPTED)",), {}),
             (("@security (PENDING)",), {}),
+        ]
+
+
+def test_review_scope_renderer():
+    from obs_flow_cli.output.review_scope import ReviewScopeRenderer
+    from obs_flow_common.messages import ReviewScopeDTO
+
+    # scope with both include and exclude globs
+    scope = ReviewScopeDTO(
+        name="code",
+        include_globs=["src/*.py", "lib/*.py"],
+        exclude_globs=["src/test/*"],
+    )
+    renderer = ReviewScopeRenderer(scope)
+    with patch("click.echo") as mock_echo:
+        renderer.render(fmt="text")
+        mock_echo.assert_any_call("Name    : \x1b[1mcode\x1b[0m")
+        mock_echo.assert_any_call("Include : src/*.py, lib/*.py")
+        mock_echo.assert_any_call("Exclude : src/test/*")
+
+    # scope with no exclude globs (empty -> skipped)
+    scope_no_exclude = ReviewScopeDTO(
+        name="docs",
+        include_globs=["docs/*.md"],
+        exclude_globs=[],
+    )
+    renderer = ReviewScopeRenderer(scope_no_exclude)
+    with patch("click.echo") as mock_echo:
+        renderer.render(fmt="text")
+        mock_echo.assert_any_call("Name    : \x1b[1mdocs\x1b[0m")
+        mock_echo.assert_any_call("Include : docs/*.md")
+        for call in mock_echo.call_args_list:
+            assert "Exclude" not in call[0][0]
+
+    # id format renders the name
+    with patch("click.echo") as mock_echo:
+        ReviewScopeRenderer(scope).render(fmt="id")
+        assert mock_echo.call_args_list == [
+            (("code",), {}),
         ]

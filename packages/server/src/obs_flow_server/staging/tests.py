@@ -5,6 +5,7 @@ from django.urls import reverse
 from django.utils import timezone
 from accounts.models import User, Group
 from core.models import Project, GitMapping
+from reviews.models import ReviewScope
 from pull_requests.models import PullRequest, PullRequestRevision, PullRequestReview
 from staging.models import StagingBatch, StagingBatchRevision, StagingReview
 
@@ -128,16 +129,19 @@ class TestStagingCreationWithReviewConfig(TransactionTestCase):
             project=project,
             type="staging",
             reviewer_user=user_darix,
+            scope=ReviewScope.objects.get(name="global"),
         )
         config_team = ReviewConfig.objects.create(
             project=project,
             type="staging",
             reviewer_group=group_team,
+            scope=ReviewScope.objects.get(name="global"),
         )
         config_dimstar = ReviewConfig.objects.create(
             project=project,
             type="staging",
             reviewer_user=user_dimstar,
+            scope=ReviewScope.objects.get(name="global"),
         )
         config_dimstar.depends_on.add(config_darix, config_team)
 
@@ -692,6 +696,7 @@ class TestStagingBatchRevisionModel(TestCase):
 
 
 class TestStagingReviewProvisioning(TestCase):
+    fixtures = ["global_scope.json"]
     def test_provision_reviews_and_mark_staging_ready_for_review(self):
         from reviews.models import ReviewConfig
         from staging.api import provision_reviews_for_staging_revision, mark_staging_ready_for_review
@@ -702,6 +707,7 @@ class TestStagingReviewProvisioning(TestCase):
             project=project,
             type="staging",
             reviewer_user=reviewer,
+            scope=ReviewScope.objects.get(name="global"),
         )
 
         batch = StagingBatch.objects.create(project=project)
@@ -739,8 +745,8 @@ class TestStagingReviewProvisioning(TestCase):
         u1 = User.objects.create(username="srev_1", username_lower="srev_1", account_type=User.AccountType.HUMAN)
         u2 = User.objects.create(username="srev_2", username_lower="srev_2", account_type=User.AccountType.HUMAN)
 
-        cfg1 = ReviewConfig.objects.create(project=project, type="staging", reviewer_user=u1)
-        cfg2 = ReviewConfig.objects.create(project=project, type="staging", reviewer_user=u2)
+        cfg1 = ReviewConfig.objects.create(project=project, type="staging", reviewer_user=u1, scope=ReviewScope.objects.get(name="global"))
+        cfg2 = ReviewConfig.objects.create(project=project, type="staging", reviewer_user=u2, scope=ReviewScope.objects.get(name="global"))
         cfg2.depends_on.add(cfg1)
 
         batch = StagingBatch.objects.create(project=project)
@@ -788,6 +794,7 @@ class TestStagingReviewProvisioning(TestCase):
             project=project,
             type="staging",
             reviewer_user=reviewer,
+            scope=ReviewScope.objects.get(name="global"),
         )
 
         batch = StagingBatch.objects.create(project=project)
@@ -800,11 +807,12 @@ class TestStagingReviewProvisioning(TestCase):
 
 
 class TestStagingReadyForReviewEndpoint(TestCase):
+    fixtures = ["global_scope.json"]
     def setUp(self):
         self.project = Project.objects.create(name="test:project")
         self.reviewer = User.objects.create(username="rev", username_lower="rev", account_type=User.AccountType.HUMAN)
         from reviews.models import ReviewConfig
-        ReviewConfig.objects.create(project=self.project, type="staging", reviewer_user=self.reviewer)
+        ReviewConfig.objects.create(project=self.project, type="staging", reviewer_user=self.reviewer, scope=ReviewScope.objects.get(name="global"))
 
         self.batch1 = StagingBatch.objects.create(project=self.project)
         self.rev1 = StagingBatchRevision.objects.create(
@@ -866,11 +874,12 @@ class TestStagingReadyForReviewEndpoint(TestCase):
 
 
 class TestStagingDraftWebViews(TestCase):
+    fixtures = ["global_scope.json"]
     def setUp(self):
         self.project = Project.objects.create(name="test:project")
         self.reviewer = User.objects.create(username="rev", username_lower="rev", account_type=User.AccountType.HUMAN)
         from reviews.models import ReviewConfig
-        ReviewConfig.objects.create(project=self.project, type="staging", reviewer_user=self.reviewer)
+        ReviewConfig.objects.create(project=self.project, type="staging", reviewer_user=self.reviewer, scope=ReviewScope.objects.get(name="global"))
 
         self.batch = StagingBatch.objects.create(project=self.project)
         self.rev = StagingBatchRevision.objects.create(
@@ -991,6 +1000,7 @@ class TestStagingConvertToDraftEndpoint(TestCase):
 
 
 class TestStagingMergeEndpoint(TestCase):
+    fixtures = ["global_scope.json"]
     def setUp(self):
         self.project = Project.objects.create(name="test:staging-merge", workflow_type=Project.WorkflowType.STAGING)
         self.mapping = GitMapping.objects.create(owner="suse", repo="staging-repo", branch="main", project=self.project)
@@ -1045,6 +1055,7 @@ class TestStagingMergeEndpoint(TestCase):
             revision=self.batch_rev,
             reviewer_user=self.reviewer,
             state=StagingReview.State.ACCEPTED,
+            scope=ReviewScope.objects.get(name="global"),
         )
 
     @override_settings(GITEA_URL="https://gitea.example.com", GITEA_TOKEN="secret-token")
@@ -1121,6 +1132,7 @@ class TestStagingMergeEndpoint(TestCase):
             revision=batch2_rev,
             reviewer_user=self.reviewer,
             state=StagingReview.State.PENDING,
+            scope=ReviewScope.objects.get(name="global"),
         )
 
         # Make batch 1 already merged
@@ -1142,6 +1154,7 @@ class TestStagingMergeEndpoint(TestCase):
 
 
 class TestStagingWebMergeActions(TestCase):
+    fixtures = ["global_scope.json"]
     def setUp(self):
         self.project = Project.objects.create(name="test:staging-web-merge", workflow_type=Project.WorkflowType.STAGING)
         self.mapping = GitMapping.objects.create(owner="suse", repo="web-staging-repo", branch="main", project=self.project)
@@ -1179,6 +1192,7 @@ class TestStagingWebMergeActions(TestCase):
             revision=self.batch_rev,
             reviewer_user=self.reviewer,
             state=StagingReview.State.PENDING,
+            scope=ReviewScope.objects.get(name="global"),
         )
 
     def test_staging_detail_renders_merge_button_and_hides_when_merged(self):

@@ -21,6 +21,14 @@ from obs_flow_common.messages import (
     ReviewConfigAddResponse,
     ReviewConfigRemoveResponse,
     ReviewConfigListResponse,
+    ReviewScopeListRequest,
+    ReviewScopeListResponse,
+    ReviewScopeAddRequest,
+    ReviewScopeAddResponse,
+    ReviewScopeRemoveRequest,
+    ReviewScopeRemoveResponse,
+    ReviewScopeUpdateRequest,
+    ReviewScopeUpdateResponse,
 )
 
 from obs_flow_client.connection import Connection
@@ -89,3 +97,31 @@ def pr_review_reopen(conn: Connection, req: PRReviewReopenRequest) -> PRReviewAc
     serialized_data = msgspec.json.encode(req)
     response_bytes = conn.post("/api/v1/pr_review/reopen", data=serialized_data)
     return msgspec.json.decode(response_bytes, type=PRReviewActionResponse)
+
+
+def review_scope_list(conn: Connection, req: ReviewScopeListRequest) -> ReviewScopeListResponse:
+    """Lists all review scopes."""
+    serialized_data = msgspec.json.encode(req)
+    response_bytes = conn.post("/api/v1/review-scope/list", data=serialized_data)
+    return msgspec.json.decode(response_bytes, type=ReviewScopeListResponse)
+
+
+def review_scope_add(conn: Connection, req: ReviewScopeAddRequest) -> ReviewScopeAddResponse:
+    """Adds a new review scope."""
+    serialized_data = msgspec.json.encode(req)
+    response_bytes = conn.post("/api/v1/review-scope/add", data=serialized_data)
+    return msgspec.json.decode(response_bytes, type=ReviewScopeAddResponse)
+
+
+def review_scope_update(conn: Connection, req: ReviewScopeUpdateRequest) -> ReviewScopeUpdateResponse:
+    """Update an existing review scope's globs."""
+    serialized_data = msgspec.json.encode(req)
+    response_bytes = conn.post("/api/v1/review-scope/update", data=serialized_data)
+    return msgspec.json.decode(response_bytes, type=ReviewScopeUpdateResponse)
+
+
+def review_scope_remove(conn: Connection, req: ReviewScopeRemoveRequest) -> ReviewScopeRemoveResponse:
+    """Removes a review scope by name."""
+    serialized_data = msgspec.json.encode(req)
+    response_bytes = conn.post("/api/v1/review-scope/remove", data=serialized_data)
+    return msgspec.json.decode(response_bytes, type=ReviewScopeRemoveResponse)

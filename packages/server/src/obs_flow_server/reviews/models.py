@@ -1,8 +1,70 @@
+import fnmatch
 from django.db import models
 from django.db.models import Q
 from django.conf import settings
 
 from core.models import Project, Package
+
+
+class ReviewScope(models.Model):
+    # Names of reserved/built-in scopes that cannot be modified or deleted.
+    RESERVED_NAMES = frozenset({"global"})
+
+    name = models.CharField(max_length=100, unique=True)
+    include_globs = models.JSONField(default=list)
+    exclude_globs = models.JSONField(default=list)
+
+    def __str__(self):
+        return self.name
+
+    def save(self, *args, **kwargs):
+        if self.name in self.RESERVED_NAMES and not self._state.adding:
+            raise ValueError(f"The '{self.name}' scope is reserved and cannot be modified.")
+        super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        if self.name in self.RESERVED_NAMES:
+            raise ValueError(f"The '{self.name}' scope is reserved and cannot be deleted.")
+        return super().delete(*args, **kwargs)
+
+    @staticmethod
+    def matches_glob(filepath: str, pattern: str) -> bool:
+        """
+        Checks if a filepath matches a glob pattern.
+        Handles recursive matching ('**/*'), basename matching, and directory prefixes.
+        """
+        if fnmatch.fnmatch(filepath, pattern):
+            return True
+        if "/" not in pattern and fnmatch.fnmatch(filepath.split("/")[-1], pattern):
+            return True
+        return False
+
+    def is_file_in_scope(self, filepath: str) -> bool:
+        """
+        Determines if a file is in review scope:
+        A file is considered in-scope if it matches at least one include glob
+        AND does not match any exclude glob.
+        """
+        included = any(self.matches_glob(filepath, pat) for pat in self.include_globs)
+        if not included:
+            return False
+        excluded = any(self.matches_glob(filepath, pat) for pat in self.exclude_globs)
+        if excluded:
+            return False
+        return True
+
+    def get_files_in_scope(self, files: set[str] | list[str]) -> set[str]:
+        """
+        Filters the given files and returns only those that fall within the specified scope.
+        """
+        return {f for f in files if self.is_file_in_scope(f)}
+
+    def evaluate(self, files: set[str] | list[str]) -> bool:
+        """
+        Evaluates whether the scope is triggered by any file in the given set of files.
+        Returns True if at least one file is in-scope.
+        """
+        return len(self.get_files_in_scope(files)) > 0
 
 
 class ReviewConfigBase(models.Model):
@@ -15,6 +77,11 @@ class ReviewConfigBase(models.Model):
         MAINTAINER = "maintainer", "Maintainer"
 
     type = models.CharField(max_length=10, choices=ConfigType.choices)
+    scope = models.ForeignKey(
+        ReviewScope,
+        on_delete=models.PROTECT,
+        related_name="%(class)s_configs",
+    )
     reviewer_user = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
@@ -145,9 +212,17 @@ class BaseReview(models.Model):
         ACCEPTED = "accepted", "Accepted"
         REJECTED = "rejected", "Rejected"
         OVERRIDDEN = "overridden", "Overridden"
+        SKIPPED = "skipped", "Skipped"
 
     class DynamicRole(models.TextChoices):
         MAINTAINER = "maintainer", "Maintainer"
+
+    scope = models.ForeignKey(
+        ReviewScope,
+        on_delete=models.PROTECT,
+        related_name="%(class)s_reviews",
+    )
+    is_inherited = models.BooleanField(default=False)
 
     reviewer_user = models.ForeignKey(
         settings.AUTH_USER_MODEL,
@@ -243,7 +318,7 @@ class BaseReview(models.Model):
 
     def unblock_downstream_reviews(self) -> list["BaseReview"]:
         """
-        When this review is resolved (ACCEPTED or OVERRIDDEN), inspects downstream
+        When this review is resolved (ACCEPTED, OVERRIDDEN, or SKIPPED), inspects downstream
         reviews that depend on it. If all their prerequisites are resolved,
         transitions them from WAITING to PENDING.
         """
@@ -256,15 +331,59 @@ class BaseReview(models.Model):
         for dep in dependents:
             if dep.state == self.State.WAITING:
                 prereqs = dep.depends_on.all()
-                if prereqs.exists() and all(p.state in (self.State.ACCEPTED, self.State.OVERRIDDEN) for p in prereqs):
+                if prereqs.exists() and all(p.state in (self.State.ACCEPTED, self.State.OVERRIDDEN, self.State.SKIPPED) for p in prereqs):
                     dep.state = self.State.PENDING
                     dep.save(update_fields=["state"])
                     unblocked.append(dep)
 
         return unblocked
 
+    def propagate_decision(self) -> list["BaseReview"]:
+        """
+        Propagates a decision on a review forward:
+        When a review is decided at revision N, the decision propagates forward
+        to every later revision with is_inherited = True, storing it on each,
+        and stops at the first revision where is_inherited = False.
+        """
+        propagated = []
+        rev = self.revision
+        model_class = self.__class__
+        rev_model_class = rev.__class__
+
+        if hasattr(rev, "pull_request"):
+            parent_filter = {"pull_request": rev.pull_request}
+        elif hasattr(rev, "staging_batch"):
+            parent_filter = {"staging_batch": rev.staging_batch}
+        else:
+            return propagated
+
+        later_revs = rev_model_class.objects.filter(
+            **parent_filter,
+            revision_number__gt=rev.revision_number,
+        ).order_by("revision_number")
+
+        for later_rev in later_revs:
+            later_review = model_class.objects.filter(
+                revision=later_rev,
+                reviewer_user=self.reviewer_user,
+                reviewer_group=self.reviewer_group,
+                dynamic_role=self.dynamic_role,
+                scope=self.scope,
+            ).first()
+
+            if not later_review or not later_review.is_inherited:
+                break
+
+            later_review.state = self.state
+            later_review.actor = self.actor
+            later_review.justification = self.justification
+            later_review.save()
+            propagated.append(later_review)
+
+        return propagated
+
     def save(self, *args, **kwargs):
-        is_resolved = self.state in (self.State.ACCEPTED, self.State.OVERRIDDEN)
+        is_resolved = self.state in (self.State.ACCEPTED, self.State.OVERRIDDEN, self.State.SKIPPED)
         is_raw = kwargs.get("raw", False)
         super().save(*args, **kwargs)
         if is_resolved and self.pk and not is_raw:

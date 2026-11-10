@@ -16,6 +16,9 @@ class ReviewConfigRenderer(Renderer):
     type = Field(
         label="Type",
     )
+    scope = Field(
+        label="Scope",
+    )
     reviewer = Field(
         label="Reviewer",
         style={"bold": True},
