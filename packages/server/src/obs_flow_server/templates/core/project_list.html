@@ -69,9 +69,6 @@
 
     {% include "partials/pagination.html" %}
 {% else %}
-    <article data-empty>
-        <h3>No projects found</h3>
-        {% if base_query %}<p>Try changing or <a href="?">resetting the filters</a>.</p>{% endif %}
-    </article>
+    {% include "partials/empty_state.html" with title="No projects found" reset=base_query %}
 {% endif %}
 {% endblock %}

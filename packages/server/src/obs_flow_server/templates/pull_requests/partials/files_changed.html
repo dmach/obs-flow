@@ -8,9 +8,9 @@
         </div>
         {% if revisions and revisions|length > 1 %}
             <div>
-                <form method="get" action="{{ pr.files_changed_url }}" hx-get="{{ pr.files_changed_url }}" hx-trigger="change" hx-target="main" hx-select="main" hx-swap="outerHTML" hx-push-url="true">
-                    <label for="rev-select">Revision: </label>
-                    <select id="rev-select" name="rev">
+                <form method="get" action="{{ pr.files_changed_url }}">
+                    <label for="rev-select">Revision</label>
+                    <select id="rev-select" name="rev" hx-get="{{ pr.files_changed_url }}" hx-trigger="change" hx-target="main" hx-select="main" hx-swap="outerHTML" hx-push-url="true">
                         {% for rev in revisions %}
                             <option value="{{ rev.revision_number }}" {% if rev.id == current_revision.id %}selected{% endif %}>
                                 Rev {{ rev.revision_number }} ({{ rev.fingerprint|slice:":8" }}){% if forloop.first %} (latest){% endif %}
@@ -48,9 +48,7 @@
             </header>
 
             {% if file.is_binary %}
-                <article data-empty>
-                    <p>Binary file not shown.</p>
-                </article>
+                {% include "partials/empty_state.html" with title="Binary file not shown" %}
             {% elif file.lines %}
                 <table data-diff>
                     <colgroup><col><col><col></colgroup>
@@ -108,14 +106,10 @@
                     </tbody>
                 </table>
             {% else %}
-                <article data-empty>
-                    <p>Empty file or no changes.</p>
-                </article>
+                {% include "partials/empty_state.html" with title="Empty file" hint="No changes to show." %}
             {% endif %}
         </article>
     {% empty %}
-        <article data-empty>
-            <p>No changed files found for this pull request.</p>
-        </article>
+        {% include "partials/empty_state.html" with title="No changed files found" hint="This pull request has no file changes." %}
     {% endfor %}
 </div>

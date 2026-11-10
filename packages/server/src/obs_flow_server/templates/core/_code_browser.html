@@ -69,9 +69,7 @@
                 {% empty %}
                     <tr>
                         <td colspan="5">
-                            <article data-empty>
-                                <p>Empty directory</p>
-                            </article>
+                            {% include "partials/empty_state.html" with title="Empty directory" %}
                         </td>
                     </tr>
                 {% endfor %}

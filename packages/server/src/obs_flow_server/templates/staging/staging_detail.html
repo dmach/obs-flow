@@ -43,7 +43,7 @@
                     </tbody>
                 </table>
             {% else %}
-                <article data-empty><p>No pull requests included in this batch.</p></article>
+                {% include "partials/empty_state.html" with title="No pull requests found" hint="No pull requests are included in this batch." %}
             {% endif %}
         </section>
 
@@ -76,7 +76,7 @@
                     </tbody>
                 </table>
             {% else %}
-                <article data-empty><p>No revisions found.</p></article>
+                {% include "partials/empty_state.html" with title="No revisions found" %}
             {% endif %}
         </section>
 

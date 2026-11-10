@@ -1,3 +1,4 @@
+import os
 import json
 from unittest.mock import MagicMock, patch
 from django.test import Client, TestCase, TransactionTestCase, override_settings
@@ -1870,6 +1871,63 @@ class TestNativePRCreation(TransactionTestCase):
             self.assertEqual(res_merge.status_code, 200)
             pr.refresh_from_db()
             self.assertEqual(pr.state, PullRequest.State.MERGED)
+
+
+class TestNativePRCreationResolvesShas(TransactionTestCase):
+    def test_zero_placeholder_shas_are_resolved_from_repos(self):
+        import json
+        import subprocess
+        import tempfile
+        from pathlib import Path
+        from django.test import override_settings
+        from django_bolt.testing import TestClient
+        from obs_flow_server.api import api
+        from core.models import Org, Project, Package
+        from core.git_forge import ensure_git_repo
+
+        with tempfile.TemporaryDirectory() as tmp, override_settings(GIT_FORGE_ROOT=Path(tmp)):
+            org = Org.objects.create(name="distro")
+            proj = Project.objects.create(name="distro:main", org=org, branch_name="main", review_debounce_minutes=0)
+            Package.objects.create(project=proj, name="mypkg")
+            target = ensure_git_repo("distro", "mypkg", initial_branch="main")
+            source = ensure_git_repo("~dev", "mypkg", initial_branch="work")
+
+            work = Path(tmp) / "work"
+            env = {"GIT_AUTHOR_NAME": "t", "GIT_AUTHOR_EMAIL": "t@x", "GIT_COMMITTER_NAME": "t", "GIT_COMMITTER_EMAIL": "t@x", "PATH": os.environ["PATH"]}
+
+            def git(*args, cwd=work):
+                return subprocess.run(["git", *args], cwd=cwd, env=env, check=True, capture_output=True, text=True).stdout.strip()
+
+            work.mkdir()
+            git("init", "-b", "main")
+            (work / "a").write_text("1\n")
+            git("add", "a")
+            git("commit", "-m", "base")
+            git("push", str(target), "main:main")
+            git("checkout", "-b", "work")
+            (work / "a").write_text("2\n")
+            git("commit", "-am", "change")
+            git("push", str(source), "work:work")
+            base_sha = git("rev-parse", "main")
+            head_sha = git("rev-parse", "work")
+
+            with TestClient(api) as client:
+                res = client.post(
+                    "/api/v1/pr/create",
+                    content=json.dumps({
+                        "target_project": "distro:main",
+                        "target_package": "mypkg",
+                        "author": "dev",
+                        "title": "Change",
+                        "source_owner": "~dev",
+                        "source_repo": "mypkg",
+                        "source_branch": "work",
+                    }),
+                )
+            self.assertEqual(res.status_code, 200)
+            rev = PullRequest.objects.get(project=proj, number=1).revisions.get()
+            self.assertEqual(rev.head_sha, head_sha)
+            self.assertEqual(rev.base_sha, base_sha)
 
 
 class TestPRTabsAndDiffViews(TestCase):

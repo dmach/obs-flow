@@ -248,18 +248,11 @@ EOF
     git add 0001-fix-ssl-threading.patch python3.spec
     git commit -m "python3: Add 0001-fix-ssl-threading.patch for multi-threaded SSL"
 
-    # Commit 3: Update documentation
-    cat << 'EOF' >> README.md
-
-## Upstream 3.13.2 Notes
-Upstream release 3.13.2 addresses several thread safety issues under GIL-disabled configurations.
-EOF
-    git add README.md
-    git commit -m "docs: Add packaging notes for 3.13.2 GIL behavior"
-
+    # Push 1: commits 1-2 only. PR 1 is opened from this state (revision 1);
+    # commit 3 is pushed after the PR exists (see step 5b, revision 2).
     git push -u origin dev
     popd > /dev/null
-    echo "Successfully seeded 3 commits and 4 changed files for PR 1 demo."
+    echo "Successfully seeded 2 commits for PR 1 demo (3rd commit is pushed in step 5b)."
 fi
 
 echo ""
@@ -313,6 +306,30 @@ echo "--- 5. Opening Native Pull Requests ---"
     --source-owner devel:languages:python \
     --source-repo python-requests \
     --source-branch master
+
+echo ""
+echo "--- 5b. Pushing a second revision to PR 1 ---"
+if [[ -d "${TMP_WORK}/tux_python3" ]]; then
+    pushd "${TMP_WORK}/tux_python3" > /dev/null
+        # Commit 3: Update documentation
+        cat << 'EOF' >> README.md
+
+## Upstream 3.13.2 Notes
+Upstream release 3.13.2 addresses several thread safety issues under GIL-disabled configurations.
+EOF
+        git add README.md
+        git commit -m "docs: Add packaging notes for 3.13.2 GIL behavior"
+
+        # Push 2
+        git push origin dev
+    popd > /dev/null
+
+    # Pushes do not create PR revisions by themselves (the post-receive hook is a
+    # stub, /api/v1/pr/sync needs Gitea), so record revision 2 for the new head.
+    PR_PROJECT=openSUSE:Factory PR_PACKAGE=python3 PR_NUMBER=1 \
+        uv run --package obs-flow-server python packages/server/src/obs_flow_server/manage.py shell \
+        < "${SCRIPT_DIR}/add_pr_revision.py"
+fi
 
 echo ""
 echo "--- 6. Adding Discussion Comments ---"

@@ -32,9 +32,7 @@
             {% empty %}
                 <tr>
                     <td colspan="4">
-                        <article data-empty>
-                            <p>No bookmarks saved yet.</p>
-                        </article>
+                        {% include "partials/empty_state.html" with title="No bookmarks saved yet" hint="Use “Save this page” in the footer to add one." %}
                     </td>
                 </tr>
             {% endfor %}

@@ -35,9 +35,7 @@
         {% empty %}
             <tr>
                 <td colspan="5">
-                    <article data-empty>
-                        <p>No commits found.</p>
-                    </article>
+                    {% include "partials/empty_state.html" with title="No commits found" %}
                 </td>
             </tr>
         {% endfor %}

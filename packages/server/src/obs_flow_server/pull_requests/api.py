@@ -213,8 +213,9 @@ def create_pull_request_endpoint(payload: PRCreateRequest):
         rev_draft_expires_at = timezone.now() + timedelta(minutes=timeout_minutes)
 
     target_branch = target_project.branch_name or "main"
-    head_sha = payload.head_sha
-    base_sha = payload.base_sha
+    # The request defaults both SHAs to an all-zero placeholder; resolve those from the repos.
+    head_sha = payload.head_sha if payload.head_sha.strip("0") else ""
+    base_sha = payload.base_sha if payload.base_sha.strip("0") else ""
     if not head_sha or not base_sha:
         try:
             import subprocess

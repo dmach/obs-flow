@@ -27,7 +27,7 @@
                     </tbody>
                 </table>
             {% else %}
-                <article data-empty><p>No packages have forked this package.</p></article>
+                {% include "partials/empty_state.html" with title="No forks found" hint="No packages have forked this package." %}
             {% endif %}
         </section>
     </div>

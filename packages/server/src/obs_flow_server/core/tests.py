@@ -886,7 +886,7 @@ class TestCommentsAPIAndUI(TransactionTestCase):
         res_del = self.client.post(f"/comments/{comment.id}/delete/")
         self.assertEqual(res_del.status_code, 200)
         self.assertNotContains(res_del, "First HTMX PR comment!")
-        self.assertContains(res_del, "No comments yet.")
+        self.assertContains(res_del, "No comments yet")
 
     def test_comment_htmx_views_staging(self):
         # 1. Add comment via HTMX endpoint

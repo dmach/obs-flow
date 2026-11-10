@@ -86,7 +86,7 @@
                         </tbody>
                     </table>
                 {% else %}
-                    <article data-empty><p>No revisions found.</p></article>
+                    {% include "partials/empty_state.html" with title="No revisions found" %}
                 {% endif %}
             </section>
 

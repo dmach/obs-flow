@@ -31,7 +31,7 @@
                     </tbody>
                 </table>
             {% else %}
-                <article data-empty><p>No packages in this project.</p></article>
+                {% include "partials/empty_state.html" with title="No packages found" hint="This project has no packages." %}
             {% endif %}
         </section>
     </div>

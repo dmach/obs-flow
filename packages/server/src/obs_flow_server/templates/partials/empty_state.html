@@ -1,0 +1,9 @@
+{# Empty state. Params: title; optional hint (text) or reset (truthy: offer to reset the filters). #}
+<article data-empty>
+    <h3>{{ title }}</h3>
+    {% if reset %}
+        <p>Try changing or <a href="?">resetting the filters</a>.</p>
+    {% elif hint %}
+        <p>{{ hint }}</p>
+    {% endif %}
+</article>

@@ -1,5 +1,5 @@
 <dialog open id="bookmark-modal">
-    <form id="bookmark-modal-close" method="dialog"></form>
+    <form id="bookmark-modal-close" method="dialog" hx-get="{% url 'home' %}" hx-select="#modal-container" hx-target="#modal-container" hx-swap="innerHTML" hx-trigger="submit, keyup[key=='Escape'] from:body"></form>
     <article>
         <header>
             <h3>Error</h3>

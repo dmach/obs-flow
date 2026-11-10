@@ -68,9 +68,7 @@
             </tbody>
         </table>
     {% else %}
-        <article data-empty>
-            <p>You don't have any active personal access tokens yet.</p>
-        </article>
+        {% include "partials/empty_state.html" with title="No active tokens" hint="You don't have any active personal access tokens yet." %}
     {% endif %}
 </section>
 {% endblock %}

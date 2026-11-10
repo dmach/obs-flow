@@ -31,9 +31,7 @@
                 <p>{{ comment.body }}</p>
             </article>
         {% empty %}
-            <article data-empty>
-                <p>No comments yet. Start the conversation!</p>
-            </article>
+            {% include "partials/empty_state.html" with title="No comments yet" hint="Start the conversation!" %}
         {% endfor %}
     </div>
 

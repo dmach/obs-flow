@@ -74,7 +74,7 @@ Spacing: 0.25 / 0.5 / 0.75 / 1 / 1.5 / 2.5rem. Block elements carry `margin-bott
 | Markup | Looks like |
 |---|---|
 | `body > header` | App header bar (below) |
-| `main` | Content column, max 1280px, 1.5rem side padding |
+| `main` | Content column, full page width, side padding `--flow-gutter` (1.5rem), no max-width |
 | `main > header` | Page title row: `h1` left, actions right |
 | `main > section > h1 + p` | Home intro: large muted line |
 | `main > details` | Filter panel box |
@@ -109,7 +109,7 @@ Spacing: 0.25 / 0.5 / 0.75 / 1 / 1.5 / 2.5rem. Block elements carry `margin-bott
 
 ### App header
 
-`body > header`: `--flow-bg-subtle` bar, 1px bottom border. Two rows inside a 1280px column:
+`body > header`: `--flow-bg-subtle` bar, 1px bottom border. Two rows inside the full page width (1.5rem side padding):
 
 - **Top row** (`header > div`, min-height 3.5rem): brand `a` (inline `svg` 2rem + text, 1.143rem/600) left; `nav[aria-label=Account]` right.
 - **Tabs** (`nav[aria-label=Main]`): links with 16px octicon + text, padding `0.375rem 0.5rem`, radius 6px, hover `--flow-bg-hover`.
@@ -184,6 +184,7 @@ The values come from a closed set, so templates may print `data-state="{{ x.stat
 ### Notices and toasts
 
 - **Notice:** `<div role="status">` (blue) or with `data-variant="success|warning|danger"`. 1px border, 6px radius, 1rem padding, optional `h3` (1rem).
+- **Notice with a control** (`div[role=status]` containing a `form`, e.g. the diff revision picker): text left, control right on one row; wraps when narrow. The control's own `hx-get` / `hx-trigger="change"` reloads the content, no submit button.
 - **Toast:** server-rendered from Django messages: `<div aria-live="polite"><output data-variant="…">msg</output></div>` as a direct child of `body`, fixed bottom-right.
   Neutral card with a 4px left border in the variant colour (default accent). Hides itself via one CSS animation after 5s.
   `toasts.html` maps the Django tag `error` to `danger`.
@@ -194,6 +195,7 @@ The values come from a closed set, so templates may print `data-state="{{ x.stat
 Forms nested directly in articles (`article > form > footer`) have top spacing and a divider border before the action buttons.
 Standalone button links (`article > a[role="button"]`, `.tab-content > a[role="button"]`) are right-aligned to match form footers.
 Empty state: `<article data-empty><h3>No … found</h3><p>…</p></article>`: centred, muted, 2rem padding.
+Always rendered with `{% include "partials/empty_state.html" with title="…" hint="…" %}`; list pages pass `reset=base_query` instead of `hint` to offer a filter reset. Don't hand-write `data-empty` articles.
 
 ### Tabs (in-page)
 
@@ -220,7 +222,8 @@ Open when a filter is active. Actions in `form > footer`: Reset (default), Apply
 
 ### Dialog
 
-`<dialog open><form method="dialog" id="…-close"></form><article>…</article></dialog>`, inserted into `#modal-container` by htmx.
+`<dialog open><form method="dialog" id="…-close" hx-get="{% url 'home' %}" hx-select="#modal-container" hx-target="#modal-container" hx-swap="innerHTML" hx-trigger="submit, keyup[key=='Escape'] from:body"></form><article>…</article></dialog>`, inserted into `#modal-container` by htmx.
+Every dialog closes the same way: the close form re-fetches an empty `#modal-container` via htmx (on Cancel submit and on Escape). Cancel is `<button form="…-close">`.
 `dialog[open]` is a fixed full-screen overlay (`--flow-backdrop`, no blur), `article` centred, max 40rem, radius 12px, overlay shadow.
 Header `h3` is 1rem. Buttons live in `article > footer`; a submit that belongs to an inner form is placed in that form's own `footer` or uses `form="id"`. Close: Escape and Cancel.
 
@@ -233,7 +236,7 @@ Header `h3` is 1rem. Buttons live in `article > footer`; a submit that belongs t
 </div>
 ```
 
-The main column is `3 1 28rem`, the sidebar `1 1 14rem`; they wrap when narrow, so there is no media query.
+The sidebar has a static width (`0 0 25rem`, 350px); the main column takes the rest (`1 1 20rem`); they wrap when narrow, so there is no media query.
 `aside` is only used in this layout (the grid rule is `div:has(> aside)`).
 Sidebar sections: bottom 1px border (not on the last), `h4` 0.857rem muted, values 1rem. Action forms: a single full-width button.
 
@@ -254,6 +257,11 @@ SHAs: 8 chars, fingerprints: 12.
 Rows are marked `data-line="hunk|add|del|ctx"`; review threads are `<tr data-thread><td colspan="3">` and reset the gutter/code cell styling (they are `:first-child` and `:last-child`).
 The `+` comment trigger is a `details > summary` inside a line-number cell, shown on row hover; its form is posted with htmx and the response row is inserted after the line (`hx-swap="afterend"`).
 Revision picker, comment forms and thread actions are htmx only (`hx-on::after:swap` resets the form); no inline JS.
+
+### Page header band
+
+Project and package pages put `breadcrumb`, title and `nav[aria-label=Subnav]` in a full-bleed band (`.page-header`) directly under the app header.
+The band's background and bottom rule run edge to edge; its content spans the full page width (1.5rem side padding). Tabs overlap the rule with a 2px accent underline.
 
 ### Footer
 

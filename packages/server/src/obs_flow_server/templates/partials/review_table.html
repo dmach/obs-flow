@@ -46,7 +46,5 @@
         </tbody>
     </table>
 {% else %}
-    <article data-empty>
-        <p>No reviews configured or pending.</p>
-    </article>
+    {% include "partials/empty_state.html" with title="No reviews found" hint="No reviews configured or pending." %}
 {% endif %}
