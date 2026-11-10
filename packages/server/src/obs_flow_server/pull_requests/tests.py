@@ -1996,6 +1996,142 @@ class TestNativePRCreationAuth(TransactionTestCase):
         self.assertEqual(PullRequest.objects.count(), 0)
 
 
+class TestPRCreateWebView(TestCase):
+    def setUp(self):
+        import subprocess
+        import tempfile
+        from pathlib import Path
+        from core.git_forge import ensure_git_repo
+
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        override = override_settings(GIT_FORGE_ROOT=Path(self.tmp.name))
+        override.enable()
+        self.addCleanup(override.disable)
+
+        self.org = Org.objects.create(name="distro")
+        self.proj = Project.objects.create(name="distro:main", org=self.org, branch_name="main", review_debounce_minutes=0)
+        self.parent = Package.objects.create(project=self.proj, name="mypkg")
+        self.user = User.objects.create(username="dev", username_lower="dev", account_type=User.AccountType.HUMAN)
+        self.home_org = self.user.implicit_personal_org
+        self.home = Project.objects.create(name="home:dev", org=self.home_org, branch_name="work", review_debounce_minutes=0)
+        self.fork = Package.objects.create(project=self.home, name="mypkg", forked_from=self.parent)
+
+        target = ensure_git_repo("distro", "mypkg", initial_branch="main")
+        source = ensure_git_repo("~dev", "mypkg", initial_branch="work")
+        work = Path(self.tmp.name) / "wc"
+        env = {"GIT_AUTHOR_NAME": "t", "GIT_AUTHOR_EMAIL": "t@x", "GIT_COMMITTER_NAME": "t", "GIT_COMMITTER_EMAIL": "t@x", "PATH": os.environ["PATH"]}
+
+        def git(*args):
+            return subprocess.run(["git", *args], cwd=work, env=env, check=True, capture_output=True, text=True).stdout.strip()
+
+        work.mkdir()
+        git("init", "-b", "main")
+        (work / "a").write_text("1\n")
+        git("add", "a")
+        git("commit", "-m", "base")
+        git("push", str(target), "main:main")
+        git("checkout", "-b", "work")
+        (work / "a").write_text("2\n")
+        git("commit", "-am", "change")
+        git("push", str(source), "work:work")
+        self.head = git("rev-parse", "work")
+        self.base = git("rev-parse", "main")
+
+    def url(self):
+        return "/packages/home:dev/mypkg/pull-requests/new/"
+
+    def post_data(self, **kw):
+        data = {
+            "target_project": "distro:main",
+            "target_package": "mypkg",
+            "title": "My change",
+            "source_owner": "~dev",
+            "source_repo": "mypkg",
+            "source_branch": "work",
+        }
+        data.update(kw)
+        return data
+
+    def test_anonymous_redirected_to_login(self):
+        res = self.client.get(self.url())
+        self.assertEqual(res.status_code, 302)
+        self.assertIn("/accounts/login/", res["Location"])
+        res = self.client.post(self.url(), self.post_data())
+        self.assertEqual(res.status_code, 302)
+        self.assertEqual(PullRequest.objects.count(), 0)
+
+    def test_fork_page_prefills_source_and_parent_target(self):
+        self.client.force_login(self.user)
+        res = self.client.get(self.url())
+        self.assertEqual(res.status_code, 200)
+        form = res.context["form"]
+        self.assertEqual(form.initial["target_project"], "distro:main")
+        self.assertEqual(form.initial["target_package"], "mypkg")
+        self.assertEqual(form.initial["source_owner"], "~dev")
+        self.assertEqual(form.initial["source_repo"], "mypkg")
+        self.assertEqual(form.initial["source_branch"], "work")
+
+    def test_non_fork_package_and_project_prefill_target_only(self):
+        self.client.force_login(self.user)
+        res = self.client.get("/packages/distro:main/mypkg/pull-requests/new/")
+        self.assertEqual(res.context["form"].initial, {"target_project": "distro:main", "target_package": "mypkg"})
+        res = self.client.get("/projects/distro:main/pull-requests/new/")
+        self.assertEqual(res.context["form"].initial, {"target_project": "distro:main"})
+
+    def test_post_creates_pr_as_request_user(self):
+        self.client.force_login(self.user)
+        res = self.client.post(self.url(), self.post_data(is_draft="on"))
+        pr = PullRequest.objects.get()
+        self.assertRedirects(res, pr.get_absolute_url(), fetch_redirect_response=False)
+        self.assertEqual(pr.author, self.user)
+        self.assertEqual(pr.package, self.parent)
+        rev = pr.revisions.get()
+        self.assertEqual((rev.head_sha, rev.base_sha), (self.head, self.base))
+        self.assertTrue(rev.is_draft)
+
+    def test_post_project_level_pr(self):
+        self.client.force_login(self.user)
+        res = self.client.post("/projects/distro:main/pull-requests/new/", self.post_data(target_package=""))
+        self.assertEqual(res.status_code, 302)
+        self.assertIsNone(PullRequest.objects.get().package)
+
+    def test_invalid_branch_rerenders_with_error(self):
+        self.client.force_login(self.user)
+        res = self.client.post(self.url(), self.post_data(source_branch="nope"))
+        self.assertEqual(res.status_code, 200)
+        self.assertContains(res, "not found")
+        self.assertEqual(PullRequest.objects.count(), 0)
+
+    def test_branch_cannot_inject_git_option(self):
+        self.client.force_login(self.user)
+        res = self.client.post(self.url(), self.post_data(source_branch="--output=/tmp/x"))
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(PullRequest.objects.count(), 0)
+
+    def test_traversal_in_source_rejected(self):
+        self.client.force_login(self.user)
+        res = self.client.post(self.url(), self.post_data(source_owner="../x"))
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(PullRequest.objects.count(), 0)
+
+    def test_unknown_target_and_no_changes_rejected(self):
+        self.client.force_login(self.user)
+        res = self.client.post(self.url(), self.post_data(target_project="nope"))
+        self.assertContains(res, "does not exist")
+        res = self.client.post(self.url(), self.post_data(source_owner="distro", source_branch="main"))
+        self.assertContains(res, "no changes")
+        self.assertEqual(PullRequest.objects.count(), 0)
+
+    def test_list_pages_show_new_pr_button_only_in_entity_context(self):
+        res = self.client.get("/projects/distro:main/pull-requests/")
+        self.assertContains(res, "/projects/distro:main/pull-requests/new/")
+        res = self.client.get("/packages/home:dev/mypkg/pull-requests/")
+        self.assertContains(res, self.url())
+        res = self.client.get("/pull-requests/")
+        self.assertNotContains(res, "New Pull Request")
+
+
 class TestPRTabsAndDiffViews(TestCase):
     def setUp(self):
         import tempfile

@@ -1,0 +1,50 @@
+{% extends package|yesno:"core/package_base.html,core/project_base.html" %}
+
+{% block title %}New Pull Request - OBS Flow{% endblock %}
+
+{% block crumb_tail %}<li>New Pull Request</li>{% endblock %}
+
+{% block page_content %}
+<header>
+    <h2>New Pull Request</h2>
+</header>
+
+<article>
+    <form method="post">
+        {% csrf_token %}
+
+        {% if form.non_field_errors %}
+            <p role="alert">{{ form.non_field_errors.0 }}</p>
+        {% endif %}
+
+        <fieldset>
+            <legend>Target</legend>
+            {% for field in form.visible_fields|slice:":2" %}
+                <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+                {{ field }}
+                {% if field.help_text %}<small>{{ field.help_text }}</small>{% endif %}
+                {% if field.errors %}<small role="alert">{{ field.errors.0 }}</small>{% endif %}
+            {% endfor %}
+        </fieldset>
+
+        <fieldset>
+            <legend>Source</legend>
+            {% for field in form.visible_fields|slice:"3:6" %}
+                <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+                {{ field }}
+                {% if field.errors %}<small role="alert">{{ field.errors.0 }}</small>{% endif %}
+            {% endfor %}
+        </fieldset>
+
+        <label for="{{ form.title.id_for_label }}">Title</label>
+        {{ form.title }}
+        {% if form.title.errors %}<small role="alert">{{ form.title.errors.0 }}</small>{% endif %}
+
+        <label>{{ form.is_draft }} {{ form.is_draft.label }}</label>
+
+        <footer>
+            <button type="submit" data-variant="primary">Create Pull Request</button>
+        </footer>
+    </form>
+</article>
+{% endblock %}

@@ -1,3 +1,9 @@
+{% if package %}
+<p><a href="{% url 'pr_create' package.project.name package.name %}" role="button" data-variant="primary">New Pull Request</a></p>
+{% elif project %}
+<p><a href="{% url 'pr_create' project.name %}" role="button" data-variant="primary">New Pull Request</a></p>
+{% endif %}
+
 <details {% if base_query %}open{% endif %}>
     <summary>Search &amp; Filters</summary>
     <form method="GET" action="" data-clean-url="true">

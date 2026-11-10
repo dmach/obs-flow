@@ -1,6 +1,7 @@
 import datetime
 import urllib.parse
 from django.contrib import messages
+from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator
 from django.db.models import Q
 from django.http import HttpResponse
@@ -12,7 +13,7 @@ from django.views.decorators.http import require_POST
 from core.htmx import close_modal_and_refresh
 from core.models import Project
 from pull_requests.models import PullRequest, PullRequestReview, ReviewThread
-from pull_requests.forms import PullRequestFilterForm
+from pull_requests.forms import PullRequestCreateForm, PullRequestFilterForm
 from pull_requests.workflows import execute_pr_merge, mark_draft, mark_ready_for_review, validate_pr_merge
 
 
@@ -161,6 +162,67 @@ def package_pr_list(request, project_name, package_name):
     context["package"] = package
     context["active_tab"] = "pull_requests"
     return render(request, "core/package_pr_list.html", context)
+
+
+def _pr_create_initial(project, package):
+    """Defaults: a fork proposes its changes to the package it was forked from."""
+    if package is not None and package.forked_from is not None:
+        parent = package.forked_from
+        return {
+            "target_project": parent.project.name,
+            "target_package": parent.name,
+            "source_owner": package.project.org.name if package.project.org else "",
+            "source_repo": package.name,
+            "source_branch": package.project.branch_name or "main",
+        }
+    if package is not None:
+        return {"target_project": package.project.name, "target_package": package.name}
+    return {"target_project": project.name}
+
+
+@login_required
+@ensure_csrf_cookie
+def pr_create(request, project_name, package_name=None):
+    from django.db import transaction
+    from core.models import Package
+    from pull_requests.services import create_pull_request
+
+    if package_name is None:
+        project = get_object_or_404(Project.objects.select_related("org"), name=project_name)
+        package = None
+    else:
+        package = get_object_or_404(
+            Package.objects.select_related("project", "project__org", "forked_from", "forked_from__project"),
+            project__name=project_name,
+            name=package_name,
+        )
+        project = package.project
+
+    if request.method == "POST":
+        form = PullRequestCreateForm(request.POST)
+        if form.is_valid():
+            try:
+                with transaction.atomic():
+                    pr = create_pull_request(
+                        author=request.user,
+                        target_project=form.cleaned_data["target_project_obj"],
+                        target_package=form.cleaned_data["target_package_obj"],
+                        title=form.cleaned_data["title"],
+                        source_owner=form.cleaned_data["source_owner"],
+                        source_repo=form.cleaned_data["source_repo"],
+                        source_branch=form.cleaned_data["source_branch"],
+                        is_draft=form.cleaned_data["is_draft"],
+                    )
+            except ValueError as e:
+                form.add_error(None, str(e))
+            else:
+                messages.success(request, f"Created pull request {pr.formatted_id}.")
+                return redirect(pr)
+    else:
+        form = PullRequestCreateForm(initial=_pr_create_initial(project, package))
+
+    context = {"form": form, "project": project, "package": package, "active_tab": "pull_requests"}
+    return render(request, "pull_requests/pr_create.html", context)
 
 
 def get_pr_or_404(project_name, number, package_name=None):
