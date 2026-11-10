@@ -1833,13 +1833,20 @@ class TestNativePRCreation(TransactionTestCase):
             scope=ReviewScope.objects.get(name="global"),
         )
 
+        from accounts.helpers import generate_secure_token
+        from accounts.models import Token
+        developer = User.objects.create(username="developer", username_lower="developer", account_type=User.AccountType.HUMAN)
+        raw_token, last_eight, token_hash = generate_secure_token()
+        Token.objects.create(user=developer, token_hash=token_hash, last_eight=last_eight)
+        auth_headers = {"Authorization": f"Bearer {raw_token}"}
+
         with TestClient(api) as client:
             res = client.post(
                 "/api/v1/pr/create",
+                headers=auth_headers,
                 content=json.dumps({
                     "target_project": "openSUSE:Factory",
                     "target_package": "kernel-source",
-                    "author": "developer",
                     "title": "Upgrade kernel to 6.12",
                     "source_owner": "~developer",
                     "source_repo": "kernel-source",
@@ -1852,6 +1859,7 @@ class TestNativePRCreation(TransactionTestCase):
             self.assertEqual(pr_data["id"], "openSUSE/kernel-source#1")
             self.assertEqual(pr_data["title"], "Upgrade kernel to 6.12")
             self.assertEqual(pr_data["state"], "open")
+            self.assertEqual(pr_data["author"]["username"], "developer")
 
             # Check that review was provisioned
             pr = PullRequest.objects.get(project=proj, package=pkg, number=1)
@@ -1911,13 +1919,19 @@ class TestNativePRCreationResolvesShas(TransactionTestCase):
             base_sha = git("rev-parse", "main")
             head_sha = git("rev-parse", "work")
 
+            from accounts.helpers import generate_secure_token
+            from accounts.models import Token
+            dev = User.objects.create(username="dev", username_lower="dev", account_type=User.AccountType.HUMAN)
+            raw_token, last_eight, token_hash = generate_secure_token()
+            Token.objects.create(user=dev, token_hash=token_hash, last_eight=last_eight)
+
             with TestClient(api) as client:
                 res = client.post(
                     "/api/v1/pr/create",
+                    headers={"Authorization": f"Bearer {raw_token}"},
                     content=json.dumps({
                         "target_project": "distro:main",
                         "target_package": "mypkg",
-                        "author": "dev",
                         "title": "Change",
                         "source_owner": "~dev",
                         "source_repo": "mypkg",
@@ -1928,6 +1942,58 @@ class TestNativePRCreationResolvesShas(TransactionTestCase):
             rev = PullRequest.objects.get(project=proj, number=1).revisions.get()
             self.assertEqual(rev.head_sha, head_sha)
             self.assertEqual(rev.base_sha, base_sha)
+
+
+class TestNativePRCreationAuth(TransactionTestCase):
+    def setUp(self):
+        org = Org.objects.create(name="distro")
+        Project.objects.create(name="distro:main", org=org, branch_name="main")
+        self.body = {
+            "target_project": "distro:main",
+            "title": "T",
+            "source_owner": "~dev",
+            "source_repo": "pkg",
+            "source_branch": "work",
+        }
+
+    def test_unauthenticated_rejected_and_no_pr_or_user_created(self):
+        users_before = User.objects.count()
+        with TestClient(api) as client:
+            res = client.post("/api/v1/pr/create", content=json.dumps(self.body))
+        self.assertGreaterEqual(res.status_code, 400)
+        self.assertEqual(PullRequest.objects.count(), 0)
+        self.assertEqual(User.objects.count(), users_before)
+
+    def test_author_field_is_ignored_author_is_token_user(self):
+        from accounts.helpers import generate_secure_token
+        from accounts.models import Token
+        u = User.objects.create(username="u", username_lower="u", account_type=User.AccountType.HUMAN)
+        raw, last_eight, token_hash = generate_secure_token()
+        Token.objects.create(user=u, token_hash=token_hash, last_eight=last_eight)
+        with TestClient(api) as client:
+            res = client.post(
+                "/api/v1/pr/create",
+                headers={"Authorization": f"Bearer {raw}"},
+                content=json.dumps({**self.body, "author": "someone-else"}),
+            )
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(PullRequest.objects.get().author, u)
+        self.assertFalse(User.objects.filter(username="someone-else").exists())
+
+    def test_invalid_source_owner_rejected(self):
+        from accounts.helpers import generate_secure_token
+        from accounts.models import Token
+        u = User.objects.create(username="u", username_lower="u", account_type=User.AccountType.HUMAN)
+        raw, last_eight, token_hash = generate_secure_token()
+        Token.objects.create(user=u, token_hash=token_hash, last_eight=last_eight)
+        with TestClient(api) as client:
+            res = client.post(
+                "/api/v1/pr/create",
+                headers={"Authorization": f"Bearer {raw}"},
+                content=json.dumps({**self.body, "source_owner": "../../etc"}),
+            )
+        self.assertEqual(res.status_code, 400)
+        self.assertEqual(PullRequest.objects.count(), 0)
 
 
 class TestPRTabsAndDiffViews(TestCase):

@@ -198,8 +198,6 @@ def test_cli_pr_create():
                 "openSUSE:Factory",
                 "--target-package",
                 "bash",
-                "--author",
-                "contributor",
                 "--title",
                 "Update bash",
                 "--source-owner",

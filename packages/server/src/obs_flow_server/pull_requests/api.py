@@ -157,108 +157,42 @@ def build_pr_detail(pr: PullRequest) -> PRDetail:
 
 
 @api.post("/api/v1/pr/create")
-@sync_to_async
-@transaction.atomic
-def create_pull_request_endpoint(payload: PRCreateRequest):
-    try:
-        target_project = Project.objects.get(name=payload.target_project)
-    except Project.DoesNotExist:
-        raise ValueError(f"Target project '{payload.target_project}' does not exist")
+async def create_pull_request_endpoint(payload: PRCreateRequest, request):
+    def do_create():
+        from pull_requests.services import create_pull_request
 
-    target_package = None
-    if payload.target_package:
+        author = get_authenticated_user(request)
         try:
-            target_package = Package.objects.get(project=target_project, name=payload.target_package)
-        except Package.DoesNotExist:
-            raise ValueError(
-                f"Target package '{payload.target_package}' does not exist in project '{payload.target_project}'"
+            target_project = Project.objects.get(name=payload.target_project)
+        except Project.DoesNotExist:
+            raise ValueError(f"Target project '{payload.target_project}' does not exist")
+
+        target_package = None
+        if payload.target_package:
+            try:
+                target_package = Package.objects.get(project=target_project, name=payload.target_package)
+            except Package.DoesNotExist:
+                raise ValueError(
+                    f"Target package '{payload.target_package}' does not exist in project '{payload.target_project}'"
+                )
+
+        with transaction.atomic():
+            pr = create_pull_request(
+                author=author,
+                target_project=target_project,
+                target_package=target_package,
+                title=payload.title,
+                source_owner=payload.source_owner,
+                source_repo=payload.source_repo,
+                source_branch=payload.source_branch,
+                is_draft=payload.is_draft,
+                # The request defaults both SHAs to an all-zero placeholder; resolve those from the repos.
+                head_sha=payload.head_sha if payload.head_sha.strip("0") else "",
+                base_sha=payload.base_sha if payload.base_sha.strip("0") else "",
             )
+        return msgspec.structs.asdict(PRCreateResponse(pull_request=build_pr_detail(pr)))
 
-    author, _ = User.objects.get_or_create(
-        username=payload.author,
-        defaults={"username_lower": payload.author.lower(), "account_type": User.AccountType.HUMAN},
-    )
-
-    from django.db.models import Max
-
-    max_num = (
-        PullRequest.objects.filter(project=target_project, package=target_package).aggregate(Max("number"))[
-            "number__max"
-        ]
-        or 0
-    )
-    pr_number = max_num + 1
-
-    pr = PullRequest.objects.create(
-        project=target_project,
-        package=target_package,
-        number=pr_number,
-        author=author,
-        title=payload.title,
-        source_owner=payload.source_owner,
-        source_repo=payload.source_repo,
-        source_branch=payload.source_branch,
-        state=PullRequest.State.OPEN,
-    )
-
-    timeout_minutes = target_project.effective_review_debounce_minutes
-    if payload.is_draft:
-        rev_is_draft = True
-        rev_draft_expires_at = None
-    elif timeout_minutes == 0:
-        rev_is_draft = False
-        rev_draft_expires_at = None
-    else:
-        rev_is_draft = True
-        rev_draft_expires_at = timezone.now() + timedelta(minutes=timeout_minutes)
-
-    target_branch = target_project.branch_name or "main"
-    # The request defaults both SHAs to an all-zero placeholder; resolve those from the repos.
-    head_sha = payload.head_sha if payload.head_sha.strip("0") else ""
-    base_sha = payload.base_sha if payload.base_sha.strip("0") else ""
-    if not head_sha or not base_sha:
-        try:
-            import subprocess
-            from core.git_forge import get_repo_path
-            target_repo = get_repo_path(target_project.org.name if target_project.org else "", target_package.name if target_package else None)
-            source_repo = get_repo_path(payload.source_owner, payload.source_repo)
-            if not base_sha and target_repo.exists():
-                p = subprocess.run(["git", "rev-parse", target_branch], cwd=str(target_repo), capture_output=True, text=True)
-                if p.returncode == 0 and p.stdout.strip():
-                    base_sha = p.stdout.strip()
-            if not head_sha and source_repo.exists():
-                p = subprocess.run(["git", "rev-parse", payload.source_branch], cwd=str(source_repo), capture_output=True, text=True)
-                if p.returncode == 0 and p.stdout.strip():
-                    head_sha = p.stdout.strip()
-        except Exception:
-            pass
-
-    resolved_head = head_sha or "0" * 40
-    resolved_base = base_sha or "0" * 40
-
-    from pull_requests.fingerprint import PRRevisionPayload
-    pr_payload = PRRevisionPayload(
-        head_sha=resolved_head,
-        base_sha=resolved_base,
-        target_branch=target_branch,
-    )
-    computed_fingerprint = pr_payload.compute_fingerprint()
-
-    rev = PullRequestRevision.objects.create(
-        pull_request=pr,
-        revision_number=1,
-        head_sha=resolved_head,
-        base_sha=resolved_base,
-        fingerprint=computed_fingerprint,
-        is_draft=rev_is_draft,
-        draft_expires_at=rev_draft_expires_at,
-    )
-
-    if not rev.is_draft:
-        provision_reviews_for_revision(rev)
-
-    res = PRCreateResponse(pull_request=build_pr_detail(pr))
-    return msgspec.structs.asdict(res)
+    return await sync_to_async(do_create)()
 
 
 @api.post("/api/v1/pr/sync")

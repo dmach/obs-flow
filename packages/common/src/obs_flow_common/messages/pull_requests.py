@@ -31,7 +31,6 @@ class PRSyncResponse(msgspec.Struct):
 class PRCreateRequest(msgspec.Struct):
     """Request to create a native pull request."""
     target_project: str
-    author: str
     title: str
     source_owner: str
     source_repo: str

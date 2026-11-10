@@ -4,7 +4,6 @@ import click
 @click.command(name="create")
 @click.option("--target-project", required=True, help="Target project name.")
 @click.option("--target-package", help="Target package name.")
-@click.option("--author", required=True, help="Author username.")
 @click.option("--title", required=True, help="Pull request title.")
 @click.option("--source-owner", required=True, help="Source owner (e.g. org or username).")
 @click.option("--source-repo", required=True, help="Source repo/package.")
@@ -13,7 +12,6 @@ import click
 def cli(
     target_project: str,
     target_package: str | None,
-    author: str,
     title: str,
     source_owner: str,
     source_repo: str,
@@ -30,7 +28,6 @@ def cli(
     req = PRCreateRequest(
         target_project=target_project,
         target_package=target_package,
-        author=author,
         title=title,
         source_owner=source_owner,
         source_repo=source_repo,

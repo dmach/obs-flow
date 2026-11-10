@@ -257,41 +257,42 @@ fi
 
 echo ""
 echo "--- 5. Opening Native Pull Requests ---"
+# PR authors are the token owners, so give each seeded user a dev token.
+USERS="tux geeko alice bob" \
+    uv run --package obs-flow-server python packages/server/src/obs_flow_server/manage.py shell \
+    < "${SCRIPT_DIR}/ensure_user_tokens.py"
+
 # PR 1: Tux updates Python 3 in openSUSE:Factory
-"${FLOW_BIN}" pr create \
+OBS_FLOW_TOKEN="flow-tux" "${FLOW_BIN}" pr create \
     --target-project openSUSE:Factory \
     --target-package python3 \
-    --author tux \
     --title "Update Python 3 to 3.13.2" \
     --source-owner "~tux" \
     --source-repo python3 \
     --source-branch dev
 
 # PR 2: Geeko fixes Zypper solver issue in openSUSE:Factory
-"${FLOW_BIN}" pr create \
+OBS_FLOW_TOKEN="flow-geeko" "${FLOW_BIN}" pr create \
     --target-project openSUSE:Factory \
     --target-package zypper \
-    --author geeko \
     --title "Resolve zypper solver dependency loop" \
     --source-owner "~geeko" \
     --source-repo zypper \
     --source-branch main
 
 # PR 3: Alice contributes systemd patch to devel:system
-"${FLOW_BIN}" pr create \
+OBS_FLOW_TOKEN="flow-alice" "${FLOW_BIN}" pr create \
     --target-project devel:system \
     --target-package systemd \
-    --author alice \
     --title "Improve systemd-oomd memory pressure detection" \
     --source-owner "~alice" \
     --source-repo systemd \
     --source-branch work
 
 # PR 4: Bob submits bash patchset to openSUSE:Factory (as draft)
-"${FLOW_BIN}" pr create \
+OBS_FLOW_TOKEN="flow-bob" "${FLOW_BIN}" pr create \
     --target-project openSUSE:Factory \
     --target-package bash \
-    --author bob \
     --title "WIP: Bash 5.3 upstream patchset" \
     --source-owner "~bob" \
     --source-repo bash \
@@ -299,9 +300,8 @@ echo "--- 5. Opening Native Pull Requests ---"
     --draft
 
 # PR 5: Tux submits project-level request to introduce python-requests to Factory
-"${FLOW_BIN}" pr create \
+OBS_FLOW_TOKEN="flow-tux" "${FLOW_BIN}" pr create \
     --target-project openSUSE:Factory \
-    --author tux \
     --title "Introduce python-requests package to openSUSE:Factory" \
     --source-owner devel:languages:python \
     --source-repo python-requests \
