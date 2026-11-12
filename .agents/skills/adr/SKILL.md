@@ -80,13 +80,19 @@ Cross-reference these concepts against the active ADRs you read in Step 1.
 - If the proposed ADR relies on a major project-specific concept that has *not* been defined yet, **STOP**. Do not draft the ADR.
   Instead, ask the user: "This proposal relies on [Concept], which is not defined in our existing ADRs. Should we draft an ADR for [Concept] first?"
 
-### 4. Keep it Simple and Focused (Single Core Decision)
+### 4. Keep it Simple, Focused, and Brief
 
 Each ADR must cover strictly **one architectural decision**.
 Keep ADRs simple and decoupled. If a proposal covers multiple distinct concerns (e.g., scoping logic vs event throttling/scheduling), split them into separate ADRs.
 Focus on the core decision, the "why", and high-level trade-offs rather than the "how".
 Do not include implementation details, specific class/function names, internal coding patterns, or directory/file paths unless they are the direct subject of the decision itself.
 Avoid over-specifying technical details that belong in design docs or code comments.
+
+**Brevity Mandate:**
+- Be concise, remove all conversational filler, but **preserve necessary context**.
+- Include relevant background, examples, or implementation details only if they are required for a new team member to understand the decision.
+- Use short, punchy bullet points for Consequences and Considered Options.
+- Get straight to the point in the Context and Decision sections.
 
 ### 5. UTF-8 and text formatting
 
