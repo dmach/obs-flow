@@ -73,3 +73,4 @@
 - Review: https://forge.fedoraproject.org/forge/forge/issues/113
 - Note: embargoed workflow - ideally a sibling repo, hidden PR, do some plumbing in git and DB when lifting embargo and making the PR public; Q: how to deal with reviews? all reviewers can potentialy leak the embargoed info (eg. asking 3rd parties for reviews etc.)
 - Check: https://github.com/jj-vcs/jj
+- split GA releases from updates even in the build service
