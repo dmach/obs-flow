@@ -75,3 +75,4 @@
 - Check: https://github.com/jj-vcs/jj
 - split GA releases from updates even in the build service
 - merge mode policy per project or org; fast-forward (pool) - to make sure we always test what lands in production; other merge modes if necessary; also, warn about multiple open PRs early - because only one can succeed, others must be rebased and re-tested.
+- mandatory merge commits with review results etc + a signature from the build service proving that everything was valid at that time.
