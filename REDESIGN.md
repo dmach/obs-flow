@@ -94,3 +94,24 @@ The branch naming would be: `workspace/<workspace-name>/<org>/<project>`.
 | GNOME | gtk4 | workspace/51.0/suse/slfo-main | | GNOME:workspace:51.0:suse:slfo-main | gtk4 |
 | GNOME | gnome-desktop | workspace/51.0/suse/slfo-main | | GNOME:workspace:51.0:suse:slfo-main | gnome-desktop |
 
+## Maintenance Workflow
+
+### Current State
+- Project pull request with package submodule and _patchinfo is **manually** created.
+- If package pull request changes, it gets out of sync with the submodule the project pull request.
+- Maintenance team monitors these out of sync packages, update the project pull requests accordingly (new patchinfo, submodule change).
+- Also, it starts with a list of projects/packages to be fixed, frequently listed in bugzilla.
+- There is usually a single _patchinfo included in each project pull request.
+  TODO: analyze situations when there's more _patchinfo files.
+
+### Requirements
+- ???
+- Ideally bring as close as possible to the development workflow.
+
+### Idea
+- _patchinfo could become part of a staging batch.
+- Any time package pull requests associated with the staging batch change, the patchinfo would get invalidated, enforcing review and potential change.
+- There's a limitation: we're planning staging batches per project, but patchinfo is associated with many.
+- Maybe we could group staging batches and associate them with patchinfo entities.
+- We could use the patchinfo entities as release trains to coordinate multiple related staging batches.
+- Also, in theory, this is not far from the workspaces from above - a named change spanning across several projects, this time with an additional _patchinfo information associated.
