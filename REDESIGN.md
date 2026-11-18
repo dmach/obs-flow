@@ -83,13 +83,13 @@ The branch naming would be: `workspace/<workspace-name>/<org>/<project>`.
 
 | Git Org | Git Repo | Git Branch | | OBS Project | OBS Package |
 | - | - | - | - | - | - |
-| GNOME | _project | workspace/51.0/opensuse:factory | | GNOME:workspace:51.0:opensuse:factory | |
-| GNOME | gtk4 | workspace/51.0/opensuse:factory | | GNOME:workspace:51.0:opensuse:factory | gtk4 |
-| GNOME | gnome-desktop | workspace/51.0/opensuse:factory | | GNOME:workspace:51.0:opensuse:factory | gnome-desktop |
-| GNOME | _project | workspace/51.0/opensuse:leap-16.1 | | GNOME:workspace:51.0:opensuse:leap-16.1 | |
-| GNOME | gtk4 | workspace/51.0/opensuse:leap-16.1 | | GNOME:workspace:51.0:opensuse:leap-16.1 | gtk4 |
-| GNOME | gnome-desktop | workspace/51.0/opensuse:leap-16.1 | | GNOME:workspace:51.0:opensuse:leap-16.1 | gnome-desktop |
-| GNOME | _project | workspace/51.0/suse:slfo-main | | GNOME:workspace:51.0:suse:slfo-main | |
-| GNOME | gtk4 | workspace/51.0/suse:slfo-main | | GNOME:workspace:51.0:suse:slfo-main | gtk4 |
-| GNOME | gnome-desktop | workspace/51.0/suse:slfo-main | | GNOME:workspace:51.0:suse:slfo-main | gnome-desktop |
+| GNOME | _project | workspace/51.0/opensuse/factory | | GNOME:workspace:51.0:opensuse:factory | |
+| GNOME | gtk4 | workspace/51.0/opensuse/factory | | GNOME:workspace:51.0:opensuse:factory | gtk4 |
+| GNOME | gnome-desktop | workspace/51.0/opensuse/factory | | GNOME:workspace:51.0:opensuse:factory | gnome-desktop |
+| GNOME | _project | workspace/51.0/opensuse/leap-16.1 | | GNOME:workspace:51.0:opensuse:leap-16.1 | |
+| GNOME | gtk4 | workspace/51.0/opensuse/leap-16.1 | | GNOME:workspace:51.0:opensuse:leap-16.1 | gtk4 |
+| GNOME | gnome-desktop | workspace/51.0/opensuse/leap-16.1 | | GNOME:workspace:51.0:opensuse:leap-16.1 | gnome-desktop |
+| GNOME | _project | workspace/51.0/suse/slfo-main | | GNOME:workspace:51.0:suse:slfo-main | |
+| GNOME | gtk4 | workspace/51.0/suse/slfo-main | | GNOME:workspace:51.0:suse:slfo-main | gtk4 |
+| GNOME | gnome-desktop | workspace/51.0/suse/slfo-main | | GNOME:workspace:51.0:suse:slfo-main | gnome-desktop |
 
