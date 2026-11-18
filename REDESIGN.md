@@ -99,13 +99,14 @@ The branch naming would be: `workspace/<workspace-name>/<org>/<project>`.
 ### Current State
 - Project pull request with package submodule and _patchinfo is **manually** created.
 - If package pull request changes, it gets out of sync with the submodule the project pull request.
-- Maintenance team monitors these out of sync packages, update the project pull requests accordingly (new patchinfo, submodule change).
-- Also, it starts with a list of projects/packages to be fixed, frequently listed in bugzilla.
+- Maintenance team monitors these out of sync packages, update the project pull requests accordingly (update package submodule, update patchinfo according to package changes).
+- Also, it starts with a list of packages in codestreams (projects) to be fixed, frequently listed in bugzilla.
 - There is usually a single _patchinfo included in each project pull request.
   TODO: analyze situations when there's more _patchinfo files.
 
 ### Requirements
 - ???
+- Automate, remove any manual steps (create project PR, monitoring, project PR updates).
 - Ideally bring as close as possible to the development workflow.
 
 ### Idea
