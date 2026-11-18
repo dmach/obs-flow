@@ -1,9 +1,9 @@
 ## 1:1 mapping between Git and OBS
 
 ### Current State
-- Git: org/repo:branch
-- OBS: project/package
-- There is no clear mapping between them, single git branch can be used in multiple obs projects/packages.
+- Git: branches identified with org, repo, branch
+- OBS: projects identified with project name, packages identigied with project name and package name
+- There is no clear mapping between them, single git branch can be used in multiple obs packages.
 
 ### Requirements
 - Users want to be dealing with projects and packages.
