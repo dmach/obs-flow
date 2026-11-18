@@ -11,6 +11,7 @@
 
 ### Idea
 - Use git orgs to group related projects and their packages together (pool concept).
+- 
 - Git branch names map to projects; repos are packages, _project repo is project.
 
 #### Distro
@@ -49,7 +50,7 @@ NOTE: Using ~ as prefix for home orgs to create a namespace, avoiding any collis
 - Workflow: make changes in devel project, then open a pull request to Factory.
 - Further changes in the devel project **modify** any related open pull requests to Factory.
 - This is an unexpected side-effect!
-- It doesn't apply to OBS ecosystem, because submitrequests are mutable; Git pull requests are mutable and any changes it their source branch changes them.
+- It doesn't apply to OBS ecosystem, because submitrequests are immutable; Git pull requests are mutable and any changes it their source branch changes them.
 
 ### Requirements
 - Pull requests must change only upon a user action, not as a side-effect.
