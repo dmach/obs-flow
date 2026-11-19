@@ -11,35 +11,35 @@
 
 ### Idea
 - Use git orgs to group related projects and their packages together (pool concept).
-- 
 - Git branch names map to projects; repos are packages, _project repo is project.
+- We use `obs/` prefix to clearly define what's managed by OBS and mapped to projects and their packages, also avoiding future conflicts if we need namespaces for other purposes.
 
 #### Distro
 
 | Git Org | Git Repo | Git Branch | | OBS Project | OBS Package |
 | - | - | - | - | - | - |
-| suse | _project | slfo-main | | suse:slfo-main | |
-| suse | bash | slfo-main | | suse:slfo-main | bash |
+| suse | _project | obs/slfo-main | | suse:slfo-main | |
+| suse | bash | obs/slfo-main | | suse:slfo-main | bash |
 
 #### Devel Projects
 
 | Git Org | Git Repo | Git Branch | | OBS Project | OBS Package |
 | - | - | - | - | - | - |
-| GNOME | _project | factory | | GNOME:factory | |
-| GNOME | gtk4 | factory | | GNOME:factory | gtk4 |
-| GNOME | gnome-desktop | factory | | GNOME:factory | gnome-desktop |
-| GNOME | _project | next | | GNOME:next | |
-| GNOME | gtk4 | next | | GNOME:next | gtk4 |
-| GNOME | gnome-desktop | next | | GNOME:next | gnome-desktop |
+| GNOME | _project | obs/factory | | GNOME:factory | |
+| GNOME | gtk4 | obs/factory | | GNOME:factory | gtk4 |
+| GNOME | gnome-desktop | obs/factory | | GNOME:factory | gnome-desktop |
+| GNOME | _project | obs/next | | GNOME:next | |
+| GNOME | gtk4 | obs/next | | GNOME:next | gtk4 |
+| GNOME | gnome-desktop | obs/next | | GNOME:next | gnome-desktop |
 
 #### Home Projects
 
 | Git Org | Git Repo | Git Branch | | OBS Project | OBS Package |
 | - | - | - | - | - | - |
-| ~alice | _project | 3d-printing | | home:alice:3d-printing | |
-| ~alice | orcaslicer | 3d-printing | | home:alice:3d-printing | orcaslicer |
-| ~alice | _project | ai | | home:alice:ai | |
-| ~alice | llamacpp | ai | | home:alice:ai | llamacpp |
+| ~alice | _project | obs/3d-printing | | home:alice:3d-printing | |
+| ~alice | orcaslicer | obs/3d-printing | | home:alice:3d-printing | orcaslicer |
+| ~alice | _project | obs/ai | | home:alice:ai | |
+| ~alice | llamacpp | obs/ai | | home:alice:ai | llamacpp |
 
 NOTE: Using ~ as prefix for home orgs to create a namespace, avoiding any collision with regular orgs.
 
@@ -74,9 +74,9 @@ NOTE: Using ~ as prefix for home orgs to create a namespace, avoiding any collis
 
 | Git Org | Git Repo | Git Branch | | OBS Project | OBS Package |
 | - | - | - | - | - | - |
-| GNOME | _project | factory | | GNOME:factory | |
-| GNOME | gtk4 | factory | | GNOME:factory | gtk4 |
-| GNOME | gnome-desktop | factory | | GNOME:factory | gnome-desktop |
+| GNOME | _project | obs/factory | | GNOME:factory | |
+| GNOME | gtk4 | obs/factory | | GNOME:factory | gtk4 |
+| GNOME | gnome-desktop | obs/factory | | GNOME:factory | gnome-desktop |
 
 #### Freeze the branches by creating workspaces for updating GNOME to 51.0
 
