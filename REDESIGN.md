@@ -99,6 +99,7 @@ The branch naming would be: `workspace/<workspace-name>/<org>/<project>`.
 ### Current State
 - Project pull request with package submodule and _patchinfo is **manually** created.
 - If package pull request changes, it gets out of sync with the submodule the project pull request.
+- The package doesn't get build until the project PR is updated!
 - Maintenance team monitors these out of sync packages, update the project pull requests accordingly (update package submodule, update patchinfo according to package changes).
 - Also, it starts with a list of packages in codestreams (projects) to be fixed, frequently listed in bugzilla.
 - There is usually a single _patchinfo included in each project pull request.
