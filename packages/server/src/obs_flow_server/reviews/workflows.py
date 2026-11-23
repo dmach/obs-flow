@@ -11,7 +11,7 @@ from obs_flow_common.messages.reviews import (
     ReviewConfigDTO,
     ReviewerDTO,
 )
-from reviews.models import BaseReview, ReviewConfig
+from reviews.models import BaseReview, ReviewConfig, ReviewScope
 
 
 # =====================================================================
@@ -120,6 +120,44 @@ def build_review_config_dto(config: ReviewConfig) -> ReviewConfigDTO:
         depends_on=depends_on_list,
         scope=scope_name,
     )
+
+
+def get_or_create_review(revision, reviewer_str: str | None, review_model) -> BaseReview:
+    """
+    Gets or creates the review of `review_model` for this revision and reviewer.
+    An empty reviewer string resolves to the admin user.
+    """
+    user, group, role = parse_reviewer(reviewer_str, default_admin=True)
+    if user:
+        reviewer = {"reviewer_user": user}
+    elif group:
+        reviewer = {"reviewer_group": group}
+    else:
+        reviewer = {"dynamic_role": role}
+
+    review, _ = review_model.objects.get_or_create(
+        revision=revision,
+        **reviewer,
+        defaults={
+            "state": BaseReview.State.PENDING,
+            "scope": ReviewScope.objects.get(name="global"),
+        },
+    )
+    return review
+
+
+def apply_review_action(review: BaseReview, state: str, actor: User, justification: str | None) -> BaseReview:
+    """
+    Sets the given state/actor/justification on the review, clears inheritance,
+    saves it and propagates the decision to dependent reviews.
+    """
+    review.state = state
+    review.actor = actor
+    review.justification = justification
+    review.is_inherited = False
+    review.save()
+    review.propagate_decision()
+    return review
 
 
 def review_to_detail(review: BaseReview) -> ReviewDetail:

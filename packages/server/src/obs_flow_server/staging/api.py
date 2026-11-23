@@ -28,13 +28,13 @@ from obs_flow_server.api import api
 
 from accounts.helpers import get_authenticated_user
 from core.models import Project
-from reviews.workflows import parse_reviewer, review_to_detail
+from reviews.workflows import apply_review_action, parse_reviewer, review_to_detail
 from staging.models import StagingBatch, StagingReview
 from staging.workflows import (
     add_prs_to_batch,
     batch_to_detail,
     create_batch,
-    get_review_for_request,
+    get_staging_review,
     mark_staging_draft,
     mark_staging_ready_for_review,
     merge_batches,
@@ -146,14 +146,9 @@ def show_staging_review_endpoint(payload: StagingReviewShowRequest):
 def approve_staging_review_endpoint(payload: StagingReviewApproveRequest, request):
     batch = StagingBatch.objects.get(id=payload.staging_id)
 
-    review = get_review_for_request(batch, payload.reviewer)
-    review.state = StagingReview.State.ACCEPTED
     user = get_authenticated_user(request)
-    review.actor = user
-    review.justification = None
-    review.is_inherited = False
-    review.save()
-    review.propagate_decision()
+    review = get_staging_review(batch, payload.reviewer)
+    apply_review_action(review, StagingReview.State.ACCEPTED, user, None)
 
     res = StagingReviewActionResponse(staging_id=payload.staging_id, review=review_to_detail(review))
     return msgspec.structs.asdict(res)
@@ -164,14 +159,9 @@ def approve_staging_review_endpoint(payload: StagingReviewApproveRequest, reques
 def decline_staging_review_endpoint(payload: StagingReviewDeclineRequest, request):
     batch = StagingBatch.objects.get(id=payload.staging_id)
 
-    review = get_review_for_request(batch, payload.reviewer)
-    review.state = StagingReview.State.REJECTED
     user = get_authenticated_user(request)
-    review.actor = user
-    review.justification = payload.message
-    review.is_inherited = False
-    review.save()
-    review.propagate_decision()
+    review = get_staging_review(batch, payload.reviewer)
+    apply_review_action(review, StagingReview.State.REJECTED, user, payload.message)
 
     res = StagingReviewActionResponse(staging_id=payload.staging_id, review=review_to_detail(review))
     return msgspec.structs.asdict(res)
@@ -182,14 +172,9 @@ def decline_staging_review_endpoint(payload: StagingReviewDeclineRequest, reques
 def needinfo_staging_review_endpoint(payload: StagingReviewNeedInfoRequest, request):
     batch = StagingBatch.objects.get(id=payload.staging_id)
 
-    review = get_review_for_request(batch, payload.reviewer)
-    review.state = StagingReview.State.NEEDINFO
     user = get_authenticated_user(request)
-    review.actor = user
-    review.justification = payload.message
-    review.is_inherited = False
-    review.save()
-    review.propagate_decision()
+    review = get_staging_review(batch, payload.reviewer)
+    apply_review_action(review, StagingReview.State.NEEDINFO, user, payload.message)
 
     res = StagingReviewActionResponse(staging_id=payload.staging_id, review=review_to_detail(review))
     return msgspec.structs.asdict(res)
@@ -218,7 +203,7 @@ def clear_needinfo_staging_review_endpoint(payload: StagingReviewClearNeedInfoRe
         last_review = review
 
     if not last_review:
-        last_review = get_review_for_request(batch, None)
+        last_review = get_staging_review(batch, None)
 
     res = StagingReviewActionResponse(staging_id=payload.staging_id, review=review_to_detail(last_review))
     return msgspec.structs.asdict(res)
@@ -229,14 +214,9 @@ def clear_needinfo_staging_review_endpoint(payload: StagingReviewClearNeedInfoRe
 def reopen_staging_review_endpoint(payload: StagingReviewReopenRequest, request):
     batch = StagingBatch.objects.get(id=payload.staging_id)
 
-    review = get_review_for_request(batch, payload.reviewer)
-    review.state = StagingReview.State.PENDING
     user = get_authenticated_user(request)
-    review.actor = user
-    review.justification = payload.message
-    review.is_inherited = False
-    review.save()
-    review.propagate_decision()
+    review = get_staging_review(batch, payload.reviewer)
+    apply_review_action(review, StagingReview.State.PENDING, user, payload.message)
 
     res = StagingReviewActionResponse(staging_id=payload.staging_id, review=review_to_detail(review))
     return msgspec.structs.asdict(res)

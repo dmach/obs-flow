@@ -11,8 +11,7 @@ from accounts.helpers import build_user_dto
 from core.gitea import merge_pull_request
 from core.models import Project
 from pull_requests.models import PullRequest
-from reviews.models import ReviewScope
-from reviews.workflows import parse_reviewer
+from reviews.workflows import get_or_create_review
 from staging.models import (
     StagingBatch,
     StagingBatchRevision,
@@ -253,39 +252,12 @@ def batch_to_detail(batch: StagingBatch) -> StagingDetail:
     )
 
 
-def get_review_for_request(batch: StagingBatch, reviewer_str: str | None) -> StagingReview:
+def get_staging_review(batch: StagingBatch, reviewer_str: str | None) -> StagingReview:
+    """Gets or creates the StagingReview on the batch's latest revision."""
     latest_rev = batch.latest_revision
     if not latest_rev:
         raise ValueError(f"Staging batch #{batch.id} has no revisions.")
-    user, group, role = parse_reviewer(reviewer_str, default_admin=True)
-    if user:
-        review = StagingReview.objects.filter(revision=latest_rev, reviewer_user=user).first()
-        if review is None:
-            review = StagingReview.objects.create(
-                revision=latest_rev,
-                reviewer_user=user,
-                state=StagingReview.State.PENDING,
-                scope=ReviewScope.objects.get(name="global"),
-            )
-    elif group:
-        review = StagingReview.objects.filter(revision=latest_rev, reviewer_group=group).first()
-        if review is None:
-            review = StagingReview.objects.create(
-                revision=latest_rev,
-                reviewer_group=group,
-                state=StagingReview.State.PENDING,
-                scope=ReviewScope.objects.get(name="global"),
-            )
-    else:
-        review = StagingReview.objects.filter(revision=latest_rev, dynamic_role=role).first()
-        if review is None:
-            review = StagingReview.objects.create(
-                revision=latest_rev,
-                dynamic_role=role,
-                state=StagingReview.State.PENDING,
-                scope=ReviewScope.objects.get(name="global"),
-            )
-    return review
+    return get_or_create_review(latest_rev, reviewer_str, StagingReview)
 
 
 def batch_member_prs(batch: StagingBatch) -> list[PullRequest]:
