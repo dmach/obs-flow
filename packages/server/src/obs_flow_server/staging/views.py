@@ -7,6 +7,7 @@ from django.utils import timezone
 from django.views.decorators.http import require_POST
 
 from accounts.models import User
+from core.gitea import merge_pull_request
 from core.htmx import close_modal_and_refresh
 from core.models import Project
 from pull_requests.models import PullRequest
@@ -433,12 +434,11 @@ def staging_merge_action(request, batch_id):
         messages.error(request, f"Cannot merge staging batch #{batch.id}: unapproved reviews: {', '.join(names)}.")
         return redirect("staging_detail", batch_id=batch.id)
 
-    from pull_requests.api import _do_gitea_merge
     prs = [bpr.pull_request_revision.pull_request for bpr in latest_rev.revision_pull_requests.all()]
     for pr in prs:
         if pr.state != PullRequest.State.MERGED:
             try:
-                _do_gitea_merge(pr.target.owner, pr.target.repo, pr.number)
+                merge_pull_request(pr.target.owner, pr.target.repo, pr.number)
                 pr.state = PullRequest.State.MERGED
                 pr.save(update_fields=["state"])
             except Exception as e:
@@ -459,7 +459,6 @@ def staging_bulk_merge(request):
         messages.warning(request, "No staging batches selected for merge.")
         return redirect("staging_list")
 
-    from pull_requests.api import _do_gitea_merge
 
     merged_count = 0
     errors = []
@@ -484,7 +483,7 @@ def staging_bulk_merge(request):
             prs = [bpr.pull_request_revision.pull_request for bpr in latest_rev.revision_pull_requests.all()]
             for pr in prs:
                 if pr.state != PullRequest.State.MERGED:
-                    _do_gitea_merge(pr.target.owner, pr.target.repo, pr.number)
+                    merge_pull_request(pr.target.owner, pr.target.repo, pr.number)
                     pr.state = PullRequest.State.MERGED
                     pr.save(update_fields=["state"])
 
@@ -569,7 +568,6 @@ def staging_ui_modal_execute_merge(request):
         messages.warning(request, "No staging batches selected for merge.")
         return close_modal_and_refresh()
 
-    from pull_requests.api import _do_gitea_merge
 
     merged_count = 0
     errors = []
@@ -583,7 +581,7 @@ def staging_ui_modal_execute_merge(request):
 
             for pr in prs:
                 if pr.state != PullRequest.State.MERGED:
-                    _do_gitea_merge(pr.target.owner, pr.target.repo, pr.number)
+                    merge_pull_request(pr.target.owner, pr.target.repo, pr.number)
                     pr.state = PullRequest.State.MERGED
                     pr.save(update_fields=["state"])
 

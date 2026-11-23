@@ -8,6 +8,7 @@ from django.utils import timezone
 from django.views.decorators.csrf import ensure_csrf_cookie
 from django.views.decorators.http import require_POST
 
+from core.gitea import merge_pull_request
 from core.htmx import close_modal_and_refresh
 from core.models import Project
 from pull_requests.models import PullRequest, PullRequestReview
@@ -232,9 +233,8 @@ def pr_merge_action(request, pr_id):
         messages.error(request, f"Pull request #{pr.number} is already merged.")
         return redirect("pr_detail", pr_id=pr.id)
 
-    from pull_requests.api import _do_gitea_merge
     try:
-        _do_gitea_merge(pr.target.owner, pr.target.repo, pr.number)
+        merge_pull_request(pr.target.owner, pr.target.repo, pr.number)
         pr.state = PullRequest.State.MERGED
         pr.save(update_fields=["state"])
         messages.success(request, f"Pull request #{pr.number} merged successfully.")
@@ -251,7 +251,6 @@ def pr_bulk_merge(request):
         messages.warning(request, "No pull requests selected for merge.")
         return redirect("pr_list")
 
-    from pull_requests.api import _do_gitea_merge
 
     merged_count = 0
     errors = []
@@ -265,7 +264,7 @@ def pr_bulk_merge(request):
                 errors.append(f"PR #{pr.number}: Already merged.")
                 continue
 
-            _do_gitea_merge(pr.target.owner, pr.target.repo, pr.number)
+            merge_pull_request(pr.target.owner, pr.target.repo, pr.number)
             pr.state = PullRequest.State.MERGED
             pr.save(update_fields=["state"])
             merged_count += 1
@@ -350,7 +349,6 @@ def pr_ui_modal_execute_merge(request):
         messages.warning(request, "No pull requests selected for merge.")
         return close_modal_and_refresh()
 
-    from pull_requests.api import _do_gitea_merge
 
     merged_count = 0
     errors = []
@@ -362,7 +360,7 @@ def pr_ui_modal_execute_merge(request):
                 errors.append(f"PR #{pr.number}: {error}")
                 continue
 
-            _do_gitea_merge(pr.target.owner, pr.target.repo, pr.number)
+            merge_pull_request(pr.target.owner, pr.target.repo, pr.number)
             pr.state = PullRequest.State.MERGED
             pr.save(update_fields=["state"])
             merged_count += 1

@@ -38,6 +38,7 @@ from obs_flow_server.api import api
 import hashlib
 from accounts.helpers import build_user_dto, get_authenticated_user, get_auth_header
 from accounts.models import User, Group
+from core.gitea import merge_pull_request
 from core.models import Project
 from pull_requests.models import PullRequest
 from reviews.api import build_reviewer_dto_from_fields
@@ -625,7 +626,6 @@ def staging_convert_to_draft_endpoint(payload: StagingConvertToDraftRequest):
 @api.post("/api/v1/staging/merge")
 @sync_to_async
 def staging_merge_endpoint(payload: StagingMergeRequest):
-    from pull_requests.api import _do_gitea_merge
 
     if not payload.staging_ids:
         return HttpResponseBadRequest("No staging batch IDs provided.")
@@ -693,7 +693,7 @@ def staging_merge_endpoint(payload: StagingMergeRequest):
             for pr in batch_prs:
                 if pr.state != PullRequest.State.MERGED:
                     try:
-                        _do_gitea_merge(pr.target.owner, pr.target.repo, pr.number)
+                        merge_pull_request(pr.target.owner, pr.target.repo, pr.number)
                     except ValueError as e:
                         return HttpResponseBadRequest(str(e))
                     pr.state = PullRequest.State.MERGED

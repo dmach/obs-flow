@@ -31,6 +31,7 @@ from obs_flow_server.api import api
 
 from accounts.helpers import build_user_dto, get_authenticated_user, get_auth_header
 from accounts.models import User, Group
+from core.gitea import merge_pull_request
 from core.models import GitMapping, Project
 from pull_requests.models import PullRequest, PullRequestRevision, PullRequestReview
 from reviews.api import build_reviewer_dto_from_fields
@@ -640,30 +641,6 @@ def pr_convert_to_draft_endpoint(payload: PRConvertToDraftRequest):
     return msgspec.structs.asdict(res)
 
 
-def _do_gitea_merge(owner: str, repo: str, number: int) -> None:
-    if not getattr(settings, "GITEA_URL", None) or not getattr(settings, "GITEA_TOKEN", None):
-        raise ValueError("GITEA_URL and GITEA_TOKEN must be configured.")
-
-    url = f"{settings.GITEA_URL.rstrip('/')}/api/v1/repos/{owner}/{repo}/pulls/{number}/merge"
-    headers = {
-        "Authorization": f"token {settings.GITEA_TOKEN}",
-        "Content-Type": "application/json",
-        "Accept": "application/json",
-    }
-    data = json.dumps({"Do": "merge"}).encode("utf-8")
-    req = urllib.request.Request(url, data=data, headers=headers, method="POST")
-
-    try:
-        with urllib.request.urlopen(req) as response:
-            if response.status not in (200, 204):
-                raise ValueError(f"Failed to merge PR #{number} in Gitea: status {response.status}")
-    except urllib.error.HTTPError as e:
-        error_msg = e.read().decode("utf-8")
-        raise ValueError(f"Failed to merge PR #{number} in Gitea: {error_msg}")
-    except Exception as e:
-        raise ValueError(f"Failed to merge PR #{number} in Gitea: {e}")
-
-
 @api.post("/api/v1/pr/merge")
 @sync_to_async
 def pr_merge_endpoint(payload: PRMergeRequest):
@@ -721,7 +698,7 @@ def pr_merge_endpoint(payload: PRMergeRequest):
         updated_prs = []
         for pr_id, pr in prs_to_merge:
             try:
-                _do_gitea_merge(pr.target.owner, pr.target.repo, pr.number)
+                merge_pull_request(pr.target.owner, pr.target.repo, pr.number)
             except ValueError as e:
                 return HttpResponseBadRequest(str(e))
 
