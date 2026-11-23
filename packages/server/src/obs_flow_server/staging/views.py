@@ -7,22 +7,13 @@ from django.utils import timezone
 from django.views.decorators.http import require_POST
 
 from accounts.models import User
+from core.htmx import close_modal_and_refresh
 from core.models import Project
 from pull_requests.models import PullRequest
 from staging.models import StagingBatch, StagingReview
 from staging.forms import StagingBatchFilterForm
 
 
-def _close_modal_and_refresh() -> HttpResponse:
-    """
-    Close the htmx modal and reload the page.
-
-    The reload re-renders the list with fresh data and unchecked checkboxes, and
-    displays the queued django.contrib.messages as toasts - no JavaScript needed.
-    """
-    response = HttpResponse("")
-    response["HX-Refresh"] = "true"
-    return response
 
 
 def update_staging_batch(batch_id: int, title=None, embargo_date=None, release_date=None) -> StagingBatch:
@@ -316,7 +307,7 @@ def staging_ui_modal_confirm_add(request):
 
     if not prs_to_add:
         messages.error(request, "No pull requests were added (all were conflicting).")
-        return _close_modal_and_refresh()
+        return close_modal_and_refresh()
 
     # Get current PRs in the batch
     latest_rev = batch.latest_revision
@@ -345,7 +336,7 @@ def staging_ui_modal_confirm_add(request):
     create_staging_revision(batch, pr_revisions)
 
     messages.success(request, f"Successfully added {len(prs_to_add)} PRs to Staging Batch #{batch.id}.")
-    return _close_modal_and_refresh()
+    return close_modal_and_refresh()
 
 
 def _render_staging_draft_section(request, batch, latest_revision):
@@ -576,7 +567,7 @@ def staging_ui_modal_execute_merge(request):
     batch_ids = request.POST.getlist("selected_batches")
     if not batch_ids:
         messages.warning(request, "No staging batches selected for merge.")
-        return _close_modal_and_refresh()
+        return close_modal_and_refresh()
 
     from pull_requests.api import _do_gitea_merge
 
@@ -608,6 +599,6 @@ def staging_ui_modal_execute_merge(request):
     for err in errors:
         messages.error(request, err)
 
-    return _close_modal_and_refresh()
+    return close_modal_and_refresh()
 
 

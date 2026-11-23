@@ -3,12 +3,12 @@ import urllib.parse
 from django.contrib import messages
 from django.core.paginator import Paginator
 from django.db.models import Q
-from django.http import HttpResponse
 from django.shortcuts import render, get_object_or_404, redirect
 from django.utils import timezone
 from django.views.decorators.csrf import ensure_csrf_cookie
 from django.views.decorators.http import require_POST
 
+from core.htmx import close_modal_and_refresh
 from core.models import Project
 from pull_requests.models import PullRequest, PullRequestReview
 from pull_requests.forms import PullRequestFilterForm
@@ -280,10 +280,6 @@ def pr_bulk_merge(request):
     return redirect("pr_list")
 
 
-def _close_modal_and_refresh() -> HttpResponse:
-    response = HttpResponse("")
-    response["HX-Refresh"] = "true"
-    return response
 
 
 def _check_pr_for_merge(pr: PullRequest) -> tuple[bool, str | None, list[str]]:
@@ -352,7 +348,7 @@ def pr_ui_modal_execute_merge(request):
     pr_ids = request.POST.getlist("selected_prs")
     if not pr_ids:
         messages.warning(request, "No pull requests selected for merge.")
-        return _close_modal_and_refresh()
+        return close_modal_and_refresh()
 
     from pull_requests.api import _do_gitea_merge
 
@@ -378,6 +374,6 @@ def pr_ui_modal_execute_merge(request):
     for err in errors:
         messages.error(request, err)
 
-    return _close_modal_and_refresh()
+    return close_modal_and_refresh()
 
 
