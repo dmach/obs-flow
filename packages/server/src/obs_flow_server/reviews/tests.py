@@ -1001,7 +1001,7 @@ class TestScopeProvisioningStaging(TestCase):
         self.batch = StagingBatch.objects.create(project=self.project, author=self.user)
 
     def test_skipped_when_no_file_in_scope(self):
-        from staging.api import provision_reviews_for_staging_revision
+        from staging.workflows import provision_reviews_for_staging_revision
 
         scope = ReviewScope.objects.create(name="code", include_globs=["src/*.py"], exclude_globs=[])
         ReviewConfig.objects.create(
@@ -1023,7 +1023,7 @@ class TestScopeProvisioningStaging(TestCase):
         self.assertFalse(reviews[0].is_inherited)
 
     def test_pending_when_in_scope(self):
-        from staging.api import provision_reviews_for_staging_revision
+        from staging.workflows import provision_reviews_for_staging_revision
 
         scope = ReviewScope.objects.create(name="code", include_globs=["src/*.py"], exclude_globs=[])
         ReviewConfig.objects.create(

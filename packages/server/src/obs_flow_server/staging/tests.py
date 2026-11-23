@@ -90,7 +90,7 @@ class TestFixtureData(TestCase):
         self.assertEqual(staging_configs.count(), 2)
 
         # Transition Staging Batch #2 out of draft and verify reviews are provisioned from ReviewConfig
-        from staging.api import mark_staging_ready_for_review
+        from staging.workflows import mark_staging_ready_for_review
         rev2 = draft_batch.revisions.first()
         self.assertEqual(rev2.reviews.count(), 0)
         mark_staging_ready_for_review(rev2)
@@ -179,7 +179,7 @@ class TestStagingCreationWithReviewConfig(TransactionTestCase):
         self.assertEqual(StagingReview.objects.filter(revision__staging_batch=batch).count(), 0)
 
         # Transition out of draft mode and verify reviews are now created
-        from staging.api import mark_staging_ready_for_review
+        from staging.workflows import mark_staging_ready_for_review
         mark_staging_ready_for_review(batch.revisions.first())
         self.assertFalse(batch.is_draft)
 
@@ -549,7 +549,7 @@ class TestStagingUIModalViews(TransactionTestCase):
             state=StagingBatch.State.COLLECTING,
         )
         # Create revision 1 for batch2
-        from staging.api import create_staging_revision
+        from staging.workflows import create_staging_revision
         create_staging_revision(batch2, [])
 
         # PR 1234 is already in Staging Batch #1
@@ -721,7 +721,7 @@ class TestStagingReviewProvisioning(TestCase):
     fixtures = ["global_scope.json"]
     def test_provision_reviews_and_mark_staging_ready_for_review(self):
         from reviews.models import ReviewConfig
-        from staging.api import provision_reviews_for_staging_revision, mark_staging_ready_for_review
+        from staging.workflows import provision_reviews_for_staging_revision, mark_staging_ready_for_review
 
         project = Project.objects.create(name="test:project")
         reviewer = User.objects.create(username="reviewer1", username_lower="reviewer1", account_type=User.AccountType.HUMAN)
@@ -758,7 +758,7 @@ class TestStagingReviewProvisioning(TestCase):
 
     def test_cascading_unblocking_staging_reviews(self):
         from reviews.models import ReviewConfig
-        from staging.api import mark_staging_ready_for_review
+        from staging.workflows import mark_staging_ready_for_review
         from django_bolt.testing import TestClient
         from obs_flow_server.api import api
         import json
@@ -808,7 +808,7 @@ class TestStagingReviewProvisioning(TestCase):
 
     def test_staging_zero_debounce_publishes_immediately(self):
         from reviews.models import ReviewConfig
-        from staging.api import create_staging_revision
+        from staging.workflows import create_staging_revision
 
         project = Project.objects.create(name="test:project-zero", review_debounce_minutes=0)
         reviewer = User.objects.create(username="reviewer_zero", username_lower="reviewer_zero", account_type=User.AccountType.HUMAN)

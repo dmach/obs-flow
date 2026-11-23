@@ -19,7 +19,7 @@ class Command(BaseCommand):
         from pull_requests.models import PullRequestRevision
         from pull_requests.api import mark_ready_for_review
         from staging.models import StagingBatchRevision
-        from staging.api import mark_staging_ready_for_review
+        from staging.workflows import mark_staging_ready_for_review
 
         dry_run = options.get("dry_run", False)
         now = timezone.now()

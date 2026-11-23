@@ -492,7 +492,7 @@ def _do_sync_pull_request(req: PRSyncRequest) -> PRSyncResponse:
 
         # Update any StagingBatches containing this PR to use the new PullRequestRevision
         from staging.models import StagingBatch
-        from staging.api import create_staging_revision
+        from staging.workflows import create_staging_revision
 
         affected_batches = StagingBatch.objects.filter(
             revisions__revision_pull_requests__pull_request_revision__pull_request=pr

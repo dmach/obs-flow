@@ -13,33 +13,15 @@ from core.models import Project
 from pull_requests.models import PullRequest
 from staging.models import StagingBatch, StagingReview
 from staging.forms import StagingBatchFilterForm
-
-
-
-
-def update_staging_batch(batch_id: int, title=None, embargo_date=None, release_date=None) -> StagingBatch:
-    batch = StagingBatch.objects.get(id=batch_id)
-
-    if title is not None:
-        batch.title = title
-    if embargo_date is not None:
-        if embargo_date == "":
-            batch.embargo_date = None
-        elif isinstance(embargo_date, str):
-            batch.embargo_date = timezone.datetime.fromisoformat(embargo_date)
-        else:
-            batch.embargo_date = embargo_date
-
-    if release_date is not None:
-        if release_date == "":
-            batch.release_date = None
-        elif isinstance(release_date, str):
-            batch.release_date = timezone.datetime.fromisoformat(release_date)
-        else:
-            batch.release_date = release_date
-
-    batch.save()
-    return batch
+from staging.workflows import (
+    batch_member_prs,
+    find_conflicts,
+    mark_staging_draft,
+    mark_staging_ready_for_review,
+    rebuild_batch_revision,
+    staging_merge_blockers,
+    update_batch,
+)
 
 
 def staging_list(request):
@@ -207,7 +189,7 @@ def staging_edit_date(request, batch_id, date_type):
     if request.method == "POST":
         new_val = request.POST.get("date_value", "")
         kwargs = {f"{date_type}_date": new_val}
-        batch = update_staging_batch(batch_id, **kwargs)
+        batch = update_batch(batch_id, **kwargs)
         return render(request, "staging/partials/date_display.html", {"batch": batch, "date_type": date_type})
     return HttpResponse(status=405)
 
@@ -268,23 +250,11 @@ def staging_ui_modal_confirm_add(request):
 
     batch = get_object_or_404(StagingBatch, id=batch_id)
 
+    prs = [get_object_or_404(PullRequest, id=pr_id) for pr_id in pr_ids]
+
     # If no resolution is specified, check for conflicts
     if not resolution:
-        conflicts = []
-        for pr_id in pr_ids:
-            pr = get_object_or_404(PullRequest, id=pr_id)
-            # Find other open staging batches containing this PR
-            other_open_batches = StagingBatch.objects.filter(
-                state__in=[StagingBatch.State.COLLECTING, StagingBatch.State.IN_PROGRESS],
-                revisions__revision_pull_requests__pull_request_revision__pull_request=pr
-            ).exclude(id=batch.id).distinct()
-
-            if other_open_batches.exists():
-                conflicts.append({
-                    "pr": pr,
-                    "other_batches": other_open_batches,
-                })
-
+        conflicts = find_conflicts(batch, prs)
         if conflicts:
             return render(request, "staging/partials/modal_conflicts.html", {
                 "conflicts": conflicts,
@@ -293,48 +263,24 @@ def staging_ui_modal_confirm_add(request):
             })
 
     # Perform the addition based on resolution
-    prs_to_add = []
-    for pr_id in pr_ids:
-        pr = get_object_or_404(PullRequest, id=pr_id)
-        if resolution == "safe":
-            # Skip if in any other open batch
-            other_open_batches = StagingBatch.objects.filter(
-                state__in=[StagingBatch.State.COLLECTING, StagingBatch.State.IN_PROGRESS],
-                revisions__revision_pull_requests__pull_request_revision__pull_request=pr
-            ).exclude(id=batch.id).distinct()
-            if other_open_batches.exists():
-                continue
-        prs_to_add.append(pr)
+    if resolution == "safe":
+        # Skip PRs that are in any other open batch
+        conflict_ids = {c["pr"].id for c in find_conflicts(batch, prs)}
+        prs_to_add = [pr for pr in prs if pr.id not in conflict_ids]
+    else:
+        prs_to_add = list(prs)
 
     if not prs_to_add:
         messages.error(request, "No pull requests were added (all were conflicting).")
         return close_modal_and_refresh()
 
-    # Get current PRs in the batch
-    latest_rev = batch.latest_revision
-    current_prs = []
-    if latest_rev:
-        current_prs = [
-            bpr.pull_request_revision.pull_request
-            for bpr in latest_rev.revision_pull_requests.all()
-        ]
-
-    # Add new PRs
+    # Add new PRs and rebuild the batch revision
+    current_prs = batch_member_prs(batch)
     for pr in prs_to_add:
         if pr not in current_prs:
             current_prs.append(pr)
 
-    # Get latest revision for each PR
-    pr_revisions = []
-    for pr in current_prs:
-        latest_pr_rev = pr.latest_revision
-        if latest_pr_rev:
-            pr_revisions.append(latest_pr_rev)
-
-    # imported here: staging.api imports staging.views, so a module level import would be circular
-    from staging.api import create_staging_revision
-
-    create_staging_revision(batch, pr_revisions)
+    rebuild_batch_revision(batch, current_prs)
 
     messages.success(request, f"Successfully added {len(prs_to_add)} PRs to Staging Batch #{batch.id}.")
     return close_modal_and_refresh()
@@ -357,7 +303,6 @@ def staging_draft_status(request, batch_id):
     batch = get_object_or_404(StagingBatch, id=batch_id)
     latest_revision = batch.latest_revision
     if latest_revision and latest_revision.is_draft and latest_revision.draft_expires_at and latest_revision.draft_expires_at <= timezone.now():
-        from staging.api import mark_staging_ready_for_review
         mark_staging_ready_for_review(latest_revision)
         batch.refresh_from_db()
         latest_revision.refresh_from_db()
@@ -369,7 +314,6 @@ def staging_ready_for_review(request, batch_id):
     batch = get_object_or_404(StagingBatch, id=batch_id)
     latest_revision = batch.latest_revision
     if latest_revision:
-        from staging.api import mark_staging_ready_for_review
         mark_staging_ready_for_review(latest_revision)
         messages.success(request, f"Staging batch #{batch.id} is now ready for review.")
         batch.refresh_from_db()
@@ -385,7 +329,6 @@ def staging_cancel_timeout(request, batch_id):
     batch = get_object_or_404(StagingBatch, id=batch_id)
     latest_revision = batch.latest_revision
     if latest_revision:
-        from staging.api import mark_staging_draft
         mark_staging_draft(latest_revision)
         messages.success(request, f"Cancelled review debounce timeout for Staging Batch #{batch.id}.")
         batch.refresh_from_db()
@@ -401,7 +344,6 @@ def staging_convert_to_draft(request, batch_id):
     batch = get_object_or_404(StagingBatch, id=batch_id)
     latest_revision = batch.latest_revision
     if latest_revision:
-        from staging.api import mark_staging_draft
         mark_staging_draft(latest_revision)
         messages.success(request, f"Staging batch #{batch.id} converted to draft.")
         batch.refresh_from_db()
@@ -502,33 +444,6 @@ def staging_bulk_merge(request):
     return redirect("staging_list")
 
 
-def _check_staging_for_merge(batch: StagingBatch) -> tuple[bool, str | None, list, list]:
-    if batch.state == StagingBatch.State.MERGED:
-        return False, "Staging batch is already merged.", [], []
-
-    latest_rev = batch.latest_revision
-    if not latest_rev:
-        return False, "Staging batch has no revisions.", [], []
-
-    if latest_rev.is_draft:
-        return False, "Staging batch is currently in draft mode and cannot be merged.", [], []
-
-    reviews = list(latest_rev.reviews.all())
-    unapproved = latest_rev.reviews.exclude(state__in=[StagingReview.State.ACCEPTED, StagingReview.State.OVERRIDDEN])
-    if unapproved.exists():
-        names = [r.reviewer_name for r in unapproved]
-        return False, f"Unapproved reviews: {', '.join(names)}.", reviews, []
-
-    prs = [bpr.pull_request_revision.pull_request for bpr in latest_rev.revision_pull_requests.all()]
-    for pr in prs:
-        if pr.is_draft:
-            return False, f"Pull request #{pr.number} in batch is in draft mode.", reviews, prs
-        if pr.is_mergeable is False:
-            return False, f"Pull request #{pr.number} in batch has merge conflicts.", reviews, prs
-
-    return True, None, reviews, prs
-
-
 @require_POST
 def staging_ui_modal_check_merge(request):
     batch_ids = request.POST.getlist("selected_batches")
@@ -538,7 +453,7 @@ def staging_ui_modal_check_merge(request):
     for b_id in batch_ids:
         try:
             batch = StagingBatch.objects.get(id=b_id)
-            can_merge, error, reviews, prs = _check_staging_for_merge(batch)
+            can_merge, error, reviews, prs = staging_merge_blockers(batch)
             items.append({
                 "batch": batch,
                 "can_merge": can_merge,
@@ -574,7 +489,7 @@ def staging_ui_modal_execute_merge(request):
     for b_id in batch_ids:
         try:
             batch = StagingBatch.objects.get(id=b_id)
-            can_merge, error, _, prs = _check_staging_for_merge(batch)
+            can_merge, error, _, prs = staging_merge_blockers(batch)
             if not can_merge:
                 errors.append(f"Batch #{batch.id}: {error}")
                 continue
