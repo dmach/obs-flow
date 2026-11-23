@@ -1,5 +1,7 @@
 """Review lifecycle: building blocks first, I/O procedures last."""
 
+from django.db import transaction
+
 from accounts.helpers import build_user_dto
 from accounts.models import Group, User
 from core.models import Project
@@ -175,6 +177,104 @@ def clear_needinfo(revision, actor: User, justification: str | None, review_mode
         last_review = get_or_create_review(revision, None, review_model)
 
     return last_review
+
+
+@transaction.atomic
+def provision_reviews_for(revision, configs, *, review_model, revision_model, prev_rev=None) -> list[BaseReview]:
+    """
+    Provisions reviews for a revision based on the given ReviewConfigs.
+    Skips while the revision is in draft mode or reviews already exist.
+    Evaluates scopes against changed files and supports decision inheritance
+    from the previous revision. Creates one review per config, wires
+    depends_on within the created set, and promotes ready reviews from
+    WAITING to PENDING.
+    """
+    rev = revision_model.objects.select_for_update().get(pk=revision.pk)
+    if rev.is_draft:
+        return []
+    if rev.reviews.exists():
+        return list(rev.reviews.all())
+
+    created_reviews = []
+    if configs.exists():
+        config_to_review = {}
+
+        changed_files = rev.get_changed_files()
+        inter_files = rev.get_inter_revision_changed_files(prev_rev) if prev_rev else changed_files
+
+        for config in configs:
+            scope = config.scope
+            is_in_scope = scope.evaluate(changed_files)
+
+            if not is_in_scope:
+                review = review_model.objects.create(
+                    revision=rev,
+                    reviewer_user=config.reviewer_user,
+                    reviewer_group=config.reviewer_group,
+                    dynamic_role=config.dynamic_role,
+                    scope=scope,
+                    state=BaseReview.State.SKIPPED,
+                    is_inherited=False,
+                )
+            else:
+                prev_review = None
+                if prev_rev:
+                    prev_review = review_model.objects.filter(
+                        revision=prev_rev,
+                        reviewer_user=config.reviewer_user,
+                        reviewer_group=config.reviewer_group,
+                        dynamic_role=config.dynamic_role,
+                    ).first()
+
+                if (
+                    prev_review
+                    and prev_review.scope_id == scope.id
+                    and prev_review.state != BaseReview.State.SKIPPED
+                    and not scope.evaluate(inter_files)
+                ):
+                    review = review_model.objects.create(
+                        revision=rev,
+                        reviewer_user=config.reviewer_user,
+                        reviewer_group=config.reviewer_group,
+                        dynamic_role=config.dynamic_role,
+                        scope=scope,
+                        state=prev_review.state,
+                        actor=prev_review.actor,
+                        justification=prev_review.justification,
+                        is_inherited=True,
+                    )
+                else:
+                    review = review_model.objects.create(
+                        revision=rev,
+                        reviewer_user=config.reviewer_user,
+                        reviewer_group=config.reviewer_group,
+                        dynamic_role=config.dynamic_role,
+                        scope=scope,
+                        state=BaseReview.State.WAITING,
+                        is_inherited=False,
+                    )
+
+            config_to_review[config] = review
+            created_reviews.append(review)
+
+        # Set up dependencies between the created reviews
+        for config, review in config_to_review.items():
+            for dep_config in config.depends_on.all():
+                if dep_config in config_to_review:
+                    review.depends_on.add(config_to_review[dep_config])
+
+        # Reviews with no unresolved dependencies start as PENDING, others remain WAITING
+        for review in created_reviews:
+            if review.state == BaseReview.State.WAITING:
+                prereqs = review.depends_on.all()
+                if not prereqs.exists() or all(
+                    p.state in (BaseReview.State.ACCEPTED, BaseReview.State.OVERRIDDEN, BaseReview.State.SKIPPED)
+                    for p in prereqs
+                ):
+                    review.state = BaseReview.State.PENDING
+                    review.save(update_fields=["state"])
+
+    return created_reviews
 
 
 def review_to_detail(review: BaseReview) -> ReviewDetail:

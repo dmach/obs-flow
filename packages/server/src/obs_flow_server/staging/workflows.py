@@ -11,7 +11,7 @@ from accounts.helpers import build_user_dto
 from core.gitea import merge_pull_request
 from core.models import Project
 from pull_requests.models import PullRequest
-from reviews.workflows import get_or_create_review
+from reviews.workflows import get_or_create_review, provision_reviews_for
 from staging.models import (
     StagingBatch,
     StagingBatchRevision,
@@ -86,7 +86,6 @@ def create_staging_revision(batch: StagingBatch, pr_revisions) -> StagingBatchRe
     return new_rev
 
 
-@transaction.atomic
 def provision_reviews_for_staging_revision(revision: StagingBatchRevision) -> list[StagingReview]:
     """
     Provisions reviews for a StagingBatchRevision based on ReviewConfig if no reviews exist.
@@ -94,100 +93,21 @@ def provision_reviews_for_staging_revision(revision: StagingBatchRevision) -> li
     Existing reviews are never re-provisioned.
     Evaluates scopes against changed files and supports decision inheritance.
     """
-    rev = StagingBatchRevision.objects.select_for_update().get(pk=revision.pk)
-    if rev.is_draft:
-        return []
-    if rev.reviews.exists():
-        return list(rev.reviews.all())
-
     from reviews.models import ReviewConfig
-    configs = ReviewConfig.objects.filter(project=rev.staging_batch.project, type="staging").select_related("scope")
-    created_reviews = []
-    if configs.exists():
-        config_to_review = {}
-
-        batch = rev.staging_batch
-        changed_files = rev.get_changed_files()
-        prev_rev = (
-            batch.revisions.filter(revision_number__lt=rev.revision_number)
-            .order_by("-revision_number")
-            .first()
-        )
-        inter_files = rev.get_inter_revision_changed_files(prev_rev) if prev_rev else changed_files
-
-        for config in configs:
-            scope = config.scope
-            is_in_scope = scope.evaluate(changed_files)
-
-            if not is_in_scope:
-                review = StagingReview.objects.create(
-                    revision=rev,
-                    reviewer_user=config.reviewer_user,
-                    reviewer_group=config.reviewer_group,
-                    dynamic_role=config.dynamic_role,
-                    scope=scope,
-                    state=StagingReview.State.SKIPPED,
-                    is_inherited=False,
-                )
-            else:
-                prev_review = None
-                if prev_rev:
-                    prev_review = StagingReview.objects.filter(
-                        revision=prev_rev,
-                        reviewer_user=config.reviewer_user,
-                        reviewer_group=config.reviewer_group,
-                        dynamic_role=config.dynamic_role,
-                    ).first()
-
-                if (
-                    prev_review
-                    and prev_review.scope_id == scope.id
-                    and prev_review.state != StagingReview.State.SKIPPED
-                    and not scope.evaluate(inter_files)
-                ):
-                    review = StagingReview.objects.create(
-                        revision=rev,
-                        reviewer_user=config.reviewer_user,
-                        reviewer_group=config.reviewer_group,
-                        dynamic_role=config.dynamic_role,
-                        scope=scope,
-                        state=prev_review.state,
-                        actor=prev_review.actor,
-                        justification=prev_review.justification,
-                        is_inherited=True,
-                    )
-                else:
-                    review = StagingReview.objects.create(
-                        revision=rev,
-                        reviewer_user=config.reviewer_user,
-                        reviewer_group=config.reviewer_group,
-                        dynamic_role=config.dynamic_role,
-                        scope=scope,
-                        state=StagingReview.State.WAITING,
-                        is_inherited=False,
-                    )
-
-            config_to_review[config] = review
-            created_reviews.append(review)
-
-        # Set up dependencies between the created reviews
-        for config, review in config_to_review.items():
-            for dep_config in config.depends_on.all():
-                if dep_config in config_to_review:
-                    review.depends_on.add(config_to_review[dep_config])
-
-        # Reviews with no unresolved dependencies start as PENDING, others remain WAITING
-        for review in created_reviews:
-            if review.state == StagingReview.State.WAITING:
-                prereqs = review.depends_on.all()
-                if not prereqs.exists() or all(
-                    p.state in (StagingReview.State.ACCEPTED, StagingReview.State.OVERRIDDEN, StagingReview.State.SKIPPED)
-                    for p in prereqs
-                ):
-                    review.state = StagingReview.State.PENDING
-                    review.save(update_fields=["state"])
-
-    return created_reviews
+    configs = ReviewConfig.objects.filter(project=revision.staging_batch.project, type="staging").select_related("scope")
+    batch = revision.staging_batch
+    prev_rev = (
+        batch.revisions.filter(revision_number__lt=revision.revision_number)
+        .order_by("-revision_number")
+        .first()
+    )
+    return provision_reviews_for(
+        revision,
+        configs,
+        review_model=StagingReview,
+        revision_model=StagingBatchRevision,
+        prev_rev=prev_rev,
+    )
 
 
 @transaction.atomic

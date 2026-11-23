@@ -16,6 +16,7 @@ from accounts.models import User
 from core.gitea import merge_pull_request
 from core.models import GitMapping, Project
 from pull_requests.models import PullRequest, PullRequestRevision, PullRequestReview
+from reviews.workflows import provision_reviews_for
 
 
 # =====================================================================
@@ -23,7 +24,6 @@ from pull_requests.models import PullRequest, PullRequestRevision, PullRequestRe
 # =====================================================================
 
 
-@transaction.atomic
 def provision_reviews_for_revision(revision: PullRequestRevision) -> list[PullRequestReview]:
     """
     Provisions reviews for a PullRequestRevision based on ReviewConfig if no reviews exist.
@@ -31,15 +31,9 @@ def provision_reviews_for_revision(revision: PullRequestRevision) -> list[PullRe
     Existing reviews are never re-provisioned.
     Evaluates scopes against changed files and supports decision inheritance.
     """
-    rev = PullRequestRevision.objects.select_for_update().get(pk=revision.pk)
-    if rev.is_draft:
-        return []
-    if rev.reviews.exists():
-        return list(rev.reviews.all())
-
     from reviews.models import ReviewConfig
 
-    pr = rev.pull_request
+    pr = revision.pull_request
     git_mapping = pr.target
     project = git_mapping.target_project
     if git_mapping.project_id:
@@ -49,92 +43,23 @@ def provision_reviews_for_revision(revision: PullRequestRevision) -> list[PullRe
     else:
         config_type = None
 
-    created_reviews = []
     if project and config_type:
         configs = ReviewConfig.objects.filter(project=project, type=config_type).select_related("scope")
-        config_to_review = {}
+    else:
+        configs = ReviewConfig.objects.none()
 
-        changed_files = rev.get_changed_files()
-        prev_rev = (
-            pr.revisions.filter(revision_number__lt=rev.revision_number)
-            .order_by("-revision_number")
-            .first()
-        )
-        inter_files = rev.get_inter_revision_changed_files(prev_rev) if prev_rev else changed_files
-
-        for config in configs:
-            scope = config.scope
-            is_in_scope = scope.evaluate(changed_files)
-
-            if not is_in_scope:
-                review = PullRequestReview.objects.create(
-                    revision=rev,
-                    reviewer_user=config.reviewer_user,
-                    reviewer_group=config.reviewer_group,
-                    dynamic_role=config.dynamic_role,
-                    scope=scope,
-                    state=PullRequestReview.State.SKIPPED,
-                    is_inherited=False,
-                )
-            else:
-                prev_review = None
-                if prev_rev:
-                    prev_review = PullRequestReview.objects.filter(
-                        revision=prev_rev,
-                        reviewer_user=config.reviewer_user,
-                        reviewer_group=config.reviewer_group,
-                        dynamic_role=config.dynamic_role,
-                    ).first()
-
-                if (
-                    prev_review
-                    and prev_review.scope_id == scope.id
-                    and prev_review.state != PullRequestReview.State.SKIPPED
-                    and not scope.evaluate(inter_files)
-                ):
-                    review = PullRequestReview.objects.create(
-                        revision=rev,
-                        reviewer_user=config.reviewer_user,
-                        reviewer_group=config.reviewer_group,
-                        dynamic_role=config.dynamic_role,
-                        scope=scope,
-                        state=prev_review.state,
-                        actor=prev_review.actor,
-                        justification=prev_review.justification,
-                        is_inherited=True,
-                    )
-                else:
-                    review = PullRequestReview.objects.create(
-                        revision=rev,
-                        reviewer_user=config.reviewer_user,
-                        reviewer_group=config.reviewer_group,
-                        dynamic_role=config.dynamic_role,
-                        scope=scope,
-                        state=PullRequestReview.State.WAITING,
-                        is_inherited=False,
-                    )
-
-            config_to_review[config] = review
-            created_reviews.append(review)
-
-        # Set up dependencies between the created reviews
-        for config, review in config_to_review.items():
-            for dep_config in config.depends_on.all():
-                if dep_config in config_to_review:
-                    review.depends_on.add(config_to_review[dep_config])
-
-        # Reviews with no unresolved dependencies start as PENDING, others remain WAITING
-        for review in created_reviews:
-            if review.state == PullRequestReview.State.WAITING:
-                prereqs = review.depends_on.all()
-                if not prereqs.exists() or all(
-                    p.state in (PullRequestReview.State.ACCEPTED, PullRequestReview.State.OVERRIDDEN, PullRequestReview.State.SKIPPED)
-                    for p in prereqs
-                ):
-                    review.state = PullRequestReview.State.PENDING
-                    review.save(update_fields=["state"])
-
-    return created_reviews
+    prev_rev = (
+        pr.revisions.filter(revision_number__lt=revision.revision_number)
+        .order_by("-revision_number")
+        .first()
+    )
+    return provision_reviews_for(
+        revision,
+        configs,
+        review_model=PullRequestReview,
+        revision_model=PullRequestRevision,
+        prev_rev=prev_rev,
+    )
 
 
 @transaction.atomic
