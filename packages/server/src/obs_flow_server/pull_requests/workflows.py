@@ -3,11 +3,8 @@
 import json
 import urllib.error
 import urllib.request
-from datetime import timedelta
-
 from django.conf import settings
 from django.db import transaction
-from django.utils import timezone
 
 from obs_flow_common.messages import PRDetail, PRSyncRequest, PRSyncResponse
 
@@ -16,7 +13,7 @@ from accounts.models import User
 from core.gitea import merge_pull_request
 from core.models import GitMapping, Project
 from pull_requests.models import PullRequest, PullRequestRevision, PullRequestReview
-from reviews.workflows import mark_draft as _mark_draft, mark_ready, provision_reviews_for
+from reviews.workflows import initial_draft_state, mark_draft as _mark_draft, mark_ready, provision_reviews_for
 
 
 # =====================================================================
@@ -217,15 +214,7 @@ def sync_pull_request(req: PRSyncRequest) -> PRSyncResponse:
     if not latest_revision or latest_revision.fingerprint != fingerprint:
         rev_number = (latest_revision.revision_number + 1) if latest_revision else 1
 
-        if draft:
-            rev_is_draft = True
-            rev_draft_expires_at = None
-        elif timeout_minutes == 0:
-            rev_is_draft = False
-            rev_draft_expires_at = None
-        else:
-            rev_is_draft = True
-            rev_draft_expires_at = timezone.now() + timedelta(minutes=timeout_minutes)
+        rev_is_draft, rev_draft_expires_at = initial_draft_state(draft, timeout_minutes)
 
         latest_revision = PullRequestRevision.objects.create(
             pull_request=pr,

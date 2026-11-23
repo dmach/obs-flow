@@ -1,6 +1,9 @@
 """Review lifecycle: building blocks first, I/O procedures last."""
 
+from datetime import datetime, timedelta
+
 from django.db import transaction
+from django.utils import timezone
 
 from accounts.helpers import build_user_dto
 from accounts.models import Group, User
@@ -177,6 +180,19 @@ def clear_needinfo(revision, actor: User, justification: str | None, review_mode
         last_review = get_or_create_review(revision, None, review_model)
 
     return last_review
+
+
+def initial_draft_state(is_upstream_draft: bool, timeout_minutes: int) -> tuple[bool, datetime | None]:
+    """
+    Computes the initial draft state of a new revision.
+    Upstream drafts stay in manual draft mode without a timer; otherwise a
+    zero debounce timeout means ready immediately, else draft with debounce timer.
+    """
+    if is_upstream_draft:
+        return True, None
+    if timeout_minutes == 0:
+        return False, None
+    return True, timezone.now() + timedelta(minutes=timeout_minutes)
 
 
 @transaction.atomic

@@ -1,7 +1,5 @@
 """Staging batch lifecycle: building blocks first, I/O procedures last."""
 
-from datetime import timedelta
-
 from django.db import transaction
 from django.utils import timezone
 
@@ -11,7 +9,13 @@ from accounts.helpers import build_user_dto
 from core.gitea import merge_pull_request
 from core.models import Project
 from pull_requests.models import PullRequest
-from reviews.workflows import get_or_create_review, mark_draft, mark_ready, provision_reviews_for
+from reviews.workflows import (
+    get_or_create_review,
+    initial_draft_state,
+    mark_draft,
+    mark_ready,
+    provision_reviews_for,
+)
 from staging.models import (
     StagingBatch,
     StagingBatchRevision,
@@ -59,12 +63,7 @@ def create_staging_revision(batch: StagingBatch, pr_revisions) -> StagingBatchRe
     timeout_minutes = batch.project.effective_review_debounce_minutes
     rev_number = (latest_rev.revision_number + 1) if latest_rev else 1
 
-    if timeout_minutes == 0:
-        rev_is_draft = False
-        rev_draft_expires_at = None
-    else:
-        rev_is_draft = True
-        rev_draft_expires_at = timezone.now() + timedelta(minutes=timeout_minutes)
+    rev_is_draft, rev_draft_expires_at = initial_draft_state(False, timeout_minutes)
 
     new_rev = StagingBatchRevision.objects.create(
         staging_batch=batch,
