@@ -9,7 +9,7 @@ from django.conf import settings
 from django.db import transaction
 from django.utils import timezone
 
-from obs_flow_common.messages import PRDetail, PRSyncRequest, PRSyncResponse, ReviewDetail
+from obs_flow_common.messages import PRDetail, PRSyncRequest, PRSyncResponse
 
 from accounts.helpers import build_user_dto
 from accounts.models import User
@@ -17,33 +17,12 @@ from core.gitea import merge_pull_request
 from core.models import GitMapping, Project
 from pull_requests.models import PullRequest, PullRequestRevision, PullRequestReview
 from reviews.models import ReviewScope
-from reviews.workflows import build_reviewer_dto_from_fields
 from reviews.workflows import parse_reviewer
 
 
 # =====================================================================
 # Building blocks (entity-level, no external I/O)
 # =====================================================================
-
-
-def review_to_detail(review: PullRequestReview) -> ReviewDetail:
-    reviewer_dto = build_reviewer_dto_from_fields(
-        review.reviewer_user,
-        review.reviewer_group,
-        review.dynamic_role,
-    )
-    actor_dto = build_user_dto(review.actor) if review.actor else None
-    scope_name = review.scope.name
-
-    return ReviewDetail(
-        reviewer=reviewer_dto,
-        state=review.state,
-        actor=actor_dto,
-        when=review.updated_at.isoformat(),
-        why=review.justification,
-        scope=scope_name,
-        is_inherited=review.is_inherited,
-    )
 
 
 def get_review_for_request(revision: PullRequestRevision, reviewer_str: str | None) -> PullRequestReview:

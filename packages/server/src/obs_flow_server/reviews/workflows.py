@@ -1,7 +1,9 @@
 """Review lifecycle: building blocks first, I/O procedures last."""
 
+from accounts.helpers import build_user_dto
 from accounts.models import Group, User
 from core.models import Project
+from obs_flow_common.messages import ReviewDetail
 from obs_flow_common.messages.reviews import (
     DynamicRoleReviewerDTO,
     GroupReviewerDTO,
@@ -9,7 +11,7 @@ from obs_flow_common.messages.reviews import (
     ReviewConfigDTO,
     ReviewerDTO,
 )
-from reviews.models import ReviewConfig
+from reviews.models import BaseReview, ReviewConfig
 
 
 # =====================================================================
@@ -117,4 +119,24 @@ def build_review_config_dto(config: ReviewConfig) -> ReviewConfigDTO:
         reviewer=build_reviewer_dto(config),
         depends_on=depends_on_list,
         scope=scope_name,
+    )
+
+
+def review_to_detail(review: BaseReview) -> ReviewDetail:
+    reviewer_dto = build_reviewer_dto_from_fields(
+        review.reviewer_user,
+        review.reviewer_group,
+        review.dynamic_role,
+    )
+    actor_dto = build_user_dto(review.actor) if review.actor else None
+    scope_name = review.scope.name
+
+    return ReviewDetail(
+        reviewer=reviewer_dto,
+        state=review.state,
+        actor=actor_dto,
+        when=review.updated_at.isoformat(),
+        why=review.justification,
+        scope=scope_name,
+        is_inherited=review.is_inherited,
     )

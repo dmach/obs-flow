@@ -28,7 +28,7 @@ from obs_flow_server.api import api
 
 from accounts.helpers import get_authenticated_user
 from core.models import Project
-from reviews.workflows import parse_reviewer
+from reviews.workflows import parse_reviewer, review_to_detail
 from staging.models import StagingBatch, StagingReview
 from staging.workflows import (
     add_prs_to_batch,
@@ -39,7 +39,6 @@ from staging.workflows import (
     mark_staging_ready_for_review,
     merge_batches,
     remove_prs_from_batch,
-    review_to_detail,
     update_batch,
 )
 

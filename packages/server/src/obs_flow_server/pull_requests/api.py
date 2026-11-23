@@ -30,10 +30,9 @@ from pull_requests.workflows import (
     mark_ready_for_review,
     merge_pull_requests,
     pr_to_detail,
-    review_to_detail,
     sync_pull_request,
 )
-from reviews.workflows import parse_reviewer
+from reviews.workflows import parse_reviewer, review_to_detail
 
 
 @api.post("/api/v1/pr_review/show")

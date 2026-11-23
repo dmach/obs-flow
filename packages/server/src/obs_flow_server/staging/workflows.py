@@ -5,14 +5,13 @@ from datetime import timedelta
 from django.db import transaction
 from django.utils import timezone
 
-from obs_flow_common.messages import ReviewDetail, StagingDetail
+from obs_flow_common.messages import StagingDetail
 
 from accounts.helpers import build_user_dto
 from core.gitea import merge_pull_request
 from core.models import Project
 from pull_requests.models import PullRequest
 from reviews.models import ReviewScope
-from reviews.workflows import build_reviewer_dto_from_fields
 from reviews.workflows import parse_reviewer
 from staging.models import (
     StagingBatch,
@@ -251,26 +250,6 @@ def batch_to_detail(batch: StagingBatch) -> StagingDetail:
         latest_revision=latest_rev_num,
         fingerprint=fingerprint,
         is_draft=batch.is_draft,
-    )
-
-
-def review_to_detail(review: StagingReview) -> ReviewDetail:
-    reviewer_dto = build_reviewer_dto_from_fields(
-        review.reviewer_user,
-        review.reviewer_group,
-        review.dynamic_role,
-    )
-    actor_dto = build_user_dto(review.actor) if review.actor else None
-    scope_name = review.scope.name
-
-    return ReviewDetail(
-        reviewer=reviewer_dto,
-        state=review.state,
-        actor=actor_dto,
-        when=review.updated_at.isoformat(),
-        why=review.justification,
-        scope=scope_name,
-        is_inherited=review.is_inherited,
     )
 
 
