@@ -160,6 +160,23 @@ def apply_review_action(review: BaseReview, state: str, actor: User, justificati
     return review
 
 
+def clear_needinfo(revision, actor: User, justification: str | None, review_model) -> BaseReview:
+    """
+    Moves all NEEDINFO reviews of the revision back to PENDING, stamping actor/justification.
+    Returns the last updated review, or the default (admin) review if none were in NEEDINFO.
+    """
+    reviews = revision.reviews.filter(state=BaseReview.State.NEEDINFO)
+    last_review = None
+    for review in reviews:
+        apply_review_action(review, BaseReview.State.PENDING, actor, justification)
+        last_review = review
+
+    if not last_review:
+        last_review = get_or_create_review(revision, None, review_model)
+
+    return last_review
+
+
 def review_to_detail(review: BaseReview) -> ReviewDetail:
     reviewer_dto = build_reviewer_dto_from_fields(
         review.reviewer_user,

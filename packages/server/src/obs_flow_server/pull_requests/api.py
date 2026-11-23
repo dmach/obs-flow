@@ -31,7 +31,7 @@ from pull_requests.workflows import (
     pr_to_detail,
     sync_pull_request,
 )
-from reviews.workflows import apply_review_action, get_or_create_review, parse_reviewer, review_to_detail
+from reviews.workflows import apply_review_action, clear_needinfo, get_or_create_review, parse_reviewer, review_to_detail
 
 
 @api.post("/api/v1/pr_review/show")
@@ -101,25 +101,9 @@ def needinfo_review_endpoint(payload: PRReviewNeedInfoRequest, request):
 @sync_to_async
 def clear_needinfo_review_endpoint(payload: PRReviewClearNeedInfoRequest, request):
     pr = PullRequest.objects.get_by_text_id(payload.pull_request_id)
-    latest_revision = pr.latest_revision
 
-    # Clear needinfo on all reviews for this revision that are in NEEDINFO state
-    reviews = latest_revision.reviews.filter(state=PullRequestReview.State.NEEDINFO)
     user = get_authenticated_user(request)
-
-    last_review = None
-    for review in reviews:
-        review.state = PullRequestReview.State.PENDING
-        review.actor = user
-        review.justification = payload.message
-        review.is_inherited = False
-        review.save()
-        review.propagate_decision()
-        last_review = review
-
-    if not last_review:
-        # If no reviews were in NEEDINFO, just get/create a default one to return
-        last_review = get_or_create_review(latest_revision, None, PullRequestReview)
+    last_review = clear_needinfo(pr.latest_revision, user, payload.message, PullRequestReview)
 
     res = PRReviewActionResponse(pull_request_id=payload.pull_request_id, review=review_to_detail(last_review))
     return msgspec.structs.asdict(res)

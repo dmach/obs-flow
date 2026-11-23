@@ -9,8 +9,8 @@ from accounts.models import User, Group
 from core.models import Project, GitMapping
 from pull_requests.models import PullRequest, PullRequestRevision, PullRequestReview
 from staging.models import StagingBatch, StagingBatchRevision, StagingReview
-from reviews.models import ReviewConfig, ReviewScope
-from reviews.workflows import parse_reviewer
+from reviews.models import BaseReview, ReviewConfig, ReviewScope
+from reviews.workflows import clear_needinfo, parse_reviewer
 
 from obs_flow_server.api import api
 
@@ -79,6 +79,65 @@ class TestParseReviewer(TransactionTestCase):
     def test_parse_unknown_group(self):
         with self.assertRaises(Group.DoesNotExist):
             parse_reviewer("@nobody")
+
+
+class TestClearNeedinfo(TransactionTestCase):
+    fixtures = ["opensuse_data.json"]
+
+    def _actor(self):
+        return User.objects.get(username="darix")
+
+    def test_pr_clears_all_needinfo_reviews(self):
+        rev = PullRequestRevision.objects.get(pk=1)
+        r1 = PullRequestReview.objects.get(pk=1)
+        r2 = PullRequestReview.objects.get(pk=3)
+        for r in (r1, r2):
+            r.state = BaseReview.State.NEEDINFO
+            r.justification = "needs details"
+            r.save()
+
+        last = clear_needinfo(rev, self._actor(), "fixed upstream", PullRequestReview)
+
+        self.assertIn(last.pk, {r1.pk, r2.pk})
+        for r in (r1, r2):
+            r.refresh_from_db()
+            self.assertEqual(r.state, BaseReview.State.PENDING)
+            self.assertEqual(r.actor.username, "darix")
+            self.assertEqual(r.justification, "fixed upstream")
+        # untouched review keeps its state
+        untouched = PullRequestReview.objects.get(pk=2)
+        self.assertEqual(untouched.state, BaseReview.State.REJECTED)
+
+    def test_pr_no_needinfo_returns_admin_review(self):
+        rev = PullRequestRevision.objects.get(pk=1)
+
+        last = clear_needinfo(rev, self._actor(), "nothing to clear", PullRequestReview)
+
+        self.assertEqual(last.reviewer_user.username, "admin")
+        self.assertEqual(last.state, BaseReview.State.PENDING)
+
+    def test_staging_clears_all_needinfo_reviews(self):
+        rev = StagingBatchRevision.objects.get(pk=1)
+        r1 = StagingReview.objects.get(pk=1)
+        r1.state = BaseReview.State.NEEDINFO
+        r1.justification = "needs details"
+        r1.save()
+
+        last = clear_needinfo(rev, self._actor(), "addressed", StagingReview)
+
+        self.assertEqual(last.pk, r1.pk)
+        r1.refresh_from_db()
+        self.assertEqual(r1.state, BaseReview.State.PENDING)
+        self.assertEqual(r1.actor.username, "darix")
+        self.assertEqual(r1.justification, "addressed")
+
+    def test_staging_no_needinfo_returns_admin_review(self):
+        rev = StagingBatchRevision.objects.get(pk=1)
+
+        last = clear_needinfo(rev, self._actor(), "nothing to clear", StagingReview)
+
+        self.assertEqual(last.reviewer_user.username, "admin")
+        self.assertEqual(last.state, BaseReview.State.PENDING)
 
 
 class TestReviewConfigEndpoints(TransactionTestCase):

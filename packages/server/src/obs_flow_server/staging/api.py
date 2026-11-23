@@ -28,7 +28,7 @@ from obs_flow_server.api import api
 
 from accounts.helpers import get_authenticated_user
 from core.models import Project
-from reviews.workflows import apply_review_action, parse_reviewer, review_to_detail
+from reviews.workflows import apply_review_action, clear_needinfo, parse_reviewer, review_to_detail
 from staging.models import StagingBatch, StagingReview
 from staging.workflows import (
     add_prs_to_batch,
@@ -188,22 +188,8 @@ def clear_needinfo_staging_review_endpoint(payload: StagingReviewClearNeedInfoRe
     if not latest_rev:
         raise ValueError(f"Staging batch #{batch.id} has no revisions.")
 
-    # Clear needinfo on all reviews for this batch revision that are in NEEDINFO state
-    reviews = latest_rev.reviews.filter(state=StagingReview.State.NEEDINFO)
     user = get_authenticated_user(request)
-
-    last_review = None
-    for review in reviews:
-        review.state = StagingReview.State.PENDING
-        review.actor = user
-        review.justification = payload.message
-        review.is_inherited = False
-        review.save()
-        review.propagate_decision()
-        last_review = review
-
-    if not last_review:
-        last_review = get_staging_review(batch, None)
+    last_review = clear_needinfo(latest_rev, user, payload.message, StagingReview)
 
     res = StagingReviewActionResponse(staging_id=payload.staging_id, review=review_to_detail(last_review))
     return msgspec.structs.asdict(res)
