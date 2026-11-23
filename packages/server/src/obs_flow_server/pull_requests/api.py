@@ -1,5 +1,4 @@
 from datetime import timedelta
-import re
 
 import msgspec
 from asgiref.sync import sync_to_async
@@ -36,23 +35,6 @@ from core.models import GitMapping, Project
 from pull_requests.models import PullRequest, PullRequestRevision, PullRequestReview
 from reviews.api import build_reviewer_dto_from_fields
 from reviews.models import ReviewScope
-
-
-PR_ID_REGEX = re.compile(r"^([^/]+)/([^#]+)#(\d+)$")
-
-
-def get_pull_request(pull_request_id: str) -> PullRequest:
-    match = PR_ID_REGEX.match(pull_request_id)
-    if not match:
-        raise ValueError(f"Invalid pull request ID format: {pull_request_id}")
-    owner, repo, number = match.groups()
-    number = int(number)
-
-    return PullRequest.objects.get(
-        target__owner=owner,
-        target__repo=repo,
-        number=number,
-    )
 
 
 def parse_reviewer(reviewer_str: str | None):
@@ -116,7 +98,7 @@ def get_review_for_request(revision: PullRequestRevision, reviewer_str: str | No
 @api.post("/api/v1/pr_review/show")
 @sync_to_async
 def show_review_endpoint(payload: PRReviewShowRequest):
-    pr = get_pull_request(payload.pull_request_id)
+    pr = PullRequest.objects.get_by_text_id(payload.pull_request_id)
     latest_revision = pr.latest_revision
 
     reviews = latest_revision.reviews.select_related("scope", "actor", "reviewer_user", "reviewer_group").all()
@@ -135,7 +117,7 @@ def show_review_endpoint(payload: PRReviewShowRequest):
 @api.post("/api/v1/pr_review/approve")
 async def approve_review_endpoint(payload: PRReviewApproveRequest, request):
     def do_approve():
-        pr = get_pull_request(payload.pull_request_id)
+        pr = PullRequest.objects.get_by_text_id(payload.pull_request_id)
         latest_revision = pr.latest_revision
 
         review = get_review_for_request(latest_revision, payload.reviewer)
@@ -155,7 +137,7 @@ async def approve_review_endpoint(payload: PRReviewApproveRequest, request):
 @api.post("/api/v1/pr_review/decline")
 async def decline_review_endpoint(payload: PRReviewDeclineRequest, request):
     def do_decline():
-        pr = get_pull_request(payload.pull_request_id)
+        pr = PullRequest.objects.get_by_text_id(payload.pull_request_id)
         latest_revision = pr.latest_revision
 
         review = get_review_for_request(latest_revision, payload.reviewer)
@@ -175,7 +157,7 @@ async def decline_review_endpoint(payload: PRReviewDeclineRequest, request):
 @api.post("/api/v1/pr_review/needinfo")
 async def needinfo_review_endpoint(payload: PRReviewNeedInfoRequest, request):
     def do_needinfo():
-        pr = get_pull_request(payload.pull_request_id)
+        pr = PullRequest.objects.get_by_text_id(payload.pull_request_id)
         latest_revision = pr.latest_revision
 
         review = get_review_for_request(latest_revision, payload.reviewer)
@@ -195,7 +177,7 @@ async def needinfo_review_endpoint(payload: PRReviewNeedInfoRequest, request):
 @api.post("/api/v1/pr_review/clear_needinfo")
 async def clear_needinfo_review_endpoint(payload: PRReviewClearNeedInfoRequest, request):
     def do_clear_needinfo():
-        pr = get_pull_request(payload.pull_request_id)
+        pr = PullRequest.objects.get_by_text_id(payload.pull_request_id)
         latest_revision = pr.latest_revision
 
         # Clear needinfo on all reviews for this revision that are in NEEDINFO state
@@ -224,7 +206,7 @@ async def clear_needinfo_review_endpoint(payload: PRReviewClearNeedInfoRequest, 
 @api.post("/api/v1/pr_review/reopen")
 async def reopen_review_endpoint(payload: PRReviewReopenRequest, request):
     def do_reopen():
-        pr = get_pull_request(payload.pull_request_id)
+        pr = PullRequest.objects.get_by_text_id(payload.pull_request_id)
         latest_revision = pr.latest_revision
 
         review = get_review_for_request(latest_revision, payload.reviewer)
@@ -577,7 +559,7 @@ def pr_ready_for_review_endpoint(payload: PRReadyForReviewRequest):
     updated_prs = []
     for pr_id in payload.pull_request_ids:
         try:
-            pr = get_pull_request(pr_id)
+            pr = PullRequest.objects.get_by_text_id(pr_id)
         except (PullRequest.DoesNotExist, ValueError) as e:
             return HttpResponseBadRequest(str(e))
 
@@ -612,7 +594,7 @@ def pr_convert_to_draft_endpoint(payload: PRConvertToDraftRequest):
     updated_prs = []
     for pr_id in payload.pull_request_ids:
         try:
-            pr = get_pull_request(pr_id)
+            pr = PullRequest.objects.get_by_text_id(pr_id)
         except (PullRequest.DoesNotExist, ValueError) as e:
             return HttpResponseBadRequest(str(e))
 
@@ -649,17 +631,17 @@ def pr_merge_endpoint(payload: PRMergeRequest):
 
     with transaction.atomic():
         # First resolve PR objects to get DB IDs for deterministic ordering
-        prs_by_id_str = {}
+        prs_by_text_id = {}
         errors = []
         for pr_id in payload.pull_request_ids:
             try:
-                pr = get_pull_request(pr_id)
-                prs_by_id_str[pr_id] = pr
+                pr = PullRequest.objects.get_by_text_id(pr_id)
+                prs_by_text_id[pr_id] = pr
             except (PullRequest.DoesNotExist, ValueError) as e:
                 errors.append(str(e))
 
         # Lock PRs in deterministic DB id order to prevent deadlocks
-        resolved_db_ids = sorted(p.id for p in prs_by_id_str.values())
+        resolved_db_ids = sorted(p.id for p in prs_by_text_id.values())
         locked_prs = {
             p.id: p
             for p in PullRequest.objects.select_for_update().filter(id__in=resolved_db_ids).order_by("id")
@@ -668,7 +650,7 @@ def pr_merge_endpoint(payload: PRMergeRequest):
         prs_to_merge = []
         # Validate all PRs and collect all errors
         for pr_id in payload.pull_request_ids:
-            pr = prs_by_id_str.get(pr_id)
+            pr = prs_by_text_id.get(pr_id)
             if not pr:
                 continue
 

@@ -555,7 +555,7 @@ class TestPullRequestRevisionModel(TestCase):
         self.assertEqual(rev2.draft_expires_at, expiry)
 
 
-class TestPullRequestLatestRevisionAndIdStr(TestCase):
+class TestPullRequestLatestRevisionAndTextId(TestCase):
     def _make_pr(self, number=1):
         project = Project.objects.create(name=f"test:project-{number}")
         git_mapping = GitMapping.objects.create(
@@ -599,14 +599,13 @@ class TestPullRequestLatestRevisionAndIdStr(TestCase):
         )
         self.assertFalse(pr.is_draft)
 
-    def test_id_str_format_and_round_trip(self):
-        pr = self._make_pr(number=42)
-        self.assertEqual(pr.id_str, "test/repo#42")
-        from pull_requests.api import PR_ID_REGEX
+    def test_text_id_format_and_round_trip(self):
+        from obs_flow_common.pull_requests import pull_request_parse_text_id
 
-        match = PR_ID_REGEX.match(pr.id_str)
-        self.assertIsNotNone(match)
-        self.assertEqual(match.groups(), ("test", "repo", "42"))
+        pr = self._make_pr(number=42)
+        self.assertEqual(pr.text_id, "test/repo#42")
+        self.assertEqual(pull_request_parse_text_id(pr.text_id), ("test", "repo", 42))
+        self.assertEqual(PullRequest.objects.get_by_text_id(pr.text_id), pr)
 
 
 class TestPullRequestReviewProvisioning(TestCase):

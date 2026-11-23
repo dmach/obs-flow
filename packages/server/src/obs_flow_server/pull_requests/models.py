@@ -2,11 +2,21 @@ from django.db import models
 from django.db.models import Q
 from django.conf import settings
 
+from obs_flow_common.pull_requests import pull_request_build_text_id, pull_request_parse_text_id
+
 from core.models import GitMapping, Issue, Project
 from reviews.models import BaseReview
 
 
+class PullRequestManager(models.Manager):
+    def get_by_text_id(self, text_id: str) -> "PullRequest":
+        owner, repo, number = pull_request_parse_text_id(text_id)
+        return self.get(target__owner=owner, target__repo=repo, number=number)
+
+
 class PullRequest(models.Model):
+    objects = PullRequestManager()
+
     class State(models.TextChoices):
         OPEN = "open", "Open"
         CLOSED = "closed", "Closed"
@@ -30,8 +40,8 @@ class PullRequest(models.Model):
         return self.revisions.order_by("-revision_number").first()
 
     @property
-    def id_str(self) -> str:
-        return f"{self.target.owner}/{self.target.repo}#{self.number}"
+    def text_id(self) -> str:
+        return pull_request_build_text_id(self.target.owner, self.target.repo, self.number)
 
     @property
     def is_draft(self) -> bool:

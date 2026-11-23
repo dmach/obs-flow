@@ -248,7 +248,7 @@ def batch_to_detail(batch: StagingBatch) -> StagingDetail:
     latest_rev = batch.latest_revision
     if latest_rev:
         prs = [
-            bpr.pull_request_revision.pull_request.id_str
+            bpr.pull_request_revision.pull_request.text_id
             for bpr in latest_rev.revision_pull_requests.all()
         ]
         latest_rev_num = latest_rev.revision_number
@@ -373,14 +373,13 @@ def edit_staging_endpoint(payload: StagingEditRequest):
 @api.post("/api/v1/staging/add")
 @sync_to_async
 def add_to_staging_endpoint(payload: StagingAddRequest):
-    from pull_requests.api import get_pull_request
 
     batch = StagingBatch.objects.get(id=payload.id)
 
     # Validate that all requested PRs target the same project as the batch
     resolved_prs = []
     for pr_id in payload.pull_request_ids:
-        pr = get_pull_request(pr_id)
+        pr = PullRequest.objects.get_by_text_id(pr_id)
         if pr.target_project != batch.project:
             return HttpResponseBadRequest(
                 f"Pull request '{pr_id}' belongs to project '{pr.target_project.name}', "
@@ -408,7 +407,7 @@ def add_to_staging_endpoint(payload: StagingAddRequest):
 
     create_staging_revision(batch, pr_revisions)
 
-    prs = [pr.id_str for pr in current_prs]
+    prs = [pr.text_id for pr in current_prs]
     res = StagingAddResponse(id=batch.id, pull_requests=prs)
     return msgspec.structs.asdict(res)
 
@@ -416,7 +415,6 @@ def add_to_staging_endpoint(payload: StagingAddRequest):
 @api.post("/api/v1/staging/remove")
 @sync_to_async
 def remove_from_staging_endpoint(payload: StagingRemoveRequest):
-    from pull_requests.api import get_pull_request
 
     batch = StagingBatch.objects.get(id=payload.id)
 
@@ -430,7 +428,7 @@ def remove_from_staging_endpoint(payload: StagingRemoveRequest):
 
     for pr_id in payload.pull_request_ids:
         try:
-            pr = get_pull_request(pr_id)
+            pr = PullRequest.objects.get_by_text_id(pr_id)
             if pr in current_prs:
                 current_prs.remove(pr)
         except Exception:
@@ -444,7 +442,7 @@ def remove_from_staging_endpoint(payload: StagingRemoveRequest):
 
     create_staging_revision(batch, pr_revisions)
 
-    prs = [pr.id_str for pr in current_prs]
+    prs = [pr.text_id for pr in current_prs]
     res = StagingRemoveResponse(id=batch.id, pull_requests=prs)
     return msgspec.structs.asdict(res)
 

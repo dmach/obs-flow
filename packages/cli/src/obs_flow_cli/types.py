@@ -1,6 +1,6 @@
-import re
-
 import click
+
+from obs_flow_common.pull_requests import pull_request_parse_text_id
 
 
 class PullRequestIDParamType(click.ParamType):
@@ -11,15 +11,14 @@ class PullRequestIDParamType(click.ParamType):
     """
 
     name = "pull-request-id"
-    # Regex to match <owner>/<repo>#<number> where owner and repo cannot contain slashes or hashes
-    PR_ID_REGEX = re.compile(r"^([^/]+)/([^#]+)#(\d+)$")
 
     def convert(self, value: str, param: click.Parameter | None, ctx: click.Context | None) -> str:
         if not isinstance(value, str):
             self.fail(f"Expected string, got {type(value).__name__}", param, ctx)
 
-        match = self.PR_ID_REGEX.match(value)
-        if not match:
+        try:
+            pull_request_parse_text_id(value)
+        except ValueError:
             self.fail(
                 f"Invalid pull request ID format '{value}'. Expected format: <owner>/<repo>#<number>",
                 param,
