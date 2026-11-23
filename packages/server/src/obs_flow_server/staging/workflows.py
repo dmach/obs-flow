@@ -10,7 +10,7 @@ from obs_flow_common.messages import ReviewDetail, StagingDetail
 from accounts.helpers import build_user_dto
 from core.gitea import merge_pull_request
 from core.models import Project
-from pull_requests.api import parse_reviewer
+from pull_requests.workflows import parse_reviewer
 from pull_requests.models import PullRequest
 from reviews.api import build_reviewer_dto_from_fields
 from reviews.models import ReviewScope

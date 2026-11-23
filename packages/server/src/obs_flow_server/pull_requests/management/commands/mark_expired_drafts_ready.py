@@ -17,7 +17,7 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         from pull_requests.models import PullRequestRevision
-        from pull_requests.api import mark_ready_for_review
+        from pull_requests.workflows import mark_ready_for_review
         from staging.models import StagingBatchRevision
         from staging.workflows import mark_staging_ready_for_review
 

@@ -228,7 +228,7 @@ class TestPRSyncEndpoint(TransactionTestCase):
         self.assertEqual(latest_revision.reviews.count(), 0)
 
         # Transition out of draft mode and verify reviews are now created
-        from pull_requests.api import mark_ready_for_review
+        from pull_requests.workflows import mark_ready_for_review
         mark_ready_for_review(latest_revision)
         pr.refresh_from_db()
         self.assertFalse(pr.is_draft)
@@ -326,7 +326,7 @@ class TestPRSyncEndpoint(TransactionTestCase):
         self.assertEqual(latest_revision.reviews.count(), 0)
 
         # Transition out of draft mode and verify review was created for the new revision and it is the package config, not project config
-        from pull_requests.api import mark_ready_for_review
+        from pull_requests.workflows import mark_ready_for_review
         mark_ready_for_review(latest_revision)
         self.assertEqual(latest_revision.reviews.count(), 1)
         review = latest_revision.reviews.first()
@@ -612,7 +612,7 @@ class TestPullRequestReviewProvisioning(TestCase):
     fixtures = ["global_scope.json"]
     def test_provision_reviews_and_mark_ready_for_review(self):
         from reviews.models import ReviewConfig
-        from pull_requests.api import provision_reviews_for_revision, mark_ready_for_review
+        from pull_requests.workflows import provision_reviews_for_revision, mark_ready_for_review
 
         project = Project.objects.create(name="test:project")
         git_mapping = GitMapping.objects.create(owner="test", repo="repo", branch="main", project=project)
@@ -660,7 +660,7 @@ class TestPullRequestReviewProvisioning(TestCase):
 
     def test_provision_reviews_wires_dependencies(self):
         from reviews.models import ReviewConfig
-        from pull_requests.api import provision_reviews_for_revision
+        from pull_requests.workflows import provision_reviews_for_revision
 
         project = Project.objects.create(name="test:deps-project")
         git_mapping = GitMapping.objects.create(owner="test", repo="repo", branch="main", project=project)
@@ -713,7 +713,7 @@ class TestPullRequestReviewProvisioning(TestCase):
 
     def test_cascading_unblocking_on_approval(self):
         from reviews.models import ReviewConfig
-        from pull_requests.api import provision_reviews_for_revision
+        from pull_requests.workflows import provision_reviews_for_revision
 
         project = Project.objects.create(name="test:cascade-pr")
         git_mapping = GitMapping.objects.create(owner="test", repo="repo", branch="main", project=project)
@@ -791,7 +791,7 @@ class TestPullRequestReviewProvisioning(TestCase):
 
     def test_early_approval_of_waiting_review(self):
         from reviews.models import ReviewConfig
-        from pull_requests.api import provision_reviews_for_revision
+        from pull_requests.workflows import provision_reviews_for_revision
 
         project = Project.objects.create(name="test:early-pr")
         git_mapping = GitMapping.objects.create(owner="test", repo="repo", branch="main", project=project)

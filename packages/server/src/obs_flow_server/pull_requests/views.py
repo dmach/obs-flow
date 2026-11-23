@@ -11,8 +11,9 @@ from django.views.decorators.http import require_POST
 from core.gitea import merge_pull_request
 from core.htmx import close_modal_and_refresh
 from core.models import Project
-from pull_requests.models import PullRequest, PullRequestReview
+from pull_requests.models import PullRequest
 from pull_requests.forms import PullRequestFilterForm
+from pull_requests.workflows import mark_draft, mark_ready_for_review, pr_merge_blockers
 
 
 @ensure_csrf_cookie
@@ -164,7 +165,6 @@ def pr_draft_status(request, pr_id):
     pr = get_object_or_404(PullRequest, id=pr_id)
     latest_revision = pr.latest_revision
     if latest_revision and latest_revision.is_draft and latest_revision.draft_expires_at and latest_revision.draft_expires_at <= timezone.now():
-        from pull_requests.api import mark_ready_for_review
         mark_ready_for_review(latest_revision)
         pr.refresh_from_db()
         latest_revision.refresh_from_db()
@@ -176,7 +176,6 @@ def pr_ready_for_review(request, pr_id):
     pr = get_object_or_404(PullRequest, id=pr_id)
     latest_revision = pr.latest_revision
     if latest_revision:
-        from pull_requests.api import mark_ready_for_review
         mark_ready_for_review(latest_revision)
         messages.success(request, f"Pull request #{pr.number} is now ready for review.")
         pr.refresh_from_db()
@@ -192,7 +191,6 @@ def pr_cancel_timeout(request, pr_id):
     pr = get_object_or_404(PullRequest, id=pr_id)
     latest_revision = pr.latest_revision
     if latest_revision:
-        from pull_requests.api import mark_draft
         mark_draft(latest_revision)
         messages.success(request, f"Cancelled review debounce timeout for PR #{pr.number}.")
         pr.refresh_from_db()
@@ -208,7 +206,6 @@ def pr_convert_to_draft(request, pr_id):
     pr = get_object_or_404(PullRequest, id=pr_id)
     latest_revision = pr.latest_revision
     if latest_revision:
-        from pull_requests.api import mark_draft
         mark_draft(latest_revision)
         messages.success(request, f"Pull request #{pr.number} converted to draft.")
         pr.refresh_from_db()
@@ -281,36 +278,6 @@ def pr_bulk_merge(request):
 
 
 
-def _check_pr_for_merge(pr: PullRequest) -> tuple[bool, str | None, list[str]]:
-    warnings = []
-    target_project = pr.target_project
-    if target_project and target_project.workflow_type == Project.WorkflowType.STAGING:
-        return False, f"Project '{target_project.name}' uses the staging workflow. Direct merges are disabled.", []
-
-    if pr.state == PullRequest.State.MERGED:
-        return False, f"Pull request #{pr.number} is already merged.", []
-
-    if pr.state == PullRequest.State.CLOSED:
-        return False, f"Pull request #{pr.number} is closed.", []
-
-    latest_rev = pr.latest_revision
-    if pr.is_draft or (latest_rev and latest_rev.is_draft):
-        return False, f"Pull request #{pr.number} is in draft mode and cannot be merged.", []
-
-    if pr.is_mergeable is False:
-        return False, f"Pull request #{pr.number} has merge conflicts and cannot be merged.", []
-
-    if latest_rev:
-        reviews = latest_rev.reviews.all()
-        if reviews.exists():
-            unapproved = reviews.exclude(state__in=[PullRequestReview.State.ACCEPTED, PullRequestReview.State.OVERRIDDEN])
-            if unapproved.exists():
-                names = [r.reviewer_name for r in unapproved]
-                return False, f"Reviews not approved: {', '.join(names)}.", []
-
-    return True, None, warnings
-
-
 @require_POST
 def pr_ui_modal_check_merge(request):
     pr_ids = request.POST.getlist("selected_prs")
@@ -320,7 +287,7 @@ def pr_ui_modal_check_merge(request):
     for pr_id in pr_ids:
         try:
             pr = PullRequest.objects.get(id=pr_id)
-            can_merge, error, warnings = _check_pr_for_merge(pr)
+            can_merge, error, warnings = pr_merge_blockers(pr)
             items.append({
                 "pr": pr,
                 "can_merge": can_merge,
@@ -355,7 +322,7 @@ def pr_ui_modal_execute_merge(request):
     for pr_id in pr_ids:
         try:
             pr = PullRequest.objects.get(id=pr_id)
-            can_merge, error, _ = _check_pr_for_merge(pr)
+            can_merge, error, _ = pr_merge_blockers(pr)
             if not can_merge:
                 errors.append(f"PR #{pr.number}: {error}")
                 continue
