@@ -28,7 +28,7 @@ from obs_flow_server.api import api
 
 from accounts.helpers import get_authenticated_user
 from core.models import Project
-from pull_requests.workflows import parse_reviewer
+from reviews.workflows import parse_reviewer
 from staging.models import StagingBatch, StagingReview
 from staging.workflows import (
     add_prs_to_batch,
@@ -129,11 +129,13 @@ def show_staging_review_endpoint(payload: StagingReviewShowRequest):
     reviews = latest_rev.reviews.select_related("scope", "actor", "reviewer_user", "reviewer_group").all()
 
     if payload.reviewer:
-        user, group = parse_reviewer(payload.reviewer)
+        user, group, role = parse_reviewer(payload.reviewer)
         if user:
             reviews = reviews.filter(reviewer_user=user)
         elif group:
             reviews = reviews.filter(reviewer_group=group)
+        elif role:
+            reviews = reviews.filter(dynamic_role=role)
 
     details = [review_to_detail(r) for r in reviews]
     res = StagingReviewShowResponse(staging_id=payload.staging_id, reviews=details)

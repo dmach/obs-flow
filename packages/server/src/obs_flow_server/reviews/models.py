@@ -240,7 +240,7 @@ class BaseReview(models.Model):
     )
     dynamic_role = models.CharField(
         max_length=50,
-        choices=DynamicRole.choices,
+        choices=ReviewConfigBase.DynamicRole.choices,
         null=True,
         blank=True,
     )

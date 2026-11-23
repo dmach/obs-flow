@@ -4,7 +4,6 @@ from django.db import IntegrityError, transaction
 from django.db.models.deletion import ProtectedError
 
 from obs_flow_common.messages.reviews import (
-    ReviewConfigDTO,
     ReviewConfigAddRequest,
     ReviewConfigRemoveRequest,
     ReviewConfigListRequest,
@@ -20,110 +19,12 @@ from obs_flow_common.messages.reviews import (
     ReviewScopeRemoveResponse,
     ReviewScopeUpdateRequest,
     ReviewScopeUpdateResponse,
-    ReviewerDTO,
-    PersonReviewerDTO,
-    GroupReviewerDTO,
-    DynamicRoleReviewerDTO,
 )
 from obs_flow_server.api import api
 
-from accounts.models import User, Group
 from core.models import Project
 from reviews.models import ReviewConfig, ReviewScope
-
-
-def parse_reviewer(reviewer_str: str) -> tuple[User | None, Group | None, str | None]:
-    """
-    Parses a reviewer string into (user, group, dynamic_role).
-    Exactly one of them will be returned as non-None.
-    """
-    if reviewer_str.startswith("@"):
-        group_name = reviewer_str[1:]
-        group = Group.objects.get(name=group_name)
-        return None, group, None
-    elif reviewer_str.startswith("role:"):
-        role_name = reviewer_str[len("role:"):]
-        if role_name not in ReviewConfig.DynamicRole.values:
-            raise ValueError(f"Invalid dynamic role: {role_name}")
-        return None, None, role_name
-    else:
-        user = User.objects.get(username=reviewer_str)
-        return user, None, None
-
-
-def format_reviewer(config: ReviewConfig) -> str:
-    """
-    Formats a ReviewConfig's reviewer into a string identifier.
-    """
-    if config.reviewer_user:
-        return config.reviewer_user.username
-    elif config.reviewer_group:
-        return f"@{config.reviewer_group.name}"
-    elif config.dynamic_role:
-        return f"role:{config.dynamic_role}"
-    else:
-        raise ValueError("Invalid review configuration: no reviewer set")
-
-
-def get_review_config(project: Project, config_type: str, reviewer_str: str) -> ReviewConfig:
-    """
-    Finds an existing ReviewConfig by project, type, and reviewer string.
-    """
-    user, group, dynamic_role = parse_reviewer(reviewer_str)
-    return ReviewConfig.objects.get(
-        project=project,
-        type=config_type,
-        reviewer_user=user,
-        reviewer_group=group,
-        dynamic_role=dynamic_role,
-    )
-
-
-def build_reviewer_dto_from_fields(user: User | None, group: Group | None, dynamic_role: str | None) -> ReviewerDTO:
-    """
-    Converts reviewer fields into a ReviewerDTO message struct.
-    """
-    if user:
-        return PersonReviewerDTO(
-            username=user.username,
-            full_name=user.full_name,
-            email=user.email,
-            is_active=user.is_active,
-        )
-    elif group:
-        return GroupReviewerDTO(
-            name=group.name,
-            email=group.email,
-        )
-    elif dynamic_role:
-        return DynamicRoleReviewerDTO(
-            role=dynamic_role,
-        )
-    else:
-        raise ValueError("Invalid reviewer: no user, group, or dynamic role set")
-
-
-def build_reviewer_dto(config: ReviewConfig) -> ReviewerDTO:
-    """
-    Converts a ReviewConfig's reviewer into a ReviewerDTO message struct.
-    """
-    return build_reviewer_dto_from_fields(config.reviewer_user, config.reviewer_group, config.dynamic_role)
-
-
-def build_review_config_dto(config: ReviewConfig) -> ReviewConfigDTO:
-    """
-    Converts a ReviewConfig instance to a ReviewConfigDTO message struct.
-    """
-    depends_on_list = [build_reviewer_dto(dep) for dep in config.depends_on.all()]
-    scope_name = config.scope.name
-    return ReviewConfigDTO(
-        id=config.id,
-        project=config.project.name,
-        type=config.type,
-        reviewer=build_reviewer_dto(config),
-        depends_on=depends_on_list,
-        scope=scope_name,
-    )
+from reviews.workflows import build_review_config_dto, get_review_config, parse_reviewer
 
 
 @api.post("/api/v1/review-config/add")

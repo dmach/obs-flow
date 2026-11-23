@@ -12,32 +12,18 @@ from django.utils import timezone
 from obs_flow_common.messages import PRDetail, PRSyncRequest, PRSyncResponse, ReviewDetail
 
 from accounts.helpers import build_user_dto
-from accounts.models import Group, User
+from accounts.models import User
 from core.gitea import merge_pull_request
 from core.models import GitMapping, Project
 from pull_requests.models import PullRequest, PullRequestRevision, PullRequestReview
-from reviews.api import build_reviewer_dto_from_fields
 from reviews.models import ReviewScope
+from reviews.workflows import build_reviewer_dto_from_fields
+from reviews.workflows import parse_reviewer
 
 
 # =====================================================================
 # Building blocks (entity-level, no external I/O)
 # =====================================================================
-
-
-def parse_reviewer(reviewer_str: str | None):
-    if not reviewer_str:
-        # Default to admin user
-        admin_user = User.objects.get(username="admin")
-        return admin_user, None
-
-    if reviewer_str.startswith("@"):
-        group_name = reviewer_str[1:]
-        group = Group.objects.get(name=group_name)
-        return None, group
-    else:
-        user = User.objects.get(username=reviewer_str)
-        return user, None
 
 
 def review_to_detail(review: PullRequestReview) -> ReviewDetail:
@@ -61,7 +47,7 @@ def review_to_detail(review: PullRequestReview) -> ReviewDetail:
 
 
 def get_review_for_request(revision: PullRequestRevision, reviewer_str: str | None) -> PullRequestReview:
-    user, group = parse_reviewer(reviewer_str)
+    user, group, role = parse_reviewer(reviewer_str, default_admin=True)
     if user:
         review = PullRequestReview.objects.filter(revision=revision, reviewer_user=user).first()
         if review is None:
@@ -71,12 +57,21 @@ def get_review_for_request(revision: PullRequestRevision, reviewer_str: str | No
                 state=PullRequestReview.State.PENDING,
                 scope=ReviewScope.objects.get(name="global"),
             )
-    else:
+    elif group:
         review = PullRequestReview.objects.filter(revision=revision, reviewer_group=group).first()
         if review is None:
             review = PullRequestReview.objects.create(
                 revision=revision,
                 reviewer_group=group,
+                state=PullRequestReview.State.PENDING,
+                scope=ReviewScope.objects.get(name="global"),
+            )
+    else:
+        review = PullRequestReview.objects.filter(revision=revision, dynamic_role=role).first()
+        if review is None:
+            review = PullRequestReview.objects.create(
+                revision=revision,
+                dynamic_role=role,
                 state=PullRequestReview.State.PENDING,
                 scope=ReviewScope.objects.get(name="global"),
             )

@@ -10,10 +10,10 @@ from obs_flow_common.messages import ReviewDetail, StagingDetail
 from accounts.helpers import build_user_dto
 from core.gitea import merge_pull_request
 from core.models import Project
-from pull_requests.workflows import parse_reviewer
 from pull_requests.models import PullRequest
-from reviews.api import build_reviewer_dto_from_fields
 from reviews.models import ReviewScope
+from reviews.workflows import build_reviewer_dto_from_fields
+from reviews.workflows import parse_reviewer
 from staging.models import (
     StagingBatch,
     StagingBatchRevision,
@@ -278,7 +278,7 @@ def get_review_for_request(batch: StagingBatch, reviewer_str: str | None) -> Sta
     latest_rev = batch.latest_revision
     if not latest_rev:
         raise ValueError(f"Staging batch #{batch.id} has no revisions.")
-    user, group = parse_reviewer(reviewer_str)
+    user, group, role = parse_reviewer(reviewer_str, default_admin=True)
     if user:
         review = StagingReview.objects.filter(revision=latest_rev, reviewer_user=user).first()
         if review is None:
@@ -288,12 +288,21 @@ def get_review_for_request(batch: StagingBatch, reviewer_str: str | None) -> Sta
                 state=StagingReview.State.PENDING,
                 scope=ReviewScope.objects.get(name="global"),
             )
-    else:
+    elif group:
         review = StagingReview.objects.filter(revision=latest_rev, reviewer_group=group).first()
         if review is None:
             review = StagingReview.objects.create(
                 revision=latest_rev,
                 reviewer_group=group,
+                state=StagingReview.State.PENDING,
+                scope=ReviewScope.objects.get(name="global"),
+            )
+    else:
+        review = StagingReview.objects.filter(revision=latest_rev, dynamic_role=role).first()
+        if review is None:
+            review = StagingReview.objects.create(
+                revision=latest_rev,
+                dynamic_role=role,
                 state=StagingReview.State.PENDING,
                 scope=ReviewScope.objects.get(name="global"),
             )

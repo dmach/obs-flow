@@ -29,11 +29,11 @@ from pull_requests.workflows import (
     mark_draft,
     mark_ready_for_review,
     merge_pull_requests,
-    parse_reviewer,
     pr_to_detail,
     review_to_detail,
     sync_pull_request,
 )
+from reviews.workflows import parse_reviewer
 
 
 @api.post("/api/v1/pr_review/show")
@@ -44,11 +44,13 @@ def show_review_endpoint(payload: PRReviewShowRequest):
 
     reviews = latest_revision.reviews.select_related("scope", "actor", "reviewer_user", "reviewer_group").all()
     if payload.reviewer:
-        user, group = parse_reviewer(payload.reviewer)
+        user, group, role = parse_reviewer(payload.reviewer)
         if user:
             reviews = reviews.filter(reviewer_user=user)
         elif group:
             reviews = reviews.filter(reviewer_group=group)
+        elif role:
+            reviews = reviews.filter(dynamic_role=role)
 
     details = [review_to_detail(r) for r in reviews]
     res = PRReviewShowResponse(pull_request_id=payload.pull_request_id, reviews=details)

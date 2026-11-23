@@ -10,6 +10,8 @@ from core.models import Project, GitMapping
 from pull_requests.models import PullRequest, PullRequestRevision, PullRequestReview
 from staging.models import StagingBatch, StagingBatchRevision, StagingReview
 from reviews.models import ReviewConfig, ReviewScope
+from reviews.workflows import parse_reviewer
+
 from obs_flow_server.api import api
 
 # Client and CLI imports for testing
@@ -31,6 +33,52 @@ from obs_flow_common.messages import (
 )
 from click.testing import CliRunner
 from obs_flow_cli.commands.config__review import cli as review_config_cli
+
+
+class TestParseReviewer(TransactionTestCase):
+    fixtures = ["opensuse_data.json"]
+
+    def test_parse_user(self):
+        user, group, role = parse_reviewer("darix")
+        self.assertEqual(user.username, "darix")
+        self.assertIsNone(group)
+        self.assertIsNone(role)
+
+    def test_parse_group(self):
+        user, group, role = parse_reviewer("@opensuse-review-team")
+        self.assertIsNone(user)
+        self.assertEqual(group.name, "opensuse-review-team")
+        self.assertIsNone(role)
+
+    def test_parse_dynamic_role(self):
+        user, group, role = parse_reviewer("role:maintainer")
+        self.assertIsNone(user)
+        self.assertIsNone(group)
+        self.assertEqual(role, "maintainer")
+
+    def test_parse_invalid_dynamic_role(self):
+        with self.assertRaisesMessage(ValueError, "Invalid dynamic role: bogus"):
+            parse_reviewer("role:bogus")
+
+    def test_parse_empty_with_default_admin(self):
+        for empty in (None, ""):
+            user, group, role = parse_reviewer(empty, default_admin=True)
+            self.assertEqual(user.username, "admin")
+            self.assertIsNone(group)
+            self.assertIsNone(role)
+
+    def test_parse_empty_without_default_admin(self):
+        for empty in (None, ""):
+            with self.assertRaisesMessage(ValueError, "No reviewer specified."):
+                parse_reviewer(empty)
+
+    def test_parse_unknown_user(self):
+        with self.assertRaises(User.DoesNotExist):
+            parse_reviewer("nobody")
+
+    def test_parse_unknown_group(self):
+        with self.assertRaises(Group.DoesNotExist):
+            parse_reviewer("@nobody")
 
 
 class TestReviewConfigEndpoints(TransactionTestCase):
@@ -776,7 +824,7 @@ class TestScopeProvisioningPR(TestCase):
         )
 
     def test_skipped_when_no_file_in_scope(self):
-        from pull_requests.api import provision_reviews_for_revision
+        from pull_requests.workflows import provision_reviews_for_revision
 
         scope = ReviewScope.objects.create(name="code", include_globs=["src/*.py"], exclude_globs=[])
         self._make_config(scope)
@@ -792,7 +840,7 @@ class TestScopeProvisioningPR(TestCase):
         self.assertEqual(reviews[0].scope, scope)
 
     def test_pending_on_first_touch_in_scope(self):
-        from pull_requests.api import provision_reviews_for_revision
+        from pull_requests.workflows import provision_reviews_for_revision
 
         scope = ReviewScope.objects.create(name="code", include_globs=["src/*.py"], exclude_globs=[])
         self._make_config(scope)
@@ -807,7 +855,7 @@ class TestScopeProvisioningPR(TestCase):
         self.assertFalse(reviews[0].is_inherited)
 
     def test_inherited_when_scoped_files_unchanged(self):
-        from pull_requests.api import provision_reviews_for_revision
+        from pull_requests.workflows import provision_reviews_for_revision
 
         scope = ReviewScope.objects.create(name="code", include_globs=["src/*.py"], exclude_globs=[])
         self._make_config(scope)
@@ -834,7 +882,7 @@ class TestScopeProvisioningPR(TestCase):
         self.assertEqual(rev2_review.scope, scope)
 
     def test_pending_when_scoped_file_changed(self):
-        from pull_requests.api import provision_reviews_for_revision
+        from pull_requests.workflows import provision_reviews_for_revision
 
         scope = ReviewScope.objects.create(name="code", include_globs=["src/*.py"], exclude_globs=[])
         self._make_config(scope)
@@ -858,7 +906,7 @@ class TestScopeProvisioningPR(TestCase):
         self.assertEqual(rev2_review.state, PullRequestReview.State.PENDING)
 
     def test_pending_when_scope_identity_changed(self):
-        from pull_requests.api import provision_reviews_for_revision
+        from pull_requests.workflows import provision_reviews_for_revision
 
         scope_a = ReviewScope.objects.create(name="code", include_globs=["src/*.py"], exclude_globs=[])
         scope_b = ReviewScope.objects.create(name="docs", include_globs=["docs/*.md"], exclude_globs=[])
