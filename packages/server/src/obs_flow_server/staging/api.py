@@ -46,10 +46,6 @@ from staging.models import StagingBatch, StagingBatchRevision, StagingBatchRevis
 from staging.views import update_staging_batch
 
 
-def pr_to_id(pr: PullRequest) -> str:
-    return f"{pr.target.owner}/{pr.target.repo}#{pr.number}"
-
-
 def compute_staging_fingerprint(batch: StagingBatch, pr_revisions) -> str:
     """
     Computes a deterministic SHA-256 fingerprint of the staging batch.
@@ -76,7 +72,7 @@ def create_staging_revision(batch: StagingBatch, pr_revisions) -> StagingBatchRe
     and links the PR revisions. Reviews are not provisioned while in draft.
     """
     fingerprint = compute_staging_fingerprint(batch, pr_revisions)
-    latest_rev = batch.revisions.order_by("-revision_number").first()
+    latest_rev = batch.latest_revision
 
     if latest_rev and latest_rev.fingerprint == fingerprint:
         return latest_rev
@@ -248,10 +244,10 @@ def mark_staging_draft(revision: StagingBatchRevision) -> None:
 
 
 def batch_to_detail(batch: StagingBatch) -> StagingDetail:
-    latest_rev = batch.revisions.order_by("-revision_number").first()
+    latest_rev = batch.latest_revision
     if latest_rev:
         prs = [
-            pr_to_id(bpr.pull_request_revision.pull_request)
+            bpr.pull_request_revision.pull_request.id_str
             for bpr in latest_rev.revision_pull_requests.all()
         ]
         latest_rev_num = latest_rev.revision_number
@@ -300,7 +296,7 @@ def review_to_detail(review: StagingReview) -> ReviewDetail:
 def get_review_for_request(batch: StagingBatch, reviewer_str: str | None) -> StagingReview:
     from pull_requests.api import parse_reviewer
 
-    latest_rev = batch.revisions.order_by("-revision_number").first()
+    latest_rev = batch.latest_revision
     if not latest_rev:
         raise ValueError(f"Staging batch #{batch.id} has no revisions.")
     user, group = parse_reviewer(reviewer_str)
@@ -391,7 +387,7 @@ def add_to_staging_endpoint(payload: StagingAddRequest):
             )
         resolved_prs.append(pr)
 
-    latest_rev = batch.revisions.order_by("-revision_number").first()
+    latest_rev = batch.latest_revision
     current_prs = []
     if latest_rev:
         current_prs = [
@@ -405,13 +401,13 @@ def add_to_staging_endpoint(payload: StagingAddRequest):
 
     pr_revisions = []
     for pr in current_prs:
-        latest_pr_rev = pr.revisions.order_by("-revision_number").first()
+        latest_pr_rev = pr.latest_revision
         if latest_pr_rev:
             pr_revisions.append(latest_pr_rev)
 
     create_staging_revision(batch, pr_revisions)
 
-    prs = [pr_to_id(pr) for pr in current_prs]
+    prs = [pr.id_str for pr in current_prs]
     res = StagingAddResponse(id=batch.id, pull_requests=prs)
     return msgspec.structs.asdict(res)
 
@@ -423,7 +419,7 @@ def remove_from_staging_endpoint(payload: StagingRemoveRequest):
 
     batch = StagingBatch.objects.get(id=payload.id)
 
-    latest_rev = batch.revisions.order_by("-revision_number").first()
+    latest_rev = batch.latest_revision
     current_prs = []
     if latest_rev:
         current_prs = [
@@ -441,13 +437,13 @@ def remove_from_staging_endpoint(payload: StagingRemoveRequest):
 
     pr_revisions = []
     for pr in current_prs:
-        latest_pr_rev = pr.revisions.order_by("-revision_number").first()
+        latest_pr_rev = pr.latest_revision
         if latest_pr_rev:
             pr_revisions.append(latest_pr_rev)
 
     create_staging_revision(batch, pr_revisions)
 
-    prs = [pr_to_id(pr) for pr in current_prs]
+    prs = [pr.id_str for pr in current_prs]
     res = StagingRemoveResponse(id=batch.id, pull_requests=prs)
     return msgspec.structs.asdict(res)
 
@@ -461,7 +457,7 @@ def remove_from_staging_endpoint(payload: StagingRemoveRequest):
 @sync_to_async
 def show_staging_review_endpoint(payload: StagingReviewShowRequest):
     batch = StagingBatch.objects.get(id=payload.staging_id)
-    latest_rev = batch.revisions.order_by("-revision_number").first()
+    latest_rev = batch.latest_revision
     if not latest_rev:
         res = StagingReviewShowResponse(staging_id=payload.staging_id, reviews=[])
         return msgspec.structs.asdict(res)
@@ -539,7 +535,7 @@ def needinfo_staging_review_endpoint(payload: StagingReviewNeedInfoRequest, requ
 @sync_to_async
 def clear_needinfo_staging_review_endpoint(payload: StagingReviewClearNeedInfoRequest, request):
     batch = StagingBatch.objects.get(id=payload.staging_id)
-    latest_rev = batch.revisions.order_by("-revision_number").first()
+    latest_rev = batch.latest_revision
     if not latest_rev:
         raise ValueError(f"Staging batch #{batch.id} has no revisions.")
 
@@ -592,7 +588,7 @@ def staging_ready_for_review_endpoint(payload: StagingReadyForReviewRequest):
         except StagingBatch.DoesNotExist:
             return HttpResponseBadRequest(f"Staging batch #{batch_id} does not exist.")
 
-        latest_rev = batch.revisions.order_by("-revision_number").first()
+        latest_rev = batch.latest_revision
         if not latest_rev:
             return HttpResponseBadRequest(f"Staging batch #{batch_id} has no revisions.")
 
@@ -614,7 +610,7 @@ def staging_convert_to_draft_endpoint(payload: StagingConvertToDraftRequest):
         except StagingBatch.DoesNotExist:
             return HttpResponseBadRequest(f"Staging batch #{batch_id} does not exist.")
 
-        latest_rev = batch.revisions.order_by("-revision_number").first()
+        latest_rev = batch.latest_revision
         if not latest_rev:
             return HttpResponseBadRequest(f"Staging batch #{batch_id} has no revisions.")
 
@@ -657,7 +653,7 @@ def staging_merge_endpoint(payload: StagingMergeRequest):
                 errors.append(f"Staging batch #{batch_id} is already merged.")
                 continue
 
-            latest_rev = batch.revisions.order_by("-revision_number").first()
+            latest_rev = batch.latest_revision
             if not latest_rev:
                 errors.append(f"Staging batch #{batch_id} has no revisions.")
                 continue

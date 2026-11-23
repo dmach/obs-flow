@@ -312,7 +312,7 @@ class TestStagingBatchRevision(TransactionTestCase):
 
         # Verify revision 2 is created
         self.assertEqual(batch.revisions.count(), 2)
-        rev2 = batch.revisions.order_by("-revision_number").first()
+        rev2 = batch.latest_revision
         self.assertEqual(rev2.revision_number, 2)
         self.assertEqual(rev2.revision_pull_requests.count(), 1)
 
@@ -365,7 +365,7 @@ class TestStagingBatchRevision(TransactionTestCase):
 
         # Verify that a new StagingBatchRevision (revision 3) was automatically created
         self.assertEqual(batch.revisions.count(), 3)
-        rev3 = batch.revisions.order_by("-revision_number").first()
+        rev3 = batch.latest_revision
         self.assertEqual(rev3.revision_number, 3)
         self.assertEqual(rev3.revision_pull_requests.count(), 1)
 
@@ -390,7 +390,7 @@ class TestStagingBatchRevision(TransactionTestCase):
 
         # Verify revision 4 is created (empty again)
         self.assertEqual(batch.revisions.count(), 4)
-        rev4 = batch.revisions.order_by("-revision_number").first()
+        rev4 = batch.latest_revision
         self.assertEqual(rev4.revision_number, 4)
         self.assertEqual(rev4.revision_pull_requests.count(), 0)
         self.assertEqual(rev4.fingerprint, expected_fingerprint_1)
@@ -475,7 +475,7 @@ class TestStagingBatchRevision(TransactionTestCase):
             )
         self.assertEqual(response.status_code, 200)
         self.assertEqual(batch.revisions.count(), initial_rev_count + 1)
-        latest_rev = batch.revisions.order_by("-revision_number").first()
+        latest_rev = batch.latest_revision
         self.assertTrue(
             latest_rev.revision_pull_requests.filter(pull_request_revision=pr_rev).exists()
         )
@@ -693,6 +693,28 @@ class TestStagingBatchRevisionModel(TestCase):
         self.assertTrue(rev2.is_draft)
         self.assertEqual(rev2.draft_expires_at, expiry)
         self.assertTrue(batch.is_draft)
+
+        # A later non-draft revision clears the draft state again
+        rev3 = StagingBatchRevision.objects.create(
+            staging_batch=batch,
+            revision_number=3,
+            fingerprint="fp3",
+            is_draft=False,
+        )
+        self.assertFalse(rev3.is_draft)
+        self.assertFalse(batch.is_draft)
+
+    def test_latest_revision_returns_highest_revision_number(self):
+        project = Project.objects.create(name="test:project")
+        batch = StagingBatch.objects.create(project=project)
+        rev1 = StagingBatchRevision.objects.create(staging_batch=batch, revision_number=1, fingerprint="fp1")
+        rev2 = StagingBatchRevision.objects.create(staging_batch=batch, revision_number=2, fingerprint="fp2")
+        self.assertEqual(batch.latest_revision, rev2)
+
+    def test_latest_revision_none_without_revisions(self):
+        project = Project.objects.create(name="test:project")
+        batch = StagingBatch.objects.create(project=project)
+        self.assertIsNone(batch.latest_revision)
 
 
 class TestStagingReviewProvisioning(TestCase):

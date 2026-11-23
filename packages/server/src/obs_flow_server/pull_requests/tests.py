@@ -555,6 +555,60 @@ class TestPullRequestRevisionModel(TestCase):
         self.assertEqual(rev2.draft_expires_at, expiry)
 
 
+class TestPullRequestLatestRevisionAndIdStr(TestCase):
+    def _make_pr(self, number=1):
+        project = Project.objects.create(name=f"test:project-{number}")
+        git_mapping = GitMapping.objects.create(
+            owner="test", repo="repo", branch="main", project=project
+        )
+        author = User.objects.create(
+            username=f"author{number}", username_lower=f"author{number}", account_type=User.AccountType.HUMAN
+        )
+        return PullRequest.objects.create(
+            target=git_mapping,
+            number=number,
+            author=author,
+            source_owner=f"author{number}",
+            source_repo="repo",
+            source_branch="feat",
+        )
+
+    def test_latest_revision_returns_highest_revision_number(self):
+        pr = self._make_pr()
+        rev1 = PullRequestRevision.objects.create(
+            pull_request=pr, revision_number=1, head_sha="1111", base_sha="0000", fingerprint="fp1"
+        )
+        rev2 = PullRequestRevision.objects.create(
+            pull_request=pr, revision_number=2, head_sha="2222", base_sha="0000", fingerprint="fp2"
+        )
+        self.assertEqual(pr.latest_revision, rev2)
+
+    def test_latest_revision_none_without_revisions(self):
+        pr = self._make_pr(number=2)
+        self.assertIsNone(pr.latest_revision)
+
+    def test_is_draft_mirrors_latest_revision(self):
+        pr = self._make_pr(number=3)
+        self.assertFalse(pr.is_draft)
+        PullRequestRevision.objects.create(
+            pull_request=pr, revision_number=1, head_sha="1111", base_sha="0000", fingerprint="fp1", is_draft=True
+        )
+        self.assertTrue(pr.is_draft)
+        PullRequestRevision.objects.create(
+            pull_request=pr, revision_number=2, head_sha="2222", base_sha="0000", fingerprint="fp2", is_draft=False
+        )
+        self.assertFalse(pr.is_draft)
+
+    def test_id_str_format_and_round_trip(self):
+        pr = self._make_pr(number=42)
+        self.assertEqual(pr.id_str, "test/repo#42")
+        from pull_requests.api import PR_ID_REGEX
+
+        match = PR_ID_REGEX.match(pr.id_str)
+        self.assertIsNotNone(match)
+        self.assertEqual(match.groups(), ("test", "repo", "42"))
+
+
 class TestPullRequestReviewProvisioning(TestCase):
     fixtures = ["global_scope.json"]
     def test_provision_reviews_and_mark_ready_for_review(self):

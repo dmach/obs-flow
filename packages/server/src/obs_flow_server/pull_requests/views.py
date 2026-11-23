@@ -161,7 +161,7 @@ def _render_pr_draft_section(request, pr, latest_revision):
 
 def pr_draft_status(request, pr_id):
     pr = get_object_or_404(PullRequest, id=pr_id)
-    latest_revision = pr.revisions.order_by("-revision_number").first()
+    latest_revision = pr.latest_revision
     if latest_revision and latest_revision.is_draft and latest_revision.draft_expires_at and latest_revision.draft_expires_at <= timezone.now():
         from pull_requests.api import mark_ready_for_review
         mark_ready_for_review(latest_revision)
@@ -173,7 +173,7 @@ def pr_draft_status(request, pr_id):
 @require_POST
 def pr_ready_for_review(request, pr_id):
     pr = get_object_or_404(PullRequest, id=pr_id)
-    latest_revision = pr.revisions.order_by("-revision_number").first()
+    latest_revision = pr.latest_revision
     if latest_revision:
         from pull_requests.api import mark_ready_for_review
         mark_ready_for_review(latest_revision)
@@ -189,7 +189,7 @@ def pr_ready_for_review(request, pr_id):
 @require_POST
 def pr_cancel_timeout(request, pr_id):
     pr = get_object_or_404(PullRequest, id=pr_id)
-    latest_revision = pr.revisions.order_by("-revision_number").first()
+    latest_revision = pr.latest_revision
     if latest_revision:
         from pull_requests.api import mark_draft
         mark_draft(latest_revision)
@@ -205,7 +205,7 @@ def pr_cancel_timeout(request, pr_id):
 @require_POST
 def pr_convert_to_draft(request, pr_id):
     pr = get_object_or_404(PullRequest, id=pr_id)
-    latest_revision = pr.revisions.order_by("-revision_number").first()
+    latest_revision = pr.latest_revision
     if latest_revision:
         from pull_requests.api import mark_draft
         mark_draft(latest_revision)
@@ -298,7 +298,7 @@ def _check_pr_for_merge(pr: PullRequest) -> tuple[bool, str | None, list[str]]:
     if pr.state == PullRequest.State.CLOSED:
         return False, f"Pull request #{pr.number} is closed.", []
 
-    latest_rev = pr.revisions.order_by("-revision_number").first()
+    latest_rev = pr.latest_revision
     if pr.is_draft or (latest_rev and latest_rev.is_draft):
         return False, f"Pull request #{pr.number} is in draft mode and cannot be merged.", []
 

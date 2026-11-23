@@ -116,7 +116,7 @@ def get_review_for_request(revision: PullRequestRevision, reviewer_str: str | No
 @sync_to_async
 def show_review_endpoint(payload: PRReviewShowRequest):
     pr = get_pull_request(payload.pull_request_id)
-    latest_revision = pr.revisions.order_by("-revision_number").first()
+    latest_revision = pr.latest_revision
 
     reviews = latest_revision.reviews.select_related("scope", "actor", "reviewer_user", "reviewer_group").all()
     if payload.reviewer:
@@ -135,7 +135,7 @@ def show_review_endpoint(payload: PRReviewShowRequest):
 async def approve_review_endpoint(payload: PRReviewApproveRequest, request):
     def do_approve():
         pr = get_pull_request(payload.pull_request_id)
-        latest_revision = pr.revisions.order_by("-revision_number").first()
+        latest_revision = pr.latest_revision
 
         review = get_review_for_request(latest_revision, payload.reviewer)
         review.state = PullRequestReview.State.ACCEPTED
@@ -155,7 +155,7 @@ async def approve_review_endpoint(payload: PRReviewApproveRequest, request):
 async def decline_review_endpoint(payload: PRReviewDeclineRequest, request):
     def do_decline():
         pr = get_pull_request(payload.pull_request_id)
-        latest_revision = pr.revisions.order_by("-revision_number").first()
+        latest_revision = pr.latest_revision
 
         review = get_review_for_request(latest_revision, payload.reviewer)
         review.state = PullRequestReview.State.REJECTED
@@ -175,7 +175,7 @@ async def decline_review_endpoint(payload: PRReviewDeclineRequest, request):
 async def needinfo_review_endpoint(payload: PRReviewNeedInfoRequest, request):
     def do_needinfo():
         pr = get_pull_request(payload.pull_request_id)
-        latest_revision = pr.revisions.order_by("-revision_number").first()
+        latest_revision = pr.latest_revision
 
         review = get_review_for_request(latest_revision, payload.reviewer)
         review.state = PullRequestReview.State.NEEDINFO
@@ -195,7 +195,7 @@ async def needinfo_review_endpoint(payload: PRReviewNeedInfoRequest, request):
 async def clear_needinfo_review_endpoint(payload: PRReviewClearNeedInfoRequest, request):
     def do_clear_needinfo():
         pr = get_pull_request(payload.pull_request_id)
-        latest_revision = pr.revisions.order_by("-revision_number").first()
+        latest_revision = pr.latest_revision
 
         # Clear needinfo on all reviews for this revision that are in NEEDINFO state
         reviews = latest_revision.reviews.filter(state=PullRequestReview.State.NEEDINFO)
@@ -224,7 +224,7 @@ async def clear_needinfo_review_endpoint(payload: PRReviewClearNeedInfoRequest, 
 async def reopen_review_endpoint(payload: PRReviewReopenRequest, request):
     def do_reopen():
         pr = get_pull_request(payload.pull_request_id)
-        latest_revision = pr.revisions.order_by("-revision_number").first()
+        latest_revision = pr.latest_revision
 
         review = get_review_for_request(latest_revision, payload.reviewer)
         review.state = PullRequestReview.State.PENDING
@@ -480,7 +480,7 @@ def _do_sync_pull_request(req: PRSyncRequest) -> PRSyncResponse:
 
     target_project = pr.target.target_project
     timeout_minutes = target_project.effective_review_debounce_minutes if target_project else settings.REVIEW_DEBOUNCE_MINUTES
-    latest_revision = pr.revisions.order_by("-revision_number").first()
+    latest_revision = pr.latest_revision
     if not latest_revision or latest_revision.fingerprint != fingerprint:
         rev_number = (latest_revision.revision_number + 1) if latest_revision else 1
 
@@ -516,7 +516,7 @@ def _do_sync_pull_request(req: PRSyncRequest) -> PRSyncResponse:
         ).distinct()
 
         for batch in affected_batches:
-            latest_rev = batch.revisions.order_by("-revision_number").first()
+            latest_rev = batch.latest_revision
             if latest_rev:
                 latest_pr_revs = [
                     bpr.pull_request_revision
@@ -580,7 +580,7 @@ def pr_ready_for_review_endpoint(payload: PRReadyForReviewRequest):
         except (PullRequest.DoesNotExist, ValueError) as e:
             return HttpResponseBadRequest(str(e))
 
-        latest_revision = pr.revisions.order_by("-revision_number").first()
+        latest_revision = pr.latest_revision
         if not latest_revision:
             return HttpResponseBadRequest(f"Pull request {pr_id} has no revisions.")
 
@@ -615,7 +615,7 @@ def pr_convert_to_draft_endpoint(payload: PRConvertToDraftRequest):
         except (PullRequest.DoesNotExist, ValueError) as e:
             return HttpResponseBadRequest(str(e))
 
-        latest_revision = pr.revisions.order_by("-revision_number").first()
+        latest_revision = pr.latest_revision
         if not latest_revision:
             return HttpResponseBadRequest(f"Pull request {pr_id} has no revisions.")
 
@@ -707,7 +707,7 @@ def pr_merge_endpoint(payload: PRMergeRequest):
                 errors.append(f"Pull request {pr_id} is already merged.")
                 continue
 
-            latest_revision = pr.revisions.order_by("-revision_number").first()
+            latest_revision = pr.latest_revision
             if pr.is_draft or (latest_revision and latest_revision.is_draft):
                 errors.append(f"Pull request {pr_id} is in draft mode and cannot be merged.")
                 continue
@@ -728,7 +728,7 @@ def pr_merge_endpoint(payload: PRMergeRequest):
             pr.state = PullRequest.State.MERGED
             pr.save(update_fields=["state"])
 
-            latest_revision = pr.revisions.order_by("-revision_number").first()
+            latest_revision = pr.latest_revision
             rev_num = latest_revision.revision_number if latest_revision else 0
             head_sha = latest_revision.head_sha if latest_revision else ""
             base_sha = latest_revision.base_sha if latest_revision else ""

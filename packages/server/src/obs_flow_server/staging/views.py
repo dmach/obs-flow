@@ -319,7 +319,7 @@ def staging_ui_modal_confirm_add(request):
         return _close_modal_and_refresh()
 
     # Get current PRs in the batch
-    latest_rev = batch.revisions.order_by("-revision_number").first()
+    latest_rev = batch.latest_revision
     current_prs = []
     if latest_rev:
         current_prs = [
@@ -335,7 +335,7 @@ def staging_ui_modal_confirm_add(request):
     # Get latest revision for each PR
     pr_revisions = []
     for pr in current_prs:
-        latest_pr_rev = pr.revisions.order_by("-revision_number").first()
+        latest_pr_rev = pr.latest_revision
         if latest_pr_rev:
             pr_revisions.append(latest_pr_rev)
 
@@ -363,7 +363,7 @@ def _render_staging_draft_section(request, batch, latest_revision):
 
 def staging_draft_status(request, batch_id):
     batch = get_object_or_404(StagingBatch, id=batch_id)
-    latest_revision = batch.revisions.order_by("-revision_number").first()
+    latest_revision = batch.latest_revision
     if latest_revision and latest_revision.is_draft and latest_revision.draft_expires_at and latest_revision.draft_expires_at <= timezone.now():
         from staging.api import mark_staging_ready_for_review
         mark_staging_ready_for_review(latest_revision)
@@ -375,7 +375,7 @@ def staging_draft_status(request, batch_id):
 @require_POST
 def staging_ready_for_review(request, batch_id):
     batch = get_object_or_404(StagingBatch, id=batch_id)
-    latest_revision = batch.revisions.order_by("-revision_number").first()
+    latest_revision = batch.latest_revision
     if latest_revision:
         from staging.api import mark_staging_ready_for_review
         mark_staging_ready_for_review(latest_revision)
@@ -391,7 +391,7 @@ def staging_ready_for_review(request, batch_id):
 @require_POST
 def staging_cancel_timeout(request, batch_id):
     batch = get_object_or_404(StagingBatch, id=batch_id)
-    latest_revision = batch.revisions.order_by("-revision_number").first()
+    latest_revision = batch.latest_revision
     if latest_revision:
         from staging.api import mark_staging_draft
         mark_staging_draft(latest_revision)
@@ -407,7 +407,7 @@ def staging_cancel_timeout(request, batch_id):
 @require_POST
 def staging_convert_to_draft(request, batch_id):
     batch = get_object_or_404(StagingBatch, id=batch_id)
-    latest_revision = batch.revisions.order_by("-revision_number").first()
+    latest_revision = batch.latest_revision
     if latest_revision:
         from staging.api import mark_staging_draft
         mark_staging_draft(latest_revision)
@@ -427,7 +427,7 @@ def staging_merge_action(request, batch_id):
         messages.error(request, f"Staging batch #{batch.id} is already merged.")
         return redirect("staging_detail", batch_id=batch.id)
 
-    latest_rev = batch.revisions.order_by("-revision_number").first()
+    latest_rev = batch.latest_revision
     if not latest_rev:
         messages.error(request, f"Staging batch #{batch.id} has no revisions.")
         return redirect("staging_detail", batch_id=batch.id)
@@ -479,7 +479,7 @@ def staging_bulk_merge(request):
                 errors.append(f"Batch #{batch.id}: Already merged.")
                 continue
 
-            latest_rev = batch.revisions.order_by("-revision_number").first()
+            latest_rev = batch.latest_revision
             if not latest_rev or latest_rev.is_draft:
                 errors.append(f"Batch #{batch.id}: In draft or no revisions.")
                 continue
@@ -516,7 +516,7 @@ def _check_staging_for_merge(batch: StagingBatch) -> tuple[bool, str | None, lis
     if batch.state == StagingBatch.State.MERGED:
         return False, "Staging batch is already merged.", [], []
 
-    latest_rev = batch.revisions.order_by("-revision_number").first()
+    latest_rev = batch.latest_revision
     if not latest_rev:
         return False, "Staging batch has no revisions.", [], []
 

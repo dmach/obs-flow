@@ -26,8 +26,16 @@ class PullRequest(models.Model):
         unique_together = ("target", "number")
 
     @property
+    def latest_revision(self) -> "PullRequestRevision | None":
+        return self.revisions.order_by("-revision_number").first()
+
+    @property
+    def id_str(self) -> str:
+        return f"{self.target.owner}/{self.target.repo}#{self.number}"
+
+    @property
     def is_draft(self) -> bool:
-        latest = self.revisions.order_by("-revision_number").first()
+        latest = self.latest_revision
         return latest.is_draft if latest else False
 
     @property
