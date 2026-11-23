@@ -16,7 +16,7 @@ from accounts.models import User
 from core.gitea import merge_pull_request
 from core.models import GitMapping, Project
 from pull_requests.models import PullRequest, PullRequestRevision, PullRequestReview
-from reviews.workflows import provision_reviews_for
+from reviews.workflows import mark_draft as _mark_draft, mark_ready, provision_reviews_for
 
 
 # =====================================================================
@@ -62,36 +62,19 @@ def provision_reviews_for_revision(revision: PullRequestRevision) -> list[PullRe
     )
 
 
-@transaction.atomic
 def mark_ready_for_review(revision: PullRequestRevision) -> None:
     """
     Transitions a PullRequestRevision out of draft mode and provisions reviews.
     """
-    rev = PullRequestRevision.objects.select_for_update().get(pk=revision.pk)
-    if not rev.is_draft and rev.draft_expires_at is None:
-        return
-    rev.is_draft = False
-    rev.draft_expires_at = None
-    rev.save(update_fields=["is_draft", "draft_expires_at"])
-    revision.is_draft = False
-    revision.draft_expires_at = None
-    provision_reviews_for_revision(rev)
+    mark_ready(revision, revision_model=PullRequestRevision, provision_fn=provision_reviews_for_revision)
 
 
-@transaction.atomic
 def mark_draft(revision: PullRequestRevision) -> None:
     """
     Transitions a PullRequestRevision into manual draft mode without debounce timer.
     Existing reviews are not modified or removed.
     """
-    rev = PullRequestRevision.objects.select_for_update().get(pk=revision.pk)
-    if rev.is_draft and rev.draft_expires_at is None:
-        return
-    rev.is_draft = True
-    rev.draft_expires_at = None
-    rev.save(update_fields=["is_draft", "draft_expires_at"])
-    revision.is_draft = True
-    revision.draft_expires_at = None
+    _mark_draft(revision, revision_model=PullRequestRevision)
 
 
 def pr_to_detail(pr: PullRequest, latest_revision: PullRequestRevision | None = None, id: str | None = None) -> PRDetail:

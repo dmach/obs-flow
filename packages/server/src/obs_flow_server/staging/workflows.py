@@ -11,7 +11,7 @@ from accounts.helpers import build_user_dto
 from core.gitea import merge_pull_request
 from core.models import Project
 from pull_requests.models import PullRequest
-from reviews.workflows import get_or_create_review, provision_reviews_for
+from reviews.workflows import get_or_create_review, mark_draft, mark_ready, provision_reviews_for
 from staging.models import (
     StagingBatch,
     StagingBatchRevision,
@@ -110,36 +110,19 @@ def provision_reviews_for_staging_revision(revision: StagingBatchRevision) -> li
     )
 
 
-@transaction.atomic
 def mark_staging_ready_for_review(revision: StagingBatchRevision) -> None:
     """
     Transitions a StagingBatchRevision out of draft mode and provisions reviews.
     """
-    rev = StagingBatchRevision.objects.select_for_update().get(pk=revision.pk)
-    if not rev.is_draft and rev.draft_expires_at is None:
-        return
-    rev.is_draft = False
-    rev.draft_expires_at = None
-    rev.save(update_fields=["is_draft", "draft_expires_at"])
-    revision.is_draft = False
-    revision.draft_expires_at = None
-    provision_reviews_for_staging_revision(rev)
+    mark_ready(revision, revision_model=StagingBatchRevision, provision_fn=provision_reviews_for_staging_revision)
 
 
-@transaction.atomic
 def mark_staging_draft(revision: StagingBatchRevision) -> None:
     """
     Transitions a StagingBatchRevision into manual draft mode without debounce timer.
     Existing reviews are not modified or removed.
     """
-    rev = StagingBatchRevision.objects.select_for_update().get(pk=revision.pk)
-    if rev.is_draft and rev.draft_expires_at is None:
-        return
-    rev.is_draft = True
-    rev.draft_expires_at = None
-    rev.save(update_fields=["is_draft", "draft_expires_at"])
-    revision.is_draft = True
-    revision.draft_expires_at = None
+    mark_draft(revision, revision_model=StagingBatchRevision)
 
 
 def batch_to_detail(batch: StagingBatch) -> StagingDetail:

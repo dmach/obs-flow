@@ -180,6 +180,38 @@ def clear_needinfo(revision, actor: User, justification: str | None, review_mode
 
 
 @transaction.atomic
+def mark_ready(revision, *, revision_model, provision_fn) -> None:
+    """
+    Transitions a revision out of draft mode and provisions reviews.
+    """
+    rev = revision_model.objects.select_for_update().get(pk=revision.pk)
+    if not rev.is_draft and rev.draft_expires_at is None:
+        return
+    rev.is_draft = False
+    rev.draft_expires_at = None
+    rev.save(update_fields=["is_draft", "draft_expires_at"])
+    revision.is_draft = False
+    revision.draft_expires_at = None
+    provision_fn(rev)
+
+
+@transaction.atomic
+def mark_draft(revision, *, revision_model) -> None:
+    """
+    Transitions a revision into manual draft mode without debounce timer.
+    Existing reviews are not modified or removed.
+    """
+    rev = revision_model.objects.select_for_update().get(pk=revision.pk)
+    if rev.is_draft and rev.draft_expires_at is None:
+        return
+    rev.is_draft = True
+    rev.draft_expires_at = None
+    rev.save(update_fields=["is_draft", "draft_expires_at"])
+    revision.is_draft = True
+    revision.draft_expires_at = None
+
+
+@transaction.atomic
 def provision_reviews_for(revision, configs, *, review_model, revision_model, prev_rev=None) -> list[BaseReview]:
     """
     Provisions reviews for a revision based on the given ReviewConfigs.
