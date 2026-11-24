@@ -1,3 +1,7 @@
+import json
+
+from django_bolt.testing import TestClient
+
 from unittest.mock import MagicMock, patch
 from django.contrib.messages import get_messages
 from django.test import Client, TestCase, TransactionTestCase, override_settings
@@ -8,6 +12,7 @@ from core.models import Project, GitMapping
 from reviews.models import ReviewScope
 from pull_requests.models import PullRequest, PullRequestRevision, PullRequestReview
 from staging.models import StagingBatch, StagingBatchRevision, StagingReview
+from obs_flow_server.api import api
 
 
 class TestEmptyDatabase(TestCase):
@@ -111,9 +116,6 @@ class TestStagingCreationWithReviewConfig(TransactionTestCase):
         """Verify that creating a staging batch for a project with staging review configurations
         correctly populates the staging reviews and their dependencies.
         """
-        import json
-        from django_bolt.testing import TestClient
-        from obs_flow_server.api import api
         from reviews.models import ReviewConfig
 
         project = Project.objects.get(name="openSUSE:Factory")
@@ -254,13 +256,8 @@ class TestStagingBatchRevision(TransactionTestCase):
         """Verify the complete lifecycle of StagingBatchRevision, including creation,
         adding/removing PRs, fingerprinting, and automatic updates on PR code changes.
         """
-        import json
-        import hashlib
         from unittest.mock import MagicMock, patch
         from django.test import override_settings
-        from django_bolt.testing import TestClient
-        from obs_flow_server.api import api
-        from staging.models import StagingBatchRevision, StagingBatchRevisionPullRequest
 
         # 1. Create a staging batch
         payload = {
@@ -289,7 +286,6 @@ class TestStagingBatchRevision(TransactionTestCase):
 
         # Verify revision 1 is created (empty)
         from staging.fingerprint import StagingBatchPayload
-        from pull_requests.fingerprint import PRRevisionPayload
 
         batch = StagingBatch.objects.get(id=batch_id)
         self.assertEqual(batch.revisions.count(), 1)
@@ -397,9 +393,6 @@ class TestStagingBatchRevision(TransactionTestCase):
 
     def test_staging_add_cross_project_pr_rejected(self):
         """Verify that adding a PR targeting a different project to a staging batch is rejected with 400."""
-        import json
-        from django_bolt.testing import TestClient
-        from obs_flow_server.api import api
 
         other_project = Project.objects.create(name="openSUSE:Testing")
         other_mapping = GitMapping.objects.create(
@@ -438,9 +431,6 @@ class TestStagingBatchRevision(TransactionTestCase):
 
     def test_staging_add_package_target_pr_accepted(self):
         """Verify that adding a PR targeting a package within the batch's project succeeds."""
-        import json
-        from django_bolt.testing import TestClient
-        from obs_flow_server.api import api
         from core.models import Package
 
         batch = StagingBatch.objects.get(id=1)
@@ -707,7 +697,7 @@ class TestStagingBatchRevisionModel(TestCase):
     def test_latest_revision_returns_highest_revision_number(self):
         project = Project.objects.create(name="test:project")
         batch = StagingBatch.objects.create(project=project)
-        rev1 = StagingBatchRevision.objects.create(staging_batch=batch, revision_number=1, fingerprint="fp1")
+        StagingBatchRevision.objects.create(staging_batch=batch, revision_number=1, fingerprint="fp1")
         rev2 = StagingBatchRevision.objects.create(staging_batch=batch, revision_number=2, fingerprint="fp2")
         self.assertEqual(batch.latest_revision, rev2)
 
@@ -721,7 +711,7 @@ class TestStagingReviewProvisioning(TestCase):
     fixtures = ["global_scope.json"]
     def test_provision_reviews_and_mark_staging_ready_for_review(self):
         from reviews.models import ReviewConfig
-        from staging.workflows import provision_reviews_for_staging_revision, mark_staging_ready_for_review
+        from staging.workflows import mark_staging_ready_for_review
 
         project = Project.objects.create(name="test:project")
         reviewer = User.objects.create(username="reviewer1", username_lower="reviewer1", account_type=User.AccountType.HUMAN)
@@ -759,9 +749,6 @@ class TestStagingReviewProvisioning(TestCase):
     def test_cascading_unblocking_staging_reviews(self):
         from reviews.models import ReviewConfig
         from staging.workflows import mark_staging_ready_for_review
-        from django_bolt.testing import TestClient
-        from obs_flow_server.api import api
-        import json
 
         project = Project.objects.create(name="test:cascade-staging")
         u1 = User.objects.create(username="srev_1", username_lower="srev_1", account_type=User.AccountType.HUMAN)
@@ -861,9 +848,6 @@ class TestStagingReadyForReviewEndpoint(TestCase):
         self.assertEqual(self.rev2.reviews.count(), 0)
 
         payload = {"staging_ids": [self.batch1.id, self.batch2.id]}
-        from django_bolt.testing import TestClient
-        from obs_flow_server.api import api
-        import json
         with TestClient(api) as client:
             response = client.post("/api/v1/staging/ready-for-review", content=json.dumps(payload))
         self.assertEqual(response.status_code, 200)
@@ -887,9 +871,6 @@ class TestStagingReadyForReviewEndpoint(TestCase):
 
     def test_staging_ready_for_review_nonexistent_batch(self):
         payload = {"staging_ids": [9999]}
-        from django_bolt.testing import TestClient
-        from obs_flow_server.api import api
-        import json
         with TestClient(api) as client:
             response = client.post("/api/v1/staging/ready-for-review", content=json.dumps(payload))
         self.assertEqual(response.status_code, 400)
@@ -1007,9 +988,6 @@ class TestStagingConvertToDraftEndpoint(TestCase):
 
     def test_staging_convert_to_draft_endpoint_success(self):
         payload = {"staging_ids": [self.batch.id]}
-        from django_bolt.testing import TestClient
-        from obs_flow_server.api import api
-        import json
         with TestClient(api) as client:
             response = client.post("/api/v1/staging/convert-to-draft", content=json.dumps(payload))
         self.assertEqual(response.status_code, 200)
@@ -1088,9 +1066,6 @@ class TestStagingMergeEndpoint(TestCase):
         mock_urlopen.return_value.__enter__.return_value = mock_response
 
         payload = {"staging_ids": [self.batch.id]}
-        from django_bolt.testing import TestClient
-        from obs_flow_server.api import api
-        import json
 
         with TestClient(api) as client:
             res = client.post("/api/v1/staging/merge", content=json.dumps(payload))
@@ -1114,9 +1089,6 @@ class TestStagingMergeEndpoint(TestCase):
         self.review.save()
 
         payload = {"staging_ids": [self.batch.id]}
-        from django_bolt.testing import TestClient
-        from obs_flow_server.api import api
-        import json
 
         with TestClient(api) as client:
             res = client.post("/api/v1/staging/merge", content=json.dumps(payload))
@@ -1131,9 +1103,6 @@ class TestStagingMergeEndpoint(TestCase):
         self.batch_rev.save()
 
         payload = {"staging_ids": [self.batch.id]}
-        from django_bolt.testing import TestClient
-        from obs_flow_server.api import api
-        import json
 
         with TestClient(api) as client:
             res = client.post("/api/v1/staging/merge", content=json.dumps(payload))
@@ -1163,9 +1132,6 @@ class TestStagingMergeEndpoint(TestCase):
 
         # Try merging batch 1 (already merged), batch 2 (unapproved reviews), and nonexistent batch 999
         payload = {"staging_ids": [self.batch.id, batch2.id, 999]}
-        from django_bolt.testing import TestClient
-        from obs_flow_server.api import api
-        import json
 
         with TestClient(api) as client:
             res = client.post("/api/v1/staging/merge", content=json.dumps(payload))
@@ -1179,9 +1145,6 @@ class TestStagingMergeEndpoint(TestCase):
         self.pr1_rev.save()
 
         payload = {"staging_ids": [self.batch.id]}
-        from django_bolt.testing import TestClient
-        from obs_flow_server.api import api
-        import json
 
         with TestClient(api) as client:
             res = client.post("/api/v1/staging/merge", content=json.dumps(payload))
@@ -1196,9 +1159,6 @@ class TestStagingMergeEndpoint(TestCase):
         self.pr1.save()
 
         payload = {"staging_ids": [self.batch.id]}
-        from django_bolt.testing import TestClient
-        from obs_flow_server.api import api
-        import json
 
         with TestClient(api) as client:
             res = client.post("/api/v1/staging/merge", content=json.dumps(payload))

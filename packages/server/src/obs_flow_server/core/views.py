@@ -3,10 +3,8 @@ from django.core.paginator import Paginator
 from django.db.models import Q
 from django.shortcuts import render
 
-from core.models import Project, GitMapping
+from core.models import GitMapping
 from core.forms import GitMappingFilterForm
-from pull_requests.models import PullRequest
-from staging.models import StagingBatch
 
 
 def home(request):

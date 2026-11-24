@@ -3,7 +3,7 @@ from django.db.models import Q
 from django.conf import settings
 
 from core.models import Project
-from pull_requests.models import PullRequest, PullRequestRevision
+from pull_requests.models import PullRequestRevision
 from reviews.models import BaseReview
 
 

@@ -1,7 +1,6 @@
 import msgspec
 from asgiref.sync import sync_to_async
 from django.db import transaction
-from django_bolt import BoltAPI
 
 from obs_flow_common.messages import (
     GitMappingDetail,

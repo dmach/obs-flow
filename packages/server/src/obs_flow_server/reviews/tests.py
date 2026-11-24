@@ -1,7 +1,7 @@
 import os
 import json
 import msgspec
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 from django.test import TestCase, TransactionTestCase
 from django_bolt.testing import TestClient
 

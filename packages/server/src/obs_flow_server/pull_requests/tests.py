@@ -575,7 +575,7 @@ class TestPullRequestLatestRevisionAndTextId(TestCase):
 
     def test_latest_revision_returns_highest_revision_number(self):
         pr = self._make_pr()
-        rev1 = PullRequestRevision.objects.create(
+        PullRequestRevision.objects.create(
             pull_request=pr, revision_number=1, head_sha="1111", base_sha="0000", fingerprint="fp1"
         )
         rev2 = PullRequestRevision.objects.create(
@@ -612,7 +612,7 @@ class TestPullRequestReviewProvisioning(TestCase):
     fixtures = ["global_scope.json"]
     def test_provision_reviews_and_mark_ready_for_review(self):
         from reviews.models import ReviewConfig
-        from pull_requests.workflows import provision_reviews_for_revision, mark_ready_for_review
+        from pull_requests.workflows import mark_ready_for_review
 
         project = Project.objects.create(name="test:project")
         git_mapping = GitMapping.objects.create(owner="test", repo="repo", branch="main", project=project)
@@ -932,7 +932,7 @@ class TestPRSyncDebounceLifecycle(TransactionTestCase):
     @patch("urllib.request.urlopen")
     def test_sync_zero_debounce_publishes_immediately(self, mock_urlopen):
         project = Project.objects.create(name="suse:obs-flow")
-        git_mapping = GitMapping.objects.create(owner="suse", repo="obs-flow", branch="main", project=project)
+        GitMapping.objects.create(owner="suse", repo="obs-flow", branch="main", project=project)
         reviewer = User.objects.create(username="rev", username_lower="rev", account_type=User.AccountType.HUMAN)
         from reviews.models import ReviewConfig
         ReviewConfig.objects.create(project=project, type=ReviewConfig.ConfigType.PROJECT, reviewer_user=reviewer, scope=ReviewScope.objects.get(name="global"))

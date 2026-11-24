@@ -9,6 +9,7 @@ from accounts.helpers import build_user_dto
 from core.models import Project
 from pull_requests.models import PullRequest
 from pull_requests.workflows import execute_pr_merge
+from reviews.models import ReviewConfig
 from reviews.workflows import (
     get_or_create_review,
     initial_draft_state,
@@ -16,6 +17,7 @@ from reviews.workflows import (
     mark_ready,
     provision_reviews_for,
 )
+from staging.fingerprint import StagingBatchPayload
 from staging.models import (
     StagingBatch,
     StagingBatchRevision,
@@ -33,8 +35,6 @@ def compute_staging_fingerprint(pr_revisions) -> str:
     """
     Computes a deterministic SHA-256 fingerprint of the staging batch.
     """
-    from staging.fingerprint import StagingBatchPayload
-
     pr_fingerprints = []
     for pr_rev in pr_revisions:
         if not pr_rev.fingerprint:
@@ -92,7 +92,6 @@ def provision_reviews_for_staging_revision(revision: StagingBatchRevision) -> li
     Existing reviews are never re-provisioned.
     Evaluates scopes against changed files and supports decision inheritance.
     """
-    from reviews.models import ReviewConfig
     configs = ReviewConfig.objects.filter(project=revision.staging_batch.project, type="staging").select_related("scope")
     batch = revision.staging_batch
     prev_rev = (
@@ -107,6 +106,7 @@ def provision_reviews_for_staging_revision(revision: StagingBatchRevision) -> li
         revision_model=StagingBatchRevision,
         prev_rev=prev_rev,
     )
+
 
 
 def mark_staging_ready_for_review(revision: StagingBatchRevision) -> None:

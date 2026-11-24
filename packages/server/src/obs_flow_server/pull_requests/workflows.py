@@ -12,7 +12,9 @@ from accounts.helpers import build_user_dto
 from accounts.models import User
 from core.gitea import merge_pull_request
 from core.models import GitMapping, Project
+from pull_requests.fingerprint import PRRevisionPayload
 from pull_requests.models import PullRequest, PullRequestRevision, PullRequestReview
+from reviews.models import ReviewConfig
 from reviews.workflows import initial_draft_state, mark_draft as _mark_draft, mark_ready, provision_reviews_for
 
 
@@ -28,8 +30,6 @@ def provision_reviews_for_revision(revision: PullRequestRevision) -> list[PullRe
     Existing reviews are never re-provisioned.
     Evaluates scopes against changed files and supports decision inheritance.
     """
-    from reviews.models import ReviewConfig
-
     pr = revision.pull_request
     git_mapping = pr.target
     project = git_mapping.target_project
@@ -206,8 +206,6 @@ def sync_pull_request(req: PRSyncRequest) -> PRSyncResponse:
         pr.save()
 
     # Check revisions
-    from pull_requests.fingerprint import PRRevisionPayload
-
     pr_payload = PRRevisionPayload(
         head_sha=head_sha,
         base_sha=base_sha,
@@ -286,10 +284,7 @@ def merge_pull_requests(pr_text_ids: list[str]) -> tuple[list[PRDetail], list[st
 
         # Lock PRs in deterministic DB id order to prevent deadlocks
         resolved_db_ids = sorted(p.id for p in prs_by_text_id.values())
-        locked_prs = {
-            p.id: p
-            for p in PullRequest.objects.select_for_update().filter(id__in=resolved_db_ids).order_by("id")
-        }
+        list(PullRequest.objects.select_for_update().filter(id__in=resolved_db_ids).order_by("id"))
 
         prs_to_merge = []
         # Validate all PRs and collect all errors
