@@ -7,20 +7,20 @@ from django.utils import timezone
 from django.views.decorators.http import require_POST
 
 from accounts.models import User
-from core.gitea import merge_pull_request
 from core.htmx import close_modal_and_refresh
 from core.models import Project
 from pull_requests.models import PullRequest
-from staging.models import StagingBatch, StagingReview
+from staging.models import StagingBatch
 from staging.forms import StagingBatchFilterForm
 from staging.workflows import (
     batch_member_prs,
+    execute_staging_merge,
     find_conflicts,
     mark_staging_draft,
     mark_staging_ready_for_review,
     rebuild_batch_revision,
-    staging_merge_blockers,
     update_batch,
+    validate_staging_merge,
 )
 
 
@@ -157,10 +157,7 @@ def staging_detail(request, batch_id):
             )
 
     reviews = latest_revision.reviews.all() if latest_revision else []
-    can_merge = False
-    if latest_revision and not latest_revision.is_draft and batch.state != StagingBatch.State.MERGED:
-        if reviews.exists() and not reviews.exclude(state__in=[StagingReview.State.ACCEPTED, StagingReview.State.OVERRIDDEN]).exists():
-            can_merge = True
+    can_merge = validate_staging_merge(batch) == []
 
     return render(
         request,
@@ -357,40 +354,17 @@ def staging_convert_to_draft(request, batch_id):
 @require_POST
 def staging_merge_action(request, batch_id):
     batch = get_object_or_404(StagingBatch, id=batch_id)
-    if batch.state == StagingBatch.State.MERGED:
-        messages.error(request, f"Staging batch #{batch.id} is already merged.")
+    reasons = validate_staging_merge(batch)
+    if reasons:
+        messages.error(request, "; ".join(reasons))
         return redirect("staging_detail", batch_id=batch.id)
 
-    latest_rev = batch.latest_revision
-    if not latest_rev:
-        messages.error(request, f"Staging batch #{batch.id} has no revisions.")
-        return redirect("staging_detail", batch_id=batch.id)
+    try:
+        execute_staging_merge(batch)
+        messages.success(request, f"Staging batch #{batch.id} merged successfully.")
+    except Exception as e:
+        messages.error(request, str(e))
 
-    if latest_rev.is_draft:
-        messages.error(request, f"Staging batch #{batch.id} is currently in draft mode and cannot be merged.")
-        return redirect("staging_detail", batch_id=batch.id)
-
-    unapproved = latest_rev.reviews.exclude(state__in=[StagingReview.State.ACCEPTED, StagingReview.State.OVERRIDDEN])
-    if unapproved.exists():
-        names = [str(r.reviewer_user or r.reviewer_group or r.dynamic_role) for r in unapproved]
-        messages.error(request, f"Cannot merge staging batch #{batch.id}: unapproved reviews: {', '.join(names)}.")
-        return redirect("staging_detail", batch_id=batch.id)
-
-    prs = [bpr.pull_request_revision.pull_request for bpr in latest_rev.revision_pull_requests.all()]
-    for pr in prs:
-        if pr.state != PullRequest.State.MERGED:
-            try:
-                merge_pull_request(pr.target.owner, pr.target.repo, pr.number)
-                pr.state = PullRequest.State.MERGED
-                pr.save(update_fields=["state"])
-            except Exception as e:
-                messages.error(request, f"Failed to merge PR #{pr.number}: {e}")
-                return redirect("staging_detail", batch_id=batch.id)
-
-    batch.state = StagingBatch.State.MERGED
-    batch.closed_at = timezone.now()
-    batch.save(update_fields=["state", "closed_at"])
-    messages.success(request, f"Staging batch #{batch.id} merged successfully.")
     return redirect("staging_detail", batch_id=batch.id)
 
 
@@ -404,34 +378,15 @@ def staging_bulk_merge(request):
 
     merged_count = 0
     errors = []
-    for b_id in batch_ids:
+    for b_id in sorted(set(batch_ids)):
         try:
             batch = get_object_or_404(StagingBatch, id=b_id)
-            if batch.state == StagingBatch.State.MERGED:
-                errors.append(f"Batch #{batch.id}: Already merged.")
+            reasons = validate_staging_merge(batch)
+            if reasons:
+                errors.append(f"Batch #{batch.id}: {'; '.join(reasons)}")
                 continue
 
-            latest_rev = batch.latest_revision
-            if not latest_rev or latest_rev.is_draft:
-                errors.append(f"Batch #{batch.id}: In draft or no revisions.")
-                continue
-
-            unapproved = latest_rev.reviews.exclude(state__in=[StagingReview.State.ACCEPTED, StagingReview.State.OVERRIDDEN])
-            if unapproved.exists():
-                names = [str(r.reviewer_user or r.reviewer_group or r.dynamic_role) for r in unapproved]
-                errors.append(f"Batch #{batch.id}: Unapproved reviews: {', '.join(names)}.")
-                continue
-
-            prs = [bpr.pull_request_revision.pull_request for bpr in latest_rev.revision_pull_requests.all()]
-            for pr in prs:
-                if pr.state != PullRequest.State.MERGED:
-                    merge_pull_request(pr.target.owner, pr.target.repo, pr.number)
-                    pr.state = PullRequest.State.MERGED
-                    pr.save(update_fields=["state"])
-
-            batch.state = StagingBatch.State.MERGED
-            batch.closed_at = timezone.now()
-            batch.save(update_fields=["state", "closed_at"])
+            execute_staging_merge(batch)
             merged_count += 1
         except Exception as e:
             errors.append(str(e))
@@ -453,15 +408,16 @@ def staging_ui_modal_check_merge(request):
     for b_id in batch_ids:
         try:
             batch = StagingBatch.objects.get(id=b_id)
-            can_merge, error, reviews, prs = staging_merge_blockers(batch)
+            reasons = validate_staging_merge(batch)
+            latest_rev = batch.latest_revision
             items.append({
                 "batch": batch,
-                "can_merge": can_merge,
-                "error": error,
-                "reviews": reviews,
-                "prs": prs,
+                "can_merge": not reasons,
+                "error": "; ".join(reasons),
+                "reviews": list(latest_rev.reviews.all()) if latest_rev else [],
+                "prs": batch_member_prs(batch),
             })
-            if can_merge:
+            if not reasons:
                 mergeable_batches.append(batch)
         except StagingBatch.DoesNotExist:
             continue
@@ -489,20 +445,12 @@ def staging_ui_modal_execute_merge(request):
     for b_id in batch_ids:
         try:
             batch = StagingBatch.objects.get(id=b_id)
-            can_merge, error, _, prs = staging_merge_blockers(batch)
-            if not can_merge:
-                errors.append(f"Batch #{batch.id}: {error}")
+            reasons = validate_staging_merge(batch)
+            if reasons:
+                errors.append(f"Batch #{batch.id}: {'; '.join(reasons)}")
                 continue
 
-            for pr in prs:
-                if pr.state != PullRequest.State.MERGED:
-                    merge_pull_request(pr.target.owner, pr.target.repo, pr.number)
-                    pr.state = PullRequest.State.MERGED
-                    pr.save(update_fields=["state"])
-
-            batch.state = StagingBatch.State.MERGED
-            batch.closed_at = timezone.now()
-            batch.save(update_fields=["state", "closed_at"])
+            execute_staging_merge(batch)
             merged_count += 1
         except Exception as e:
             errors.append(f"Batch #{b_id}: {e}")

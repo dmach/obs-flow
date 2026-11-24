@@ -88,24 +88,31 @@ def pr_to_detail(pr: PullRequest, latest_revision: PullRequestRevision | None = 
     )
 
 
-def pr_merge_blockers(pr: PullRequest) -> tuple[bool, str | None, list[str]]:
-    warnings = []
+def validate_pr_merge(pr: PullRequest) -> list[str]:
+    """
+    Returns all blocking reasons for merging this PR; an empty list means it may be merged.
+    """
+    errors = []
+
     target_project = pr.target_project
     if target_project and target_project.workflow_type == Project.WorkflowType.STAGING:
-        return False, f"Project '{target_project.name}' uses the staging workflow. Direct merges are disabled.", []
+        errors.append(
+            f"Direct merges are not allowed for project '{target_project.name}' because it uses the staging workflow. "
+            "Please merge via a staging batch."
+        )
 
     if pr.state == PullRequest.State.MERGED:
-        return False, f"Pull request #{pr.number} is already merged.", []
+        errors.append(f"Pull request {pr.text_id} is already merged.")
 
     if pr.state == PullRequest.State.CLOSED:
-        return False, f"Pull request #{pr.number} is closed.", []
+        errors.append(f"Pull request #{pr.number} is closed.")
 
     latest_rev = pr.latest_revision
     if pr.is_draft or (latest_rev and latest_rev.is_draft):
-        return False, f"Pull request #{pr.number} is in draft mode and cannot be merged.", []
+        errors.append(f"Pull request {pr.text_id} is in draft mode and cannot be merged.")
 
     if pr.is_mergeable is False:
-        return False, f"Pull request #{pr.number} has merge conflicts and cannot be merged.", []
+        errors.append(f"Pull request #{pr.number} has merge conflicts and cannot be merged.")
 
     if latest_rev:
         reviews = latest_rev.reviews.all()
@@ -113,9 +120,9 @@ def pr_merge_blockers(pr: PullRequest) -> tuple[bool, str | None, list[str]]:
             unapproved = reviews.exclude(state__in=[PullRequestReview.State.ACCEPTED, PullRequestReview.State.OVERRIDDEN])
             if unapproved.exists():
                 names = [r.reviewer_name for r in unapproved]
-                return False, f"Reviews not approved: {', '.join(names)}.", []
+                errors.append(f"Reviews not approved: {', '.join(names)}.")
 
-    return True, None, warnings
+    return errors
 
 
 # =====================================================================
@@ -254,6 +261,17 @@ def sync_pull_request(req: PRSyncRequest) -> PRSyncResponse:
     )
 
 
+def execute_pr_merge(pr: PullRequest) -> None:
+    """
+    Merges the PR on the forge via core.gitea, then marks it MERGED.
+    Raises ValueError on forge failure (contract unchanged until P1).
+    Callers decide locking; this function does not lock.
+    """
+    merge_pull_request(pr.target.owner, pr.target.repo, pr.number)
+    pr.state = PullRequest.State.MERGED
+    pr.save(update_fields=["state"])
+
+
 def merge_pull_requests(pr_text_ids: list[str]) -> tuple[list[PRDetail], list[str]]:
     with transaction.atomic():
         # First resolve PR objects to get DB IDs for deterministic ordering
@@ -280,21 +298,9 @@ def merge_pull_requests(pr_text_ids: list[str]) -> tuple[list[PRDetail], list[st
             if not pr:
                 continue
 
-            target_project = pr.target_project
-            if target_project and target_project.workflow_type == Project.WorkflowType.STAGING:
-                errors.append(
-                    f"Direct merges are not allowed for project '{target_project.name}' because it uses the staging workflow. "
-                    "Please merge via a staging batch."
-                )
-                continue
-
-            if pr.state == PullRequest.State.MERGED:
-                errors.append(f"Pull request {pr_id} is already merged.")
-                continue
-
-            latest_revision = pr.latest_revision
-            if pr.is_draft or (latest_revision and latest_revision.is_draft):
-                errors.append(f"Pull request {pr_id} is in draft mode and cannot be merged.")
+            reasons = validate_pr_merge(pr)
+            if reasons:
+                errors.extend(reasons)
                 continue
 
             prs_to_merge.append((pr_id, pr))
@@ -306,12 +312,9 @@ def merge_pull_requests(pr_text_ids: list[str]) -> tuple[list[PRDetail], list[st
         updated_prs = []
         for pr_id, pr in prs_to_merge:
             try:
-                merge_pull_request(pr.target.owner, pr.target.repo, pr.number)
+                execute_pr_merge(pr)
             except ValueError as e:
                 return [], [str(e)]
-
-            pr.state = PullRequest.State.MERGED
-            pr.save(update_fields=["state"])
 
             latest_revision = pr.latest_revision
             updated_prs.append(pr_to_detail(pr, latest_revision, id=pr_id))

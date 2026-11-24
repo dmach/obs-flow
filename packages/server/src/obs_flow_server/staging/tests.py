@@ -1174,6 +1174,40 @@ class TestStagingMergeEndpoint(TestCase):
         self.assertIn(f"Staging batch #{batch2.id} cannot be merged because the following reviews are not approved", res.text)
         self.assertIn("Staging batch #999 does not exist.", res.text)
 
+    def test_staging_merge_blocked_member_draft(self):
+        self.pr1_rev.is_draft = True
+        self.pr1_rev.save()
+
+        payload = {"staging_ids": [self.batch.id]}
+        from django_bolt.testing import TestClient
+        from obs_flow_server.api import api
+        import json
+
+        with TestClient(api) as client:
+            res = client.post("/api/v1/staging/merge", content=json.dumps(payload))
+        self.assertEqual(res.status_code, 400)
+        self.assertIn("in batch is in draft mode", res.text)
+
+        self.batch.refresh_from_db()
+        self.assertNotEqual(self.batch.state, StagingBatch.State.MERGED)
+
+    def test_staging_merge_blocked_member_conflict(self):
+        self.pr1.is_mergeable = False
+        self.pr1.save()
+
+        payload = {"staging_ids": [self.batch.id]}
+        from django_bolt.testing import TestClient
+        from obs_flow_server.api import api
+        import json
+
+        with TestClient(api) as client:
+            res = client.post("/api/v1/staging/merge", content=json.dumps(payload))
+        self.assertEqual(res.status_code, 400)
+        self.assertIn("in batch has merge conflicts", res.text)
+
+        self.batch.refresh_from_db()
+        self.assertNotEqual(self.batch.state, StagingBatch.State.MERGED)
+
 
 class TestStagingWebMergeActions(TestCase):
     fixtures = ["global_scope.json"]
@@ -1276,7 +1310,7 @@ class TestStagingWebMergeActions(TestCase):
         self.assertEqual(res.status_code, 200)
         self.assertContains(res, "Confirm Staging Batch Merge")
         self.assertContains(res, "Cannot merge")
-        self.assertContains(res, "Unapproved reviews")
+        self.assertContains(res, "reviews are not approved")
         self.assertNotContains(res, "Confirm Merge")
 
         # Approve review -> Ready to merge
@@ -1306,3 +1340,48 @@ class TestStagingWebMergeActions(TestCase):
         self.assertEqual(self.batch.state, StagingBatch.State.MERGED)
         self.pr.refresh_from_db()
         self.assertEqual(self.pr.state, PullRequest.State.MERGED)
+
+    @override_settings(GITEA_URL="https://gitea.example.com", GITEA_TOKEN="secret-token")
+    @patch("urllib.request.urlopen")
+    def test_staging_merge_action_rejects_member_draft(self, mock_urlopen):
+        self.review.state = StagingReview.State.ACCEPTED
+        self.review.save()
+        self.pr_rev.is_draft = True
+        self.pr_rev.save()
+
+        client = Client()
+        res = client.post(f"/staging/{self.batch.id}/merge/")
+        self.assertRedirects(res, f"/staging/{self.batch.id}/")
+
+        self.batch.refresh_from_db()
+        self.assertNotEqual(self.batch.state, StagingBatch.State.MERGED)
+        mock_urlopen.assert_not_called()
+
+    @override_settings(GITEA_URL="https://gitea.example.com", GITEA_TOKEN="secret-token")
+    @patch("urllib.request.urlopen")
+    def test_staging_bulk_merge_view_rejects_member_conflict(self, mock_urlopen):
+        self.review.state = StagingReview.State.ACCEPTED
+        self.review.save()
+        self.pr.is_mergeable = False
+        self.pr.save()
+
+        client = Client()
+        res = client.post("/staging/bulk-merge/", {"selected_batches": [self.batch.id]})
+        self.assertRedirects(res, "/staging/")
+
+        self.batch.refresh_from_db()
+        self.assertNotEqual(self.batch.state, StagingBatch.State.MERGED)
+        mock_urlopen.assert_not_called()
+
+    def test_staging_ui_modal_check_merge_shows_all_reasons(self):
+        # Unapproved review + member PR in draft -> both reasons shown
+        self.pr_rev.is_draft = True
+        self.pr_rev.save()
+
+        client = Client()
+        res = client.post("/staging/ui/modal/check-merge/", {"selected_batches": [self.batch.id]})
+        self.assertEqual(res.status_code, 200)
+        self.assertContains(res, "Cannot merge")
+        self.assertContains(res, "reviews are not approved")
+        self.assertContains(res, "in batch is in draft mode")
+        self.assertNotContains(res, "Confirm Merge")

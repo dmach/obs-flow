@@ -8,12 +8,10 @@ from django.utils import timezone
 from django.views.decorators.csrf import ensure_csrf_cookie
 from django.views.decorators.http import require_POST
 
-from core.gitea import merge_pull_request
 from core.htmx import close_modal_and_refresh
-from core.models import Project
 from pull_requests.models import PullRequest
 from pull_requests.forms import PullRequestFilterForm
-from pull_requests.workflows import mark_draft, mark_ready_for_review, pr_merge_blockers
+from pull_requests.workflows import execute_pr_merge, mark_draft, mark_ready_for_review, validate_pr_merge
 
 
 @ensure_csrf_cookie
@@ -219,21 +217,13 @@ def pr_convert_to_draft(request, pr_id):
 @require_POST
 def pr_merge_action(request, pr_id):
     pr = get_object_or_404(PullRequest, id=pr_id)
-    if pr.target_project and pr.target_project.workflow_type == Project.WorkflowType.STAGING:
-        messages.error(
-            request,
-            f"Direct merges are not allowed for project '{pr.target_project.name}'. This PR must be merged via a staging batch."
-        )
-        return redirect("pr_detail", pr_id=pr.id)
-
-    if pr.state == PullRequest.State.MERGED:
-        messages.error(request, f"Pull request #{pr.number} is already merged.")
+    reasons = validate_pr_merge(pr)
+    if reasons:
+        messages.error(request, "; ".join(reasons))
         return redirect("pr_detail", pr_id=pr.id)
 
     try:
-        merge_pull_request(pr.target.owner, pr.target.repo, pr.number)
-        pr.state = PullRequest.State.MERGED
-        pr.save(update_fields=["state"])
+        execute_pr_merge(pr)
         messages.success(request, f"Pull request #{pr.number} merged successfully.")
     except Exception as e:
         messages.error(request, str(e))
@@ -254,16 +244,12 @@ def pr_bulk_merge(request):
     for pr_id in pr_ids:
         try:
             pr = get_object_or_404(PullRequest, id=pr_id)
-            if pr.target_project and pr.target_project.workflow_type == Project.WorkflowType.STAGING:
-                errors.append(f"PR #{pr.number}: Direct merges disabled for project '{pr.target_project.name}'.")
-                continue
-            if pr.state == PullRequest.State.MERGED:
-                errors.append(f"PR #{pr.number}: Already merged.")
+            reasons = validate_pr_merge(pr)
+            if reasons:
+                errors.append(f"PR #{pr.number}: {'; '.join(reasons)}")
                 continue
 
-            merge_pull_request(pr.target.owner, pr.target.repo, pr.number)
-            pr.state = PullRequest.State.MERGED
-            pr.save(update_fields=["state"])
+            execute_pr_merge(pr)
             merged_count += 1
         except Exception as e:
             errors.append(str(e))
@@ -287,14 +273,13 @@ def pr_ui_modal_check_merge(request):
     for pr_id in pr_ids:
         try:
             pr = PullRequest.objects.get(id=pr_id)
-            can_merge, error, warnings = pr_merge_blockers(pr)
+            reasons = validate_pr_merge(pr)
             items.append({
                 "pr": pr,
-                "can_merge": can_merge,
-                "error": error,
-                "warnings": warnings,
+                "can_merge": not reasons,
+                "error": "; ".join(reasons),
             })
-            if can_merge:
+            if not reasons:
                 mergeable_prs.append(pr)
         except PullRequest.DoesNotExist:
             continue
@@ -322,14 +307,12 @@ def pr_ui_modal_execute_merge(request):
     for pr_id in pr_ids:
         try:
             pr = PullRequest.objects.get(id=pr_id)
-            can_merge, error, _ = pr_merge_blockers(pr)
-            if not can_merge:
-                errors.append(f"PR #{pr.number}: {error}")
+            reasons = validate_pr_merge(pr)
+            if reasons:
+                errors.append(f"PR #{pr.number}: {'; '.join(reasons)}")
                 continue
 
-            merge_pull_request(pr.target.owner, pr.target.repo, pr.number)
-            pr.state = PullRequest.State.MERGED
-            pr.save(update_fields=["state"])
+            execute_pr_merge(pr)
             merged_count += 1
         except Exception as e:
             errors.append(f"PR #{pr_id}: {e}")

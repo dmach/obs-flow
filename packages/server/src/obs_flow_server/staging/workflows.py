@@ -6,9 +6,9 @@ from django.utils import timezone
 from obs_flow_common.messages import StagingDetail
 
 from accounts.helpers import build_user_dto
-from core.gitea import merge_pull_request
 from core.models import Project
 from pull_requests.models import PullRequest
+from pull_requests.workflows import execute_pr_merge
 from reviews.workflows import (
     get_or_create_review,
     initial_draft_state,
@@ -190,31 +190,37 @@ def find_conflicts(batch: StagingBatch, prs: list[PullRequest]) -> list[dict]:
     return conflicts
 
 
-def staging_merge_blockers(batch: StagingBatch) -> tuple[bool, str | None, list, list]:
+def validate_staging_merge(batch: StagingBatch) -> list[str]:
+    """
+    Returns all blocking reasons for merging this staging batch; an empty list means it may be merged.
+    """
+    errors = []
+
     if batch.state == StagingBatch.State.MERGED:
-        return False, "Staging batch is already merged.", [], []
+        errors.append(f"Staging batch #{batch.id} is already merged.")
 
     latest_rev = batch.latest_revision
     if not latest_rev:
-        return False, "Staging batch has no revisions.", [], []
+        errors.append(f"Staging batch #{batch.id} has no revisions.")
+        return errors
 
     if latest_rev.is_draft:
-        return False, "Staging batch is currently in draft mode and cannot be merged.", [], []
+        errors.append(f"Staging batch #{batch.id} is currently in draft mode and cannot be merged.")
 
-    reviews = list(latest_rev.reviews.all())
     unapproved = latest_rev.reviews.exclude(state__in=[StagingReview.State.ACCEPTED, StagingReview.State.OVERRIDDEN])
     if unapproved.exists():
-        names = [r.reviewer_name for r in unapproved]
-        return False, f"Unapproved reviews: {', '.join(names)}.", reviews, []
+        unapproved_names = [str(r.reviewer_user or r.reviewer_group or r.dynamic_role) for r in unapproved]
+        errors.append(
+            f"Staging batch #{batch.id} cannot be merged because the following reviews are not approved: {', '.join(unapproved_names)}."
+        )
 
-    prs = [bpr.pull_request_revision.pull_request for bpr in latest_rev.revision_pull_requests.all()]
-    for pr in prs:
+    for pr in batch_member_prs(batch):
         if pr.is_draft:
-            return False, f"Pull request #{pr.number} in batch is in draft mode.", reviews, prs
+            errors.append(f"Pull request #{pr.number} in batch is in draft mode.")
         if pr.is_mergeable is False:
-            return False, f"Pull request #{pr.number} in batch has merge conflicts.", reviews, prs
+            errors.append(f"Pull request #{pr.number} in batch has merge conflicts.")
 
-    return True, None, reviews, prs
+    return errors
 
 
 # =====================================================================
@@ -335,6 +341,25 @@ def rebuild_batches_for_pr_revision(pr: PullRequest, new_pr_revision) -> None:
                 create_staging_revision(batch, updated_pr_revs)
 
 
+def execute_staging_merge(batch: StagingBatch) -> None:
+    """
+    Merges all non-merged member PRs of the batch on the forge via execute_pr_merge,
+    then closes the batch (state=MERGED, closed_at). Callers must validate via
+    validate_staging_merge first; this function locks the batch.
+    Raises ValueError on forge failure (contract unchanged until P1).
+    """
+    locked = StagingBatch.objects.select_for_update().get(pk=batch.pk)
+    for pr in batch_member_prs(locked):
+        if pr.state != PullRequest.State.MERGED:
+            execute_pr_merge(pr)
+
+    locked.state = StagingBatch.State.MERGED
+    locked.closed_at = timezone.now()
+    locked.save(update_fields=["state", "closed_at"])
+    batch.state = locked.state
+    batch.closed_at = locked.closed_at
+
+
 def merge_batches(staging_ids: list[int]) -> tuple[list[StagingDetail], list[str]]:
     sorted_ids = sorted(set(staging_ids))
 
@@ -355,60 +380,23 @@ def merge_batches(staging_ids: list[int]) -> tuple[list[StagingDetail], list[str
                 errors.append(f"Staging batch #{batch_id} does not exist.")
                 continue
 
-            if batch.state == StagingBatch.State.MERGED:
-                errors.append(f"Staging batch #{batch_id} is already merged.")
+            reasons = validate_staging_merge(batch)
+            if reasons:
+                errors.extend(reasons)
                 continue
 
-            latest_rev = batch.latest_revision
-            if not latest_rev:
-                errors.append(f"Staging batch #{batch_id} has no revisions.")
-                continue
-
-            if latest_rev.is_draft:
-                errors.append(f"Staging batch #{batch_id} is currently in draft mode and cannot be merged.")
-                continue
-
-            # Validate that all reviews on the latest revision are resolved (ACCEPTED or OVERRIDDEN)
-            reviews = latest_rev.reviews.all()
-            unapproved_reviews = reviews.exclude(
-                state__in=[StagingReview.State.ACCEPTED, StagingReview.State.OVERRIDDEN]
-            )
-            if unapproved_reviews.exists():
-                unapproved_names = [
-                    str(r.reviewer_user or r.reviewer_group or r.dynamic_role)
-                    for r in unapproved_reviews
-                ]
-                errors.append(
-                    f"Staging batch #{batch_id} cannot be merged because the following reviews are not approved: {', '.join(unapproved_names)}."
-                )
-                continue
-
-            batches_to_merge.append((batch, latest_rev))
+            batches_to_merge.append(batch)
 
         if errors:
             return [], errors
 
         # 2. Execution pass: all batches validated, now perform atomic merges
         updated_batches = []
-        for batch, latest_rev in batches_to_merge:
-            batch_prs = [
-                bpr.pull_request_revision.pull_request
-                for bpr in latest_rev.revision_pull_requests.all()
-            ]
-
-            for pr in batch_prs:
-                if pr.state != PullRequest.State.MERGED:
-                    try:
-                        merge_pull_request(pr.target.owner, pr.target.repo, pr.number)
-                    except ValueError as e:
-                        return [], [str(e)]
-                    pr.state = PullRequest.State.MERGED
-                    pr.save(update_fields=["state"])
-
-            # Update batch state and closed_at
-            batch.state = StagingBatch.State.MERGED
-            batch.closed_at = timezone.now()
-            batch.save(update_fields=["state", "closed_at"])
+        for batch in batches_to_merge:
+            try:
+                execute_staging_merge(batch)
+            except ValueError as e:
+                return [], [str(e)]
 
             updated_batches.append(batch_to_detail(batch))
 
