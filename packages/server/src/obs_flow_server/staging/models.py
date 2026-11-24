@@ -3,7 +3,7 @@ from django.db.models import Q
 from django.conf import settings
 
 from core.models import Project
-from pull_requests.models import PullRequest, PullRequestRevision
+from pull_requests.models import PullRequestRevision
 from reviews.models import BaseReview
 
 
@@ -45,8 +45,12 @@ class StagingBatch(models.Model):
         ]
 
     @property
+    def latest_revision(self) -> "StagingBatchRevision | None":
+        return self.revisions.order_by("-revision_number").first()
+
+    @property
     def is_draft(self) -> bool:
-        latest = self.revisions.order_by("-revision_number").first()
+        latest = self.latest_revision
         return latest.is_draft if latest else False
 
     def __str__(self):

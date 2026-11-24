@@ -228,7 +228,7 @@ class TestPRSyncEndpoint(TransactionTestCase):
         self.assertEqual(latest_revision.reviews.count(), 0)
 
         # Transition out of draft mode and verify reviews are now created
-        from pull_requests.api import mark_ready_for_review
+        from pull_requests.workflows import mark_ready_for_review
         mark_ready_for_review(latest_revision)
         pr.refresh_from_db()
         self.assertFalse(pr.is_draft)
@@ -326,7 +326,7 @@ class TestPRSyncEndpoint(TransactionTestCase):
         self.assertEqual(latest_revision.reviews.count(), 0)
 
         # Transition out of draft mode and verify review was created for the new revision and it is the package config, not project config
-        from pull_requests.api import mark_ready_for_review
+        from pull_requests.workflows import mark_ready_for_review
         mark_ready_for_review(latest_revision)
         self.assertEqual(latest_revision.reviews.count(), 1)
         review = latest_revision.reviews.first()
@@ -555,11 +555,64 @@ class TestPullRequestRevisionModel(TestCase):
         self.assertEqual(rev2.draft_expires_at, expiry)
 
 
+class TestPullRequestLatestRevisionAndTextId(TestCase):
+    def _make_pr(self, number=1):
+        project = Project.objects.create(name=f"test:project-{number}")
+        git_mapping = GitMapping.objects.create(
+            owner="test", repo="repo", branch="main", project=project
+        )
+        author = User.objects.create(
+            username=f"author{number}", username_lower=f"author{number}", account_type=User.AccountType.HUMAN
+        )
+        return PullRequest.objects.create(
+            target=git_mapping,
+            number=number,
+            author=author,
+            source_owner=f"author{number}",
+            source_repo="repo",
+            source_branch="feat",
+        )
+
+    def test_latest_revision_returns_highest_revision_number(self):
+        pr = self._make_pr()
+        PullRequestRevision.objects.create(
+            pull_request=pr, revision_number=1, head_sha="1111", base_sha="0000", fingerprint="fp1"
+        )
+        rev2 = PullRequestRevision.objects.create(
+            pull_request=pr, revision_number=2, head_sha="2222", base_sha="0000", fingerprint="fp2"
+        )
+        self.assertEqual(pr.latest_revision, rev2)
+
+    def test_latest_revision_none_without_revisions(self):
+        pr = self._make_pr(number=2)
+        self.assertIsNone(pr.latest_revision)
+
+    def test_is_draft_mirrors_latest_revision(self):
+        pr = self._make_pr(number=3)
+        self.assertFalse(pr.is_draft)
+        PullRequestRevision.objects.create(
+            pull_request=pr, revision_number=1, head_sha="1111", base_sha="0000", fingerprint="fp1", is_draft=True
+        )
+        self.assertTrue(pr.is_draft)
+        PullRequestRevision.objects.create(
+            pull_request=pr, revision_number=2, head_sha="2222", base_sha="0000", fingerprint="fp2", is_draft=False
+        )
+        self.assertFalse(pr.is_draft)
+
+    def test_text_id_format_and_round_trip(self):
+        from obs_flow_common.pull_requests import pull_request_parse_text_id
+
+        pr = self._make_pr(number=42)
+        self.assertEqual(pr.text_id, "test/repo#42")
+        self.assertEqual(pull_request_parse_text_id(pr.text_id), ("test", "repo", 42))
+        self.assertEqual(PullRequest.objects.get_by_text_id(pr.text_id), pr)
+
+
 class TestPullRequestReviewProvisioning(TestCase):
     fixtures = ["global_scope.json"]
     def test_provision_reviews_and_mark_ready_for_review(self):
         from reviews.models import ReviewConfig
-        from pull_requests.api import provision_reviews_for_revision, mark_ready_for_review
+        from pull_requests.workflows import mark_ready_for_review
 
         project = Project.objects.create(name="test:project")
         git_mapping = GitMapping.objects.create(owner="test", repo="repo", branch="main", project=project)
@@ -607,7 +660,7 @@ class TestPullRequestReviewProvisioning(TestCase):
 
     def test_provision_reviews_wires_dependencies(self):
         from reviews.models import ReviewConfig
-        from pull_requests.api import provision_reviews_for_revision
+        from pull_requests.workflows import provision_reviews_for_revision
 
         project = Project.objects.create(name="test:deps-project")
         git_mapping = GitMapping.objects.create(owner="test", repo="repo", branch="main", project=project)
@@ -660,7 +713,7 @@ class TestPullRequestReviewProvisioning(TestCase):
 
     def test_cascading_unblocking_on_approval(self):
         from reviews.models import ReviewConfig
-        from pull_requests.api import provision_reviews_for_revision
+        from pull_requests.workflows import provision_reviews_for_revision
 
         project = Project.objects.create(name="test:cascade-pr")
         git_mapping = GitMapping.objects.create(owner="test", repo="repo", branch="main", project=project)
@@ -738,7 +791,7 @@ class TestPullRequestReviewProvisioning(TestCase):
 
     def test_early_approval_of_waiting_review(self):
         from reviews.models import ReviewConfig
-        from pull_requests.api import provision_reviews_for_revision
+        from pull_requests.workflows import provision_reviews_for_revision
 
         project = Project.objects.create(name="test:early-pr")
         git_mapping = GitMapping.objects.create(owner="test", repo="repo", branch="main", project=project)
@@ -879,7 +932,7 @@ class TestPRSyncDebounceLifecycle(TransactionTestCase):
     @patch("urllib.request.urlopen")
     def test_sync_zero_debounce_publishes_immediately(self, mock_urlopen):
         project = Project.objects.create(name="suse:obs-flow")
-        git_mapping = GitMapping.objects.create(owner="suse", repo="obs-flow", branch="main", project=project)
+        GitMapping.objects.create(owner="suse", repo="obs-flow", branch="main", project=project)
         reviewer = User.objects.create(username="rev", username_lower="rev", account_type=User.AccountType.HUMAN)
         from reviews.models import ReviewConfig
         ReviewConfig.objects.create(project=project, type=ReviewConfig.ConfigType.PROJECT, reviewer_user=reviewer, scope=ReviewScope.objects.get(name="global"))
@@ -1290,6 +1343,8 @@ class TestMarkExpiredDraftsReadyCommand(TestCase):
 
 
 class TestPRMergeEndpoint(TestCase):
+    fixtures = ["global_scope.json"]
+
     def setUp(self):
         self.project_direct = Project.objects.create(name="test:direct", workflow_type=Project.WorkflowType.DIRECT)
         self.mapping_direct = GitMapping.objects.create(owner="suse", repo="direct-repo", branch="main", project=self.project_direct)
@@ -1392,8 +1447,75 @@ class TestPRMergeEndpoint(TestCase):
         self.assertIn("Direct merges are not allowed", res.text)
         self.assertIn("does not exist", res.text)
 
+    def test_api_merge_blocked_closed_pr(self):
+        self.pr_direct.state = PullRequest.State.CLOSED
+        self.pr_direct.save()
+
+        payload = {"pull_request_ids": ["suse/direct-repo#1"]}
+        with TestClient(api) as client:
+            res = client.post("/api/v1/pr/merge", content=json.dumps(payload))
+        self.assertEqual(res.status_code, 400)
+        self.assertIn("is closed", res.text)
+
+        self.pr_direct.refresh_from_db()
+        self.assertEqual(self.pr_direct.state, PullRequest.State.CLOSED)
+
+    def test_api_merge_blocked_conflicting_pr(self):
+        self.pr_direct.is_mergeable = False
+        self.pr_direct.save()
+
+        payload = {"pull_request_ids": ["suse/direct-repo#1"]}
+        with TestClient(api) as client:
+            res = client.post("/api/v1/pr/merge", content=json.dumps(payload))
+        self.assertEqual(res.status_code, 400)
+        self.assertIn("merge conflicts", res.text)
+
+        self.pr_direct.refresh_from_db()
+        self.assertNotEqual(self.pr_direct.state, PullRequest.State.MERGED)
+
+    def test_api_merge_blocked_unapproved_review(self):
+        rev = PullRequestRevision.objects.create(
+            pull_request=self.pr_direct,
+            revision_number=1,
+            head_sha="aaaa",
+            base_sha="0000",
+            fingerprint="fp-merger",
+            is_draft=False,
+            draft_expires_at=None,
+        )
+        reviewer = User.objects.create(username="api_reviewer", username_lower="api_reviewer", account_type=User.AccountType.HUMAN)
+        PullRequestReview.objects.create(
+            revision=rev,
+            reviewer_user=reviewer,
+            state=PullRequestReview.State.PENDING,
+            scope=ReviewScope.objects.get(name="global"),
+        )
+
+        payload = {"pull_request_ids": ["suse/direct-repo#1"]}
+        with TestClient(api) as client:
+            res = client.post("/api/v1/pr/merge", content=json.dumps(payload))
+        self.assertEqual(res.status_code, 400)
+        self.assertIn("Reviews not approved", res.text)
+
+        self.pr_direct.refresh_from_db()
+        self.assertNotEqual(self.pr_direct.state, PullRequest.State.MERGED)
+
+    def test_api_merge_reports_all_reasons_for_one_pr(self):
+        self.pr_direct.state = PullRequest.State.CLOSED
+        self.pr_direct.is_mergeable = False
+        self.pr_direct.save()
+
+        payload = {"pull_request_ids": ["suse/direct-repo#1"]}
+        with TestClient(api) as client:
+            res = client.post("/api/v1/pr/merge", content=json.dumps(payload))
+        self.assertEqual(res.status_code, 400)
+        self.assertIn("is closed", res.text)
+        self.assertIn("merge conflicts", res.text)
+
 
 class TestPRWebMergeActions(TestCase):
+    fixtures = ["global_scope.json"]
+
     def setUp(self):
         self.project_direct = Project.objects.create(name="test:ui-direct", workflow_type=Project.WorkflowType.DIRECT)
         self.mapping_direct = GitMapping.objects.create(owner="suse", repo="ui-direct", branch="main", project=self.project_direct)
@@ -1453,6 +1575,30 @@ class TestPRWebMergeActions(TestCase):
             fingerprint="fp13",
             is_draft=True,
             draft_expires_at=None,
+        )
+        self.pr_unapproved = PullRequest.objects.create(
+            target=self.mapping_direct,
+            number=14,
+            author=self.author,
+            source_owner="ui_merger",
+            source_repo="ui-direct",
+            source_branch="feat-14",
+        )
+        self.pr_unapproved_rev = PullRequestRevision.objects.create(
+            pull_request=self.pr_unapproved,
+            revision_number=1,
+            head_sha="1414",
+            base_sha="0000",
+            fingerprint="fp14",
+            is_draft=False,
+            draft_expires_at=None,
+        )
+        self.reviewer = User.objects.create(username="ui_reviewer", username_lower="ui_reviewer", account_type=User.AccountType.HUMAN)
+        PullRequestReview.objects.create(
+            revision=self.pr_unapproved_rev,
+            reviewer_user=self.reviewer,
+            state=PullRequestReview.State.PENDING,
+            scope=ReviewScope.objects.get(name="global"),
         )
 
     def test_pr_detail_renders_merge_button_for_direct_project(self):
@@ -1530,4 +1676,39 @@ class TestPRWebMergeActions(TestCase):
         self.assertContains(res, "Confirm Pull Request Merge")
         self.assertContains(res, "Cannot merge")
         self.assertContains(res, "in draft mode")
+        self.assertNotContains(res, "Confirm Merge")
+
+    @override_settings(GITEA_URL="https://gitea.example.com", GITEA_TOKEN="secret-token")
+    @patch("urllib.request.urlopen")
+    def test_pr_merge_action_rejects_draft_pr(self, mock_urlopen):
+        client = Client()
+        res = client.post(f"/pull-requests/{self.pr_draft.id}/merge/")
+        self.assertRedirects(res, f"/pull-requests/{self.pr_draft.id}/")
+
+        self.pr_draft.refresh_from_db()
+        self.assertNotEqual(self.pr_draft.state, PullRequest.State.MERGED)
+        mock_urlopen.assert_not_called()
+
+    @override_settings(GITEA_URL="https://gitea.example.com", GITEA_TOKEN="secret-token")
+    @patch("urllib.request.urlopen")
+    def test_pr_bulk_merge_view_rejects_unapproved_review(self, mock_urlopen):
+        client = Client()
+        res = client.post("/pull-requests/bulk-merge/", {"selected_prs": [self.pr_unapproved.id]})
+        self.assertRedirects(res, "/pull-requests/")
+
+        self.pr_unapproved.refresh_from_db()
+        self.assertNotEqual(self.pr_unapproved.state, PullRequest.State.MERGED)
+        mock_urlopen.assert_not_called()
+
+    def test_pr_ui_modal_check_merge_shows_all_reasons(self):
+        self.pr_direct.state = PullRequest.State.CLOSED
+        self.pr_direct.is_mergeable = False
+        self.pr_direct.save()
+
+        client = Client()
+        res = client.post("/pull-requests/ui/modal/check-merge/", {"selected_prs": [self.pr_direct.id]})
+        self.assertEqual(res.status_code, 200)
+        self.assertContains(res, "Cannot merge")
+        self.assertContains(res, "is closed")
+        self.assertContains(res, "merge conflicts")
         self.assertNotContains(res, "Confirm Merge")

@@ -167,7 +167,7 @@ class TestSyncGiteaCommand(TransactionTestCase):
         )
 
         # Create a PR for this mapping
-        pr = PullRequest.objects.create(
+        PullRequest.objects.create(
             target=mapping,
             number=1,
             author=user,
@@ -211,7 +211,7 @@ class TestSyncGiteaCommand(TransactionTestCase):
         )
 
         # Create a PR for this mapping
-        pr = PullRequest.objects.create(
+        PullRequest.objects.create(
             target=mapping,
             number=1,
             author=user,

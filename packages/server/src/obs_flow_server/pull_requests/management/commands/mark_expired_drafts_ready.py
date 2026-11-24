@@ -2,6 +2,11 @@ import logging
 from django.core.management.base import BaseCommand
 from django.utils import timezone
 
+from pull_requests.models import PullRequestRevision
+from pull_requests.workflows import mark_ready_for_review
+from staging.models import StagingBatchRevision
+from staging.workflows import mark_staging_ready_for_review
+
 logger = logging.getLogger(__name__)
 
 
@@ -16,11 +21,6 @@ class Command(BaseCommand):
         )
 
     def handle(self, *args, **options):
-        from pull_requests.models import PullRequestRevision
-        from pull_requests.api import mark_ready_for_review
-        from staging.models import StagingBatchRevision
-        from staging.api import mark_staging_ready_for_review
-
         dry_run = options.get("dry_run", False)
         now = timezone.now()
 

@@ -1,3 +1,7 @@
+import json
+
+from django_bolt.testing import TestClient
+
 from unittest.mock import MagicMock, patch
 from django.contrib.messages import get_messages
 from django.test import Client, TestCase, TransactionTestCase, override_settings
@@ -8,6 +12,7 @@ from core.models import Project, GitMapping
 from reviews.models import ReviewScope
 from pull_requests.models import PullRequest, PullRequestRevision, PullRequestReview
 from staging.models import StagingBatch, StagingBatchRevision, StagingReview
+from obs_flow_server.api import api
 
 
 class TestEmptyDatabase(TestCase):
@@ -90,7 +95,7 @@ class TestFixtureData(TestCase):
         self.assertEqual(staging_configs.count(), 2)
 
         # Transition Staging Batch #2 out of draft and verify reviews are provisioned from ReviewConfig
-        from staging.api import mark_staging_ready_for_review
+        from staging.workflows import mark_staging_ready_for_review
         rev2 = draft_batch.revisions.first()
         self.assertEqual(rev2.reviews.count(), 0)
         mark_staging_ready_for_review(rev2)
@@ -111,9 +116,6 @@ class TestStagingCreationWithReviewConfig(TransactionTestCase):
         """Verify that creating a staging batch for a project with staging review configurations
         correctly populates the staging reviews and their dependencies.
         """
-        import json
-        from django_bolt.testing import TestClient
-        from obs_flow_server.api import api
         from reviews.models import ReviewConfig
 
         project = Project.objects.get(name="openSUSE:Factory")
@@ -179,7 +181,7 @@ class TestStagingCreationWithReviewConfig(TransactionTestCase):
         self.assertEqual(StagingReview.objects.filter(revision__staging_batch=batch).count(), 0)
 
         # Transition out of draft mode and verify reviews are now created
-        from staging.api import mark_staging_ready_for_review
+        from staging.workflows import mark_staging_ready_for_review
         mark_staging_ready_for_review(batch.revisions.first())
         self.assertFalse(batch.is_draft)
 
@@ -254,13 +256,8 @@ class TestStagingBatchRevision(TransactionTestCase):
         """Verify the complete lifecycle of StagingBatchRevision, including creation,
         adding/removing PRs, fingerprinting, and automatic updates on PR code changes.
         """
-        import json
-        import hashlib
         from unittest.mock import MagicMock, patch
         from django.test import override_settings
-        from django_bolt.testing import TestClient
-        from obs_flow_server.api import api
-        from staging.models import StagingBatchRevision, StagingBatchRevisionPullRequest
 
         # 1. Create a staging batch
         payload = {
@@ -289,7 +286,6 @@ class TestStagingBatchRevision(TransactionTestCase):
 
         # Verify revision 1 is created (empty)
         from staging.fingerprint import StagingBatchPayload
-        from pull_requests.fingerprint import PRRevisionPayload
 
         batch = StagingBatch.objects.get(id=batch_id)
         self.assertEqual(batch.revisions.count(), 1)
@@ -312,7 +308,7 @@ class TestStagingBatchRevision(TransactionTestCase):
 
         # Verify revision 2 is created
         self.assertEqual(batch.revisions.count(), 2)
-        rev2 = batch.revisions.order_by("-revision_number").first()
+        rev2 = batch.latest_revision
         self.assertEqual(rev2.revision_number, 2)
         self.assertEqual(rev2.revision_pull_requests.count(), 1)
 
@@ -365,7 +361,7 @@ class TestStagingBatchRevision(TransactionTestCase):
 
         # Verify that a new StagingBatchRevision (revision 3) was automatically created
         self.assertEqual(batch.revisions.count(), 3)
-        rev3 = batch.revisions.order_by("-revision_number").first()
+        rev3 = batch.latest_revision
         self.assertEqual(rev3.revision_number, 3)
         self.assertEqual(rev3.revision_pull_requests.count(), 1)
 
@@ -390,16 +386,13 @@ class TestStagingBatchRevision(TransactionTestCase):
 
         # Verify revision 4 is created (empty again)
         self.assertEqual(batch.revisions.count(), 4)
-        rev4 = batch.revisions.order_by("-revision_number").first()
+        rev4 = batch.latest_revision
         self.assertEqual(rev4.revision_number, 4)
         self.assertEqual(rev4.revision_pull_requests.count(), 0)
         self.assertEqual(rev4.fingerprint, expected_fingerprint_1)
 
     def test_staging_add_cross_project_pr_rejected(self):
         """Verify that adding a PR targeting a different project to a staging batch is rejected with 400."""
-        import json
-        from django_bolt.testing import TestClient
-        from obs_flow_server.api import api
 
         other_project = Project.objects.create(name="openSUSE:Testing")
         other_mapping = GitMapping.objects.create(
@@ -438,9 +431,6 @@ class TestStagingBatchRevision(TransactionTestCase):
 
     def test_staging_add_package_target_pr_accepted(self):
         """Verify that adding a PR targeting a package within the batch's project succeeds."""
-        import json
-        from django_bolt.testing import TestClient
-        from obs_flow_server.api import api
         from core.models import Package
 
         batch = StagingBatch.objects.get(id=1)
@@ -475,7 +465,7 @@ class TestStagingBatchRevision(TransactionTestCase):
             )
         self.assertEqual(response.status_code, 200)
         self.assertEqual(batch.revisions.count(), initial_rev_count + 1)
-        latest_rev = batch.revisions.order_by("-revision_number").first()
+        latest_rev = batch.latest_revision
         self.assertTrue(
             latest_rev.revision_pull_requests.filter(pull_request_revision=pr_rev).exists()
         )
@@ -549,7 +539,7 @@ class TestStagingUIModalViews(TransactionTestCase):
             state=StagingBatch.State.COLLECTING,
         )
         # Create revision 1 for batch2
-        from staging.api import create_staging_revision
+        from staging.workflows import create_staging_revision
         create_staging_revision(batch2, [])
 
         # PR 1234 is already in Staging Batch #1
@@ -694,12 +684,34 @@ class TestStagingBatchRevisionModel(TestCase):
         self.assertEqual(rev2.draft_expires_at, expiry)
         self.assertTrue(batch.is_draft)
 
+        # A later non-draft revision clears the draft state again
+        rev3 = StagingBatchRevision.objects.create(
+            staging_batch=batch,
+            revision_number=3,
+            fingerprint="fp3",
+            is_draft=False,
+        )
+        self.assertFalse(rev3.is_draft)
+        self.assertFalse(batch.is_draft)
+
+    def test_latest_revision_returns_highest_revision_number(self):
+        project = Project.objects.create(name="test:project")
+        batch = StagingBatch.objects.create(project=project)
+        StagingBatchRevision.objects.create(staging_batch=batch, revision_number=1, fingerprint="fp1")
+        rev2 = StagingBatchRevision.objects.create(staging_batch=batch, revision_number=2, fingerprint="fp2")
+        self.assertEqual(batch.latest_revision, rev2)
+
+    def test_latest_revision_none_without_revisions(self):
+        project = Project.objects.create(name="test:project")
+        batch = StagingBatch.objects.create(project=project)
+        self.assertIsNone(batch.latest_revision)
+
 
 class TestStagingReviewProvisioning(TestCase):
     fixtures = ["global_scope.json"]
     def test_provision_reviews_and_mark_staging_ready_for_review(self):
         from reviews.models import ReviewConfig
-        from staging.api import provision_reviews_for_staging_revision, mark_staging_ready_for_review
+        from staging.workflows import mark_staging_ready_for_review
 
         project = Project.objects.create(name="test:project")
         reviewer = User.objects.create(username="reviewer1", username_lower="reviewer1", account_type=User.AccountType.HUMAN)
@@ -736,10 +748,7 @@ class TestStagingReviewProvisioning(TestCase):
 
     def test_cascading_unblocking_staging_reviews(self):
         from reviews.models import ReviewConfig
-        from staging.api import mark_staging_ready_for_review
-        from django_bolt.testing import TestClient
-        from obs_flow_server.api import api
-        import json
+        from staging.workflows import mark_staging_ready_for_review
 
         project = Project.objects.create(name="test:cascade-staging")
         u1 = User.objects.create(username="srev_1", username_lower="srev_1", account_type=User.AccountType.HUMAN)
@@ -786,7 +795,7 @@ class TestStagingReviewProvisioning(TestCase):
 
     def test_staging_zero_debounce_publishes_immediately(self):
         from reviews.models import ReviewConfig
-        from staging.api import create_staging_revision
+        from staging.workflows import create_staging_revision
 
         project = Project.objects.create(name="test:project-zero", review_debounce_minutes=0)
         reviewer = User.objects.create(username="reviewer_zero", username_lower="reviewer_zero", account_type=User.AccountType.HUMAN)
@@ -839,9 +848,6 @@ class TestStagingReadyForReviewEndpoint(TestCase):
         self.assertEqual(self.rev2.reviews.count(), 0)
 
         payload = {"staging_ids": [self.batch1.id, self.batch2.id]}
-        from django_bolt.testing import TestClient
-        from obs_flow_server.api import api
-        import json
         with TestClient(api) as client:
             response = client.post("/api/v1/staging/ready-for-review", content=json.dumps(payload))
         self.assertEqual(response.status_code, 200)
@@ -865,9 +871,6 @@ class TestStagingReadyForReviewEndpoint(TestCase):
 
     def test_staging_ready_for_review_nonexistent_batch(self):
         payload = {"staging_ids": [9999]}
-        from django_bolt.testing import TestClient
-        from obs_flow_server.api import api
-        import json
         with TestClient(api) as client:
             response = client.post("/api/v1/staging/ready-for-review", content=json.dumps(payload))
         self.assertEqual(response.status_code, 400)
@@ -985,9 +988,6 @@ class TestStagingConvertToDraftEndpoint(TestCase):
 
     def test_staging_convert_to_draft_endpoint_success(self):
         payload = {"staging_ids": [self.batch.id]}
-        from django_bolt.testing import TestClient
-        from obs_flow_server.api import api
-        import json
         with TestClient(api) as client:
             response = client.post("/api/v1/staging/convert-to-draft", content=json.dumps(payload))
         self.assertEqual(response.status_code, 200)
@@ -1066,9 +1066,6 @@ class TestStagingMergeEndpoint(TestCase):
         mock_urlopen.return_value.__enter__.return_value = mock_response
 
         payload = {"staging_ids": [self.batch.id]}
-        from django_bolt.testing import TestClient
-        from obs_flow_server.api import api
-        import json
 
         with TestClient(api) as client:
             res = client.post("/api/v1/staging/merge", content=json.dumps(payload))
@@ -1092,9 +1089,6 @@ class TestStagingMergeEndpoint(TestCase):
         self.review.save()
 
         payload = {"staging_ids": [self.batch.id]}
-        from django_bolt.testing import TestClient
-        from obs_flow_server.api import api
-        import json
 
         with TestClient(api) as client:
             res = client.post("/api/v1/staging/merge", content=json.dumps(payload))
@@ -1109,9 +1103,6 @@ class TestStagingMergeEndpoint(TestCase):
         self.batch_rev.save()
 
         payload = {"staging_ids": [self.batch.id]}
-        from django_bolt.testing import TestClient
-        from obs_flow_server.api import api
-        import json
 
         with TestClient(api) as client:
             res = client.post("/api/v1/staging/merge", content=json.dumps(payload))
@@ -1141,9 +1132,6 @@ class TestStagingMergeEndpoint(TestCase):
 
         # Try merging batch 1 (already merged), batch 2 (unapproved reviews), and nonexistent batch 999
         payload = {"staging_ids": [self.batch.id, batch2.id, 999]}
-        from django_bolt.testing import TestClient
-        from obs_flow_server.api import api
-        import json
 
         with TestClient(api) as client:
             res = client.post("/api/v1/staging/merge", content=json.dumps(payload))
@@ -1151,6 +1139,34 @@ class TestStagingMergeEndpoint(TestCase):
         self.assertIn(f"Staging batch #{self.batch.id} is already merged.", res.text)
         self.assertIn(f"Staging batch #{batch2.id} cannot be merged because the following reviews are not approved", res.text)
         self.assertIn("Staging batch #999 does not exist.", res.text)
+
+    def test_staging_merge_blocked_member_draft(self):
+        self.pr1_rev.is_draft = True
+        self.pr1_rev.save()
+
+        payload = {"staging_ids": [self.batch.id]}
+
+        with TestClient(api) as client:
+            res = client.post("/api/v1/staging/merge", content=json.dumps(payload))
+        self.assertEqual(res.status_code, 400)
+        self.assertIn("in batch is in draft mode", res.text)
+
+        self.batch.refresh_from_db()
+        self.assertNotEqual(self.batch.state, StagingBatch.State.MERGED)
+
+    def test_staging_merge_blocked_member_conflict(self):
+        self.pr1.is_mergeable = False
+        self.pr1.save()
+
+        payload = {"staging_ids": [self.batch.id]}
+
+        with TestClient(api) as client:
+            res = client.post("/api/v1/staging/merge", content=json.dumps(payload))
+        self.assertEqual(res.status_code, 400)
+        self.assertIn("in batch has merge conflicts", res.text)
+
+        self.batch.refresh_from_db()
+        self.assertNotEqual(self.batch.state, StagingBatch.State.MERGED)
 
 
 class TestStagingWebMergeActions(TestCase):
@@ -1254,7 +1270,7 @@ class TestStagingWebMergeActions(TestCase):
         self.assertEqual(res.status_code, 200)
         self.assertContains(res, "Confirm Staging Batch Merge")
         self.assertContains(res, "Cannot merge")
-        self.assertContains(res, "Unapproved reviews")
+        self.assertContains(res, "reviews are not approved")
         self.assertNotContains(res, "Confirm Merge")
 
         # Approve review -> Ready to merge
@@ -1284,3 +1300,48 @@ class TestStagingWebMergeActions(TestCase):
         self.assertEqual(self.batch.state, StagingBatch.State.MERGED)
         self.pr.refresh_from_db()
         self.assertEqual(self.pr.state, PullRequest.State.MERGED)
+
+    @override_settings(GITEA_URL="https://gitea.example.com", GITEA_TOKEN="secret-token")
+    @patch("urllib.request.urlopen")
+    def test_staging_merge_action_rejects_member_draft(self, mock_urlopen):
+        self.review.state = StagingReview.State.ACCEPTED
+        self.review.save()
+        self.pr_rev.is_draft = True
+        self.pr_rev.save()
+
+        client = Client()
+        res = client.post(f"/staging/{self.batch.id}/merge/")
+        self.assertRedirects(res, f"/staging/{self.batch.id}/")
+
+        self.batch.refresh_from_db()
+        self.assertNotEqual(self.batch.state, StagingBatch.State.MERGED)
+        mock_urlopen.assert_not_called()
+
+    @override_settings(GITEA_URL="https://gitea.example.com", GITEA_TOKEN="secret-token")
+    @patch("urllib.request.urlopen")
+    def test_staging_bulk_merge_view_rejects_member_conflict(self, mock_urlopen):
+        self.review.state = StagingReview.State.ACCEPTED
+        self.review.save()
+        self.pr.is_mergeable = False
+        self.pr.save()
+
+        client = Client()
+        res = client.post("/staging/bulk-merge/", {"selected_batches": [self.batch.id]})
+        self.assertRedirects(res, "/staging/")
+
+        self.batch.refresh_from_db()
+        self.assertNotEqual(self.batch.state, StagingBatch.State.MERGED)
+        mock_urlopen.assert_not_called()
+
+    def test_staging_ui_modal_check_merge_shows_all_reasons(self):
+        # Unapproved review + member PR in draft -> both reasons shown
+        self.pr_rev.is_draft = True
+        self.pr_rev.save()
+
+        client = Client()
+        res = client.post("/staging/ui/modal/check-merge/", {"selected_batches": [self.batch.id]})
+        self.assertEqual(res.status_code, 200)
+        self.assertContains(res, "Cannot merge")
+        self.assertContains(res, "reviews are not approved")
+        self.assertContains(res, "in batch is in draft mode")
+        self.assertNotContains(res, "Confirm Merge")
