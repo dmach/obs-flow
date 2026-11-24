@@ -6,7 +6,7 @@ from django.test import TestCase, TransactionTestCase
 from django_bolt.testing import TestClient
 
 from accounts.models import User, Group
-from core.models import Project, GitMapping
+from core.models import Project
 from pull_requests.models import PullRequest, PullRequestRevision, PullRequestReview
 from staging.models import StagingBatch, StagingBatchRevision, StagingReview
 from reviews.models import BaseReview, ReviewConfig, ReviewScope
@@ -896,9 +896,6 @@ class TestScopeMatching(TestCase):
 class TestScopeProvisioningPR(TestCase):
     def setUp(self):
         self.project = Project.objects.create(name="test:scope-pr")
-        self.git_mapping = GitMapping.objects.create(
-            owner="test", repo="repo", branch="main", project=self.project
-        )
         self.author = User.objects.create(
             username="author_scope", username_lower="author_scope", account_type=User.AccountType.HUMAN
         )
@@ -908,7 +905,7 @@ class TestScopeProvisioningPR(TestCase):
 
     def _make_pr(self, number=1):
         return PullRequest.objects.create(
-            target=self.git_mapping,
+            project=self.project,
             number=number,
             author=self.author,
             source_owner="dev",
@@ -1042,9 +1039,6 @@ class TestScopeProvisioningPR(TestCase):
 class TestForwardPropagation(TestCase):
     def setUp(self):
         self.project = Project.objects.create(name="test:propagation")
-        self.git_mapping = GitMapping.objects.create(
-            owner="test", repo="repo", branch="main", project=self.project
-        )
         self.author = User.objects.create(
             username="author_prop", username_lower="author_prop", account_type=User.AccountType.HUMAN
         )
@@ -1053,7 +1047,7 @@ class TestForwardPropagation(TestCase):
         )
         self.scope = ReviewScope.objects.create(name="code", include_globs=["src/*.py"], exclude_globs=[])
         self.pr = PullRequest.objects.create(
-            target=self.git_mapping,
+            project=self.project,
             number=1,
             author=self.author,
             source_owner="dev",
