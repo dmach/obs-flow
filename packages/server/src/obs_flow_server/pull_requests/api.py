@@ -103,7 +103,7 @@ def clear_needinfo_review_endpoint(payload: PRReviewClearNeedInfoRequest, reques
     pr = PullRequest.objects.get_by_text_id(payload.pull_request_id)
 
     user = get_authenticated_user(request)
-    last_review = clear_needinfo(pr.latest_revision, user, payload.message, PullRequestReview)
+    last_review = clear_needinfo(pr.latest_revision, user, payload.message, PullRequestReview, payload.reviewer)
 
     res = PRReviewActionResponse(pull_request_id=payload.pull_request_id, review=review_to_detail(last_review))
     return msgspec.structs.asdict(res)

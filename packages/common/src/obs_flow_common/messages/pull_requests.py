@@ -79,7 +79,7 @@ class PRReviewActionResponse(msgspec.Struct):
 class PRReviewApproveRequest(msgspec.Struct):
     """Request to approve a pull request review."""
     pull_request_id: str
-    reviewer: str | None = None
+    reviewer: str
     override: bool = False
 
 
@@ -87,7 +87,7 @@ class PRReviewDeclineRequest(msgspec.Struct):
     """Request to decline a pull request review."""
     pull_request_id: str
     message: str
-    reviewer: str | None = None
+    reviewer: str
     override: bool = False
 
 
@@ -95,14 +95,18 @@ class PRReviewNeedInfoRequest(msgspec.Struct):
     """Request to put a pull request review in needinfo state."""
     pull_request_id: str
     message: str
-    reviewer: str | None = None
+    reviewer: str
     override: bool = False
 
 
 class PRReviewClearNeedInfoRequest(msgspec.Struct):
-    """Request to clear needinfo state on a pull request."""
+    """Request to clear needinfo state on a pull request.
+
+    ``reviewer`` targets a single review entry; ``None`` clears all needinfo reviews.
+    """
     pull_request_id: str
     message: str
+    reviewer: str | None = None
     override: bool = False
 
 
@@ -110,5 +114,5 @@ class PRReviewReopenRequest(msgspec.Struct):
     """Request to reopen a declined pull request review."""
     pull_request_id: str
     message: str
-    reviewer: str | None = None
+    reviewer: str
     override: bool = False

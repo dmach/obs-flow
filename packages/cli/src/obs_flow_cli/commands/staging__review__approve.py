@@ -3,9 +3,9 @@ import click
 
 @click.command(name="approve")
 @click.argument("staging_id", type=click.INT)
-@click.option("--reviewer", help="The reviewer (user or @group) to approve on behalf of")
+@click.option("--reviewer", required=True, help="The reviewer (user or @group) to approve on behalf of")
 @click.option("--override", is_flag=True, help="Override someone else's review")
-def cli(staging_id: int, reviewer: str | None, override: bool) -> None:
+def cli(staging_id: int, reviewer: str, override: bool) -> None:
     """Approve a staging batch review."""
 
     from obs_flow_client import staging_review_approve

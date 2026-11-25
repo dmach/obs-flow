@@ -60,14 +60,7 @@ class TestParseReviewer(TransactionTestCase):
         with self.assertRaisesMessage(ValueError, "Invalid dynamic role: bogus"):
             parse_reviewer("role:bogus")
 
-    def test_parse_empty_with_default_admin(self):
-        for empty in (None, ""):
-            user, group, role = parse_reviewer(empty, default_admin=True)
-            self.assertEqual(user.username, "admin")
-            self.assertIsNone(group)
-            self.assertIsNone(role)
-
-    def test_parse_empty_without_default_admin(self):
+    def test_parse_empty(self):
         for empty in (None, ""):
             with self.assertRaisesMessage(ValueError, "No reviewer specified."):
                 parse_reviewer(empty)
@@ -108,13 +101,41 @@ class TestClearNeedinfo(TransactionTestCase):
         untouched = PullRequestReview.objects.get(pk=2)
         self.assertEqual(untouched.state, BaseReview.State.REJECTED)
 
-    def test_pr_no_needinfo_returns_admin_review(self):
+    def test_pr_targeted_clear_leaves_others_untouched(self):
+        rev = PullRequestRevision.objects.get(pk=1)
+        r1 = PullRequestReview.objects.get(pk=1)  # factory-auto
+        r3 = PullRequestReview.objects.get(pk=3)  # @factory-staging
+        for r in (r1, r3):
+            r.state = BaseReview.State.NEEDINFO
+            r.justification = "needs details"
+            r.save()
+
+        last = clear_needinfo(rev, self._actor(), "fixed upstream", PullRequestReview, "factory-auto")
+
+        self.assertEqual(last.pk, r1.pk)
+        r1.refresh_from_db()
+        self.assertEqual(r1.state, BaseReview.State.PENDING)
+        self.assertEqual(r1.actor.username, "darix")
+        self.assertEqual(r1.justification, "fixed upstream")
+        # other needinfo review stays untouched
+        r3.refresh_from_db()
+        self.assertEqual(r3.state, BaseReview.State.NEEDINFO)
+
+    def test_pr_targeted_clear_miss_raises(self):
+        rev = PullRequestRevision.objects.get(pk=1)
+        r1 = PullRequestReview.objects.get(pk=1)
+        r1.state = BaseReview.State.NEEDINFO
+        r1.justification = "needs details"
+        r1.save()
+
+        with self.assertRaisesMessage(ValueError, "No needinfo reviews to clear."):
+            clear_needinfo(rev, self._actor(), "answered", PullRequestReview, "@opensuse-review-team")
+
+    def test_pr_no_needinfo_raises(self):
         rev = PullRequestRevision.objects.get(pk=1)
 
-        last = clear_needinfo(rev, self._actor(), "nothing to clear", PullRequestReview)
-
-        self.assertEqual(last.reviewer_user.username, "admin")
-        self.assertEqual(last.state, BaseReview.State.PENDING)
+        with self.assertRaisesMessage(ValueError, "No needinfo reviews to clear."):
+            clear_needinfo(rev, self._actor(), "nothing to clear", PullRequestReview)
 
     def test_staging_clears_all_needinfo_reviews(self):
         rev = StagingBatchRevision.objects.get(pk=1)
@@ -131,13 +152,34 @@ class TestClearNeedinfo(TransactionTestCase):
         self.assertEqual(r1.actor.username, "darix")
         self.assertEqual(r1.justification, "addressed")
 
-    def test_staging_no_needinfo_returns_admin_review(self):
+    def test_staging_targeted_clear(self):
+        rev = StagingBatchRevision.objects.get(pk=1)
+        r1 = StagingReview.objects.get(pk=1)  # darix
+        r1.state = BaseReview.State.NEEDINFO
+        r1.justification = "needs details"
+        r1.save()
+
+        last = clear_needinfo(rev, self._actor(), "addressed", StagingReview, "darix")
+
+        self.assertEqual(last.pk, r1.pk)
+        r1.refresh_from_db()
+        self.assertEqual(r1.state, BaseReview.State.PENDING)
+
+    def test_staging_targeted_clear_miss_raises(self):
+        rev = StagingBatchRevision.objects.get(pk=1)
+        r1 = StagingReview.objects.get(pk=1)
+        r1.state = BaseReview.State.NEEDINFO
+        r1.justification = "needs details"
+        r1.save()
+
+        with self.assertRaisesMessage(ValueError, "No needinfo reviews to clear."):
+            clear_needinfo(rev, self._actor(), "addressed", StagingReview, "factory-auto")
+
+    def test_staging_no_needinfo_raises(self):
         rev = StagingBatchRevision.objects.get(pk=1)
 
-        last = clear_needinfo(rev, self._actor(), "nothing to clear", StagingReview)
-
-        self.assertEqual(last.reviewer_user.username, "admin")
-        self.assertEqual(last.state, BaseReview.State.PENDING)
+        with self.assertRaisesMessage(ValueError, "No needinfo reviews to clear."):
+            clear_needinfo(rev, self._actor(), "nothing to clear", StagingReview)
 
 
 class TestReviewConfigEndpoints(TransactionTestCase):

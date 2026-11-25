@@ -189,7 +189,7 @@ def clear_needinfo_staging_review_endpoint(payload: StagingReviewClearNeedInfoRe
         raise ValueError(f"Staging batch #{batch.id} has no revisions.")
 
     user = get_authenticated_user(request)
-    last_review = clear_needinfo(latest_rev, user, payload.message, StagingReview)
+    last_review = clear_needinfo(latest_rev, user, payload.message, StagingReview, payload.reviewer)
 
     res = StagingReviewActionResponse(staging_id=payload.staging_id, review=review_to_detail(last_review))
     return msgspec.structs.asdict(res)
