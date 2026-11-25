@@ -35,5 +35,5 @@ def cli(pull_request_id: str, message: str, reviewer: str | None, all_reviews: b
 
     config = get_config()
 
-    renderer = ReviewRenderer(res.review)
+    renderer = ReviewRenderer(res.reviews)
     renderer.render(fmt=config.output, verbose=config.verbose)

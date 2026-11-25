@@ -33,5 +33,5 @@ def cli(staging_id: int, message: str, reviewer: str | None, all_reviews: bool, 
 
     config = get_config()
 
-    renderer = ReviewRenderer(res.review)
+    renderer = ReviewRenderer(res.reviews)
     renderer.render(fmt=config.output, verbose=config.verbose)

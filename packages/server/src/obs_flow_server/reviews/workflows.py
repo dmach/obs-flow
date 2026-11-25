@@ -162,12 +162,12 @@ def apply_review_action(review: BaseReview, state: str, actor: User, justificati
     return review
 
 
-def clear_needinfo(revision, actor: User, justification: str | None, review_model, reviewer: str | None = None) -> BaseReview:
+def clear_needinfo(revision, actor: User, justification: str | None, review_model, reviewer: str | None = None) -> list[BaseReview]:
     """
     Moves NEEDINFO reviews of the revision back to PENDING, stamping actor/justification.
     When `reviewer` is given, only that reviewer's NEEDINFO review is cleared;
     otherwise all NEEDINFO reviews are cleared.
-    Returns the last updated review. Raises ValueError if nothing matched.
+    Returns the list of cleared reviews (in pk order). Raises ValueError if nothing matched.
     """
     reviews = revision.reviews.filter(state=BaseReview.State.NEEDINFO)
     if reviewer:
@@ -179,15 +179,15 @@ def clear_needinfo(revision, actor: User, justification: str | None, review_mode
         else:
             reviews = reviews.filter(dynamic_role=role)
 
-    last_review = None
-    for review in reviews:
+    cleared = []
+    for review in reviews.order_by("pk"):
         apply_review_action(review, BaseReview.State.PENDING, actor, justification)
-        last_review = review
+        cleared.append(review)
 
-    if not last_review:
+    if not cleared:
         raise ValueError("No needinfo reviews to clear.")
 
-    return last_review
+    return cleared
 
 
 def initial_draft_state(is_upstream_draft: bool, timeout_minutes: int) -> tuple[bool, datetime | None]:

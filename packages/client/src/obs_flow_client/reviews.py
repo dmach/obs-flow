@@ -85,11 +85,11 @@ def pr_review_needinfo(conn: Connection, req: PRReviewNeedInfoRequest) -> PRRevi
 
 def pr_review_clear_needinfo(
     conn: Connection, req: PRReviewClearNeedInfoRequest
-) -> PRReviewActionResponse:
+) -> PRReviewShowResponse:
     """Clears needinfo state on a pull request."""
     serialized_data = msgspec.json.encode(req)
     response_bytes = conn.post("/api/v1/pr_review/clear_needinfo", data=serialized_data)
-    return msgspec.json.decode(response_bytes, type=PRReviewActionResponse)
+    return msgspec.json.decode(response_bytes, type=PRReviewShowResponse)
 
 
 def pr_review_reopen(conn: Connection, req: PRReviewReopenRequest) -> PRReviewActionResponse:

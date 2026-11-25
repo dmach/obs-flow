@@ -89,9 +89,9 @@ class TestClearNeedinfo(TransactionTestCase):
             r.justification = "needs details"
             r.save()
 
-        last = clear_needinfo(rev, self._actor(), "fixed upstream", PullRequestReview)
+        cleared = clear_needinfo(rev, self._actor(), "fixed upstream", PullRequestReview)
 
-        self.assertIn(last.pk, {r1.pk, r2.pk})
+        self.assertEqual({r.pk for r in cleared}, {r1.pk, r2.pk})
         for r in (r1, r2):
             r.refresh_from_db()
             self.assertEqual(r.state, BaseReview.State.PENDING)
@@ -110,9 +110,9 @@ class TestClearNeedinfo(TransactionTestCase):
             r.justification = "needs details"
             r.save()
 
-        last = clear_needinfo(rev, self._actor(), "fixed upstream", PullRequestReview, "factory-auto")
+        cleared = clear_needinfo(rev, self._actor(), "fixed upstream", PullRequestReview, "factory-auto")
 
-        self.assertEqual(last.pk, r1.pk)
+        self.assertEqual([r.pk for r in cleared], [r1.pk])
         r1.refresh_from_db()
         self.assertEqual(r1.state, BaseReview.State.PENDING)
         self.assertEqual(r1.actor.username, "darix")
@@ -144,9 +144,9 @@ class TestClearNeedinfo(TransactionTestCase):
         r1.justification = "needs details"
         r1.save()
 
-        last = clear_needinfo(rev, self._actor(), "addressed", StagingReview)
+        cleared = clear_needinfo(rev, self._actor(), "addressed", StagingReview)
 
-        self.assertEqual(last.pk, r1.pk)
+        self.assertEqual([r.pk for r in cleared], [r1.pk])
         r1.refresh_from_db()
         self.assertEqual(r1.state, BaseReview.State.PENDING)
         self.assertEqual(r1.actor.username, "darix")
@@ -159,9 +159,9 @@ class TestClearNeedinfo(TransactionTestCase):
         r1.justification = "needs details"
         r1.save()
 
-        last = clear_needinfo(rev, self._actor(), "addressed", StagingReview, "darix")
+        cleared = clear_needinfo(rev, self._actor(), "addressed", StagingReview, "darix")
 
-        self.assertEqual(last.pk, r1.pk)
+        self.assertEqual([r.pk for r in cleared], [r1.pk])
         r1.refresh_from_db()
         self.assertEqual(r1.state, BaseReview.State.PENDING)
 
