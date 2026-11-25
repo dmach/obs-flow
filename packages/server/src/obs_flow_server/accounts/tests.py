@@ -61,6 +61,10 @@ class GroupModelTests(TestCase):
         group.refresh_from_db()
         self.assertEqual(group.name_lower, "newgroup")
 
+    def test_group_is_active_by_default(self):
+        group = Group.objects.create(name="NewGroup")
+        self.assertTrue(group.is_active)
+
 
 class AuthViewsTests(TestCase):
     def setUp(self):
