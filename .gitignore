@@ -216,3 +216,6 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# OBS group data downloaded by scripts/fetch_obs_groups.sh
+/scripts/obs_groups_cache*/
