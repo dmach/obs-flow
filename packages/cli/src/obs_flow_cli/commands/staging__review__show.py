@@ -3,7 +3,7 @@ import click
 
 @click.command(name="show")
 @click.argument("staging_id", type=click.INT)
-@click.option("--reviewer", help="Filter by reviewer (user or @group)")
+@click.option("--reviewer", help="Filter by reviewer (user, @group, or role:<name>)")
 def cli(staging_id: int, reviewer: str | None) -> None:
     """Show staging batch review details."""
 

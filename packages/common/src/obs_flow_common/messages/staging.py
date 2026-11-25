@@ -118,7 +118,7 @@ class StagingReviewActionResponse(msgspec.Struct):
 class StagingReviewApproveRequest(msgspec.Struct):
     """Request to approve a staging batch review."""
     staging_id: int
-    reviewer: str | None = None
+    reviewer: str
     override: bool = False
 
 
@@ -126,7 +126,7 @@ class StagingReviewDeclineRequest(msgspec.Struct):
     """Request to decline a staging batch review."""
     staging_id: int
     message: str
-    reviewer: str | None = None
+    reviewer: str
     override: bool = False
 
 
@@ -134,14 +134,18 @@ class StagingReviewNeedInfoRequest(msgspec.Struct):
     """Request to put a staging batch review in needinfo state."""
     staging_id: int
     message: str
-    reviewer: str | None = None
+    reviewer: str
     override: bool = False
 
 
 class StagingReviewClearNeedInfoRequest(msgspec.Struct):
-    """Request to clear needinfo state on a staging batch."""
+    """Request to clear needinfo state on a staging batch.
+
+    ``reviewer`` targets a single review entry; ``None`` clears all needinfo reviews.
+    """
     staging_id: int
     message: str
+    reviewer: str | None = None
     override: bool = False
 
 
@@ -149,5 +153,5 @@ class StagingReviewReopenRequest(msgspec.Struct):
     """Request to reopen a declined staging batch review."""
     staging_id: int
     message: str
-    reviewer: str | None = None
+    reviewer: str
     override: bool = False

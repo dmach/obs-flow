@@ -24,18 +24,15 @@ from reviews.models import BaseReview, ReviewConfig, ReviewScope
 # =====================================================================
 
 
-def parse_reviewer(reviewer_str: str | None, *, default_admin: bool = False) -> tuple[User | None, Group | None, str | None]:
+def parse_reviewer(reviewer_str: str | None) -> tuple[User | None, Group | None, str | None]:
     """
     Parses a reviewer string into (user, group, dynamic_role).
     Exactly one of them will be returned as non-None.
 
     Accepted formats: <username>, @<group_name>, role:<dynamic_role>.
-    With default_admin=True, None/"" resolves to the admin user.
+    Raises ValueError if no reviewer is specified.
     """
     if not reviewer_str:
-        if default_admin:
-            # Default to admin user
-            return User.objects.get(username="admin"), None, None
         raise ValueError("No reviewer specified.")
 
     if reviewer_str.startswith("@"):
@@ -130,9 +127,9 @@ def build_review_config_dto(config: ReviewConfig) -> ReviewConfigDTO:
 def get_or_create_review(revision, reviewer_str: str | None, review_model) -> BaseReview:
     """
     Gets or creates the review of `review_model` for this revision and reviewer.
-    An empty reviewer string resolves to the admin user.
+    A reviewer must be specified; an empty value raises ValueError.
     """
-    user, group, role = parse_reviewer(reviewer_str, default_admin=True)
+    user, group, role = parse_reviewer(reviewer_str)
     if user:
         reviewer = {"reviewer_user": user}
     elif group:
@@ -165,21 +162,32 @@ def apply_review_action(review: BaseReview, state: str, actor: User, justificati
     return review
 
 
-def clear_needinfo(revision, actor: User, justification: str | None, review_model) -> BaseReview:
+def clear_needinfo(revision, actor: User, justification: str | None, review_model, reviewer: str | None = None) -> list[BaseReview]:
     """
-    Moves all NEEDINFO reviews of the revision back to PENDING, stamping actor/justification.
-    Returns the last updated review, or the default (admin) review if none were in NEEDINFO.
+    Moves NEEDINFO reviews of the revision back to PENDING, stamping actor/justification.
+    When `reviewer` is given, only that reviewer's NEEDINFO review is cleared;
+    otherwise all NEEDINFO reviews are cleared.
+    Returns the list of cleared reviews (in pk order). Raises ValueError if nothing matched.
     """
     reviews = revision.reviews.filter(state=BaseReview.State.NEEDINFO)
-    last_review = None
-    for review in reviews:
+    if reviewer:
+        user, group, role = parse_reviewer(reviewer)
+        if user:
+            reviews = reviews.filter(reviewer_user=user)
+        elif group:
+            reviews = reviews.filter(reviewer_group=group)
+        else:
+            reviews = reviews.filter(dynamic_role=role)
+
+    cleared = []
+    for review in reviews.order_by("pk"):
         apply_review_action(review, BaseReview.State.PENDING, actor, justification)
-        last_review = review
+        cleared.append(review)
 
-    if not last_review:
-        last_review = get_or_create_review(revision, None, review_model)
+    if not cleared:
+        raise ValueError("No needinfo reviews to clear.")
 
-    return last_review
+    return cleared
 
 
 def initial_draft_state(is_upstream_draft: bool, timeout_minutes: int) -> tuple[bool, datetime | None]:

@@ -176,7 +176,7 @@ def staging_review_needinfo(
 
 def staging_review_clear_needinfo(
     conn: Connection, req: StagingReviewClearNeedInfoRequest
-) -> StagingReviewActionResponse:
+) -> StagingReviewShowResponse:
     """Clears needinfo state on a staging batch review.
 
     Args:
@@ -184,11 +184,11 @@ def staging_review_clear_needinfo(
         req: The StagingReviewClearNeedInfoRequest payload.
 
     Returns:
-        A StagingReviewActionResponse containing the updated review state.
+        A StagingReviewShowResponse containing the cleared reviews.
     """
     serialized_data = msgspec.json.encode(req)
     response_bytes = conn.post("/api/v1/staging_review/clear_needinfo", data=serialized_data)
-    return msgspec.json.decode(response_bytes, type=StagingReviewActionResponse)
+    return msgspec.json.decode(response_bytes, type=StagingReviewShowResponse)
 
 
 def staging_review_reopen(

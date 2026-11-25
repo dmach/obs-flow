@@ -6,9 +6,9 @@ from obs_flow_cli.types import PR_ID
 @click.command(name="decline")
 @click.argument("pull_request_id", type=PR_ID)
 @click.option("-m", "--message", required=True, help="The reason for declining the review")
-@click.option("--reviewer", help="The reviewer (user or @group) to decline on behalf of")
+@click.option("--reviewer", required=True, help="The reviewer (user, @group, or role:<name>) to decline on behalf of")
 @click.option("--override", is_flag=True, help="Override someone else's review")
-def cli(pull_request_id: str, message: str, reviewer: str | None, override: bool) -> None:
+def cli(pull_request_id: str, message: str, reviewer: str, override: bool) -> None:
     """Decline a pull request review."""
 
     from obs_flow_client import pr_review_decline
