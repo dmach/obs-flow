@@ -5,7 +5,7 @@ from obs_flow_cli.types import PR_ID
 
 @click.command(name="approve")
 @click.argument("pull_request_id", type=PR_ID)
-@click.option("--reviewer", required=True, help="The reviewer (user or @group) to approve on behalf of")
+@click.option("--reviewer", required=True, help="The reviewer (user, @group, or role:<name>) to approve on behalf of")
 @click.option("--override", is_flag=True, help="Override someone else's review")
 def cli(pull_request_id: str, reviewer: str, override: bool) -> None:
     """Approve a pull request review."""

@@ -5,7 +5,7 @@ from obs_flow_cli.types import PR_ID
 
 @click.command(name="show")
 @click.argument("pull_request_id", type=PR_ID)
-@click.option("--reviewer", help="Filter by reviewer (user or @group)")
+@click.option("--reviewer", help="Filter by reviewer (user, @group, or role:<name>)")
 def cli(pull_request_id: str, reviewer: str | None) -> None:
     """Show pull request review details."""
 

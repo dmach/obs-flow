@@ -4,7 +4,7 @@ import click
 @click.command(name="clear-needinfo")
 @click.argument("staging_id", type=click.INT)
 @click.option("-m", "--message", required=True, help="The explanation or answer to the requested info")
-@click.option("--reviewer", help="Clear needinfo only for this reviewer (user or @group)")
+@click.option("--reviewer", help="Clear needinfo only for this reviewer (user, @group, or role:<name>)")
 @click.option("--all", "all_reviews", is_flag=True, help="Clear needinfo on all reviews")
 @click.option("--override", is_flag=True, help="Override someone else's review")
 def cli(staging_id: int, message: str, reviewer: str | None, all_reviews: bool, override: bool) -> None:

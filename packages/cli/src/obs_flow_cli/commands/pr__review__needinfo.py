@@ -6,7 +6,7 @@ from obs_flow_cli.types import PR_ID
 @click.command(name="needinfo")
 @click.argument("pull_request_id", type=PR_ID)
 @click.option("-m", "--message", required=True, help="The information requested")
-@click.option("--reviewer", required=True, help="The reviewer (user or @group) to ask for info on behalf of")
+@click.option("--reviewer", required=True, help="The reviewer (user, @group, or role:<name>) to ask for info on behalf of")
 @click.option("--override", is_flag=True, help="Override someone else's review")
 def cli(pull_request_id: str, message: str, reviewer: str, override: bool) -> None:
     """Put a pull request review in a needinfo state."""

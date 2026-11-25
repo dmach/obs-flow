@@ -6,7 +6,7 @@ from obs_flow_cli.types import PR_ID
 @click.command(name="clear-needinfo")
 @click.argument("pull_request_id", type=PR_ID)
 @click.option("-m", "--message", required=True, help="The explanation or answer to the requested info")
-@click.option("--reviewer", help="Clear needinfo only for this reviewer (user or @group)")
+@click.option("--reviewer", help="Clear needinfo only for this reviewer (user, @group, or role:<name>)")
 @click.option("--all", "all_reviews", is_flag=True, help="Clear needinfo on all reviews")
 @click.option("--override", is_flag=True, help="Override someone else's review")
 def cli(pull_request_id: str, message: str, reviewer: str | None, all_reviews: bool, override: bool) -> None:

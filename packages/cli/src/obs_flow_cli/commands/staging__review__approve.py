@@ -3,7 +3,7 @@ import click
 
 @click.command(name="approve")
 @click.argument("staging_id", type=click.INT)
-@click.option("--reviewer", required=True, help="The reviewer (user or @group) to approve on behalf of")
+@click.option("--reviewer", required=True, help="The reviewer (user, @group, or role:<name>) to approve on behalf of")
 @click.option("--override", is_flag=True, help="Override someone else's review")
 def cli(staging_id: int, reviewer: str, override: bool) -> None:
     """Approve a staging batch review."""
