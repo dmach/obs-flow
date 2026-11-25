@@ -471,6 +471,50 @@ class TestStagingBatchRevision(TransactionTestCase):
         )
 
 
+class TestStagingRemovePRs(TransactionTestCase):
+    fixtures = ["opensuse_data.json"]
+
+    def _batch_with_pr(self) -> StagingBatch:
+        from staging.workflows import add_prs_to_batch, create_staging_revision
+
+        batch = StagingBatch.objects.create(project=Project.objects.get(name="openSUSE:Factory"))
+        create_staging_revision(batch, [])
+        add_prs_to_batch(batch, ["openSUSE/osc#1234"])
+        return batch
+
+    def test_remove_unknown_pr_rejected(self):
+        batch = self._batch_with_pr()
+        rev_count = batch.revisions.count()
+
+        with TestClient(api) as client:
+            response = client.post(
+                "/api/v1/staging/remove",
+                content=json.dumps({"id": batch.id, "pull_request_ids": ["nobody/nope#999"]}),
+            )
+        self.assertEqual(response.status_code, 404)
+        # no new revision created, PR stays in the batch
+        self.assertEqual(batch.revisions.count(), rev_count)
+        from staging.workflows import batch_member_prs
+        self.assertEqual([pr.text_id for pr in batch_member_prs(batch)], ["openSUSE/osc#1234"])
+
+    def test_remove_mixed_list_is_all_or_nothing(self):
+        batch = self._batch_with_pr()
+        rev_count = batch.revisions.count()
+
+        with TestClient(api) as client:
+            response = client.post(
+                "/api/v1/staging/remove",
+                content=json.dumps({
+                    "id": batch.id,
+                    "pull_request_ids": ["openSUSE/osc#1234", "nobody/nope#999"],
+                }),
+            )
+        self.assertEqual(response.status_code, 404)
+        self.assertEqual(batch.revisions.count(), rev_count)
+        from staging.workflows import batch_member_prs
+        self.assertEqual([pr.text_id for pr in batch_member_prs(batch)], ["openSUSE/osc#1234"])
+
+
 class TestStagingUIModalViews(TransactionTestCase):
     fixtures = ["opensuse_data.json"]
 

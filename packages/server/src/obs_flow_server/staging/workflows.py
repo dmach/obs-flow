@@ -305,12 +305,9 @@ def remove_prs_from_batch(batch: StagingBatch, pr_text_ids: list[str]) -> list[s
     current_prs = batch_member_prs(batch)
 
     for pr_id in pr_text_ids:
-        try:
-            pr = PullRequest.objects.get_by_text_id(pr_id)
-            if pr in current_prs:
-                current_prs.remove(pr)
-        except Exception:
-            pass
+        pr = PullRequest.objects.get_by_text_id(pr_id)
+        if pr in current_prs:
+            current_prs.remove(pr)
 
     rebuild_batch_revision(batch, current_prs)
 
