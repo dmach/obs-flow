@@ -94,7 +94,7 @@ class User(AbstractBaseUser):
 class Group(models.Model):
     name = models.CharField(max_length=150)
     name_lower = models.CharField(max_length=150, unique=True)
-    email = models.EmailField(unique=True, null=True, blank=True)
+    email = models.EmailField(null=True, blank=True)
     description = models.TextField(null=True, blank=True)
 
     def save(self, *args, **kwargs):
