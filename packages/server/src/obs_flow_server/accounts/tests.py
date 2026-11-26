@@ -61,6 +61,11 @@ class GroupModelTests(TestCase):
         group.refresh_from_db()
         self.assertEqual(group.name_lower, "newgroup")
 
+    def test_groups_can_share_email(self):
+        Group.objects.create(name="team-a", email="team@example.com")
+        Group.objects.create(name="team-b", email="team@example.com")
+        self.assertEqual(Group.objects.filter(email="team@example.com").count(), 2)
+
 
 class AuthViewsTests(TestCase):
     def setUp(self):
