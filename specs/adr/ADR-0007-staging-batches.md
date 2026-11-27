@@ -12,11 +12,12 @@ Merging interdependent PRs individually risks breaking builds. We need to group 
 
 ## Decision
 We chose to introduce **Staging Batches**:
-1. **Opt-in:** Projects can require staging or allow direct PR merges.
-2. **Aggregation:** Groups multiple PRs targeting the same project.
-3. **OBS Integration:** Creates a unified staging environment in OBS.
-4. **Lifecycle:** Batches have their own builds, tests, and reviews.
-5. **Atomic Merge:** All PRs in the batch merge simultaneously.
+1. **Aggregation:** Groups multiple PRs targeting the same project.
+2. **OBS Integration:** Creates a unified staging environment in OBS.
+3. **Lifecycle:** Batches have their own builds, tests, and reviews.
+4. **States:** `COLLECTING`, `IN_PROGRESS`, `PENDING_RELEASE`, `RELEASED` (terminal), `DROPPED` (terminal).
+5. **Batch merge level:** Staging batches define the `batch` merge level on the project's merge level chain (ADR-0016):
+   PRs in a batch cannot be merged individually, they get atomically merged with the whole batch.
 
 ## Consequences
 
