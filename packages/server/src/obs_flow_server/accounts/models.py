@@ -96,6 +96,7 @@ class Group(models.Model):
     name_lower = models.CharField(max_length=150, unique=True)
     email = models.EmailField(unique=True, null=True, blank=True)
     description = models.TextField(null=True, blank=True)
+    is_active = models.BooleanField(default=True)
 
     def save(self, *args, **kwargs):
         self.name_lower = self.name.lower()
