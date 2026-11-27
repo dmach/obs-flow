@@ -7,6 +7,7 @@ from django.utils import timezone
 from django.views.decorators.http import require_POST
 
 from core.htmx import close_modal_and_refresh
+from core.models import Project
 from pull_requests.models import PullRequest
 from staging.models import StagingBatch
 from staging.forms import StagingBatchFilterForm

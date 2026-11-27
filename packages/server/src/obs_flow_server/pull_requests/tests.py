@@ -1777,8 +1777,8 @@ class TestPRWebMergeActions(TestCase):
     @patch("urllib.request.urlopen")
     def test_pr_merge_action_rejects_draft_pr(self, mock_urlopen):
         client = Client()
-        res = client.post(f"/pull-requests/{self.pr_draft.id}/merge/")
-        self.assertRedirects(res, f"/pull-requests/{self.pr_draft.id}/")
+        res = client.post(f"{self.pr_draft.get_absolute_url()}merge/")
+        self.assertRedirects(res, f"{self.pr_draft.get_absolute_url()}")
 
         self.pr_draft.refresh_from_db()
         self.assertNotEqual(self.pr_draft.state, PullRequest.State.MERGED)
