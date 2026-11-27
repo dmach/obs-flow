@@ -14,6 +14,17 @@ reset-db: ## Reset the database and recreate migrations
 	uv run --package obs-flow-server python packages/server/src/obs_flow_server/manage.py loaddata packages/server/src/obs_flow_server/core/fixtures/opensuse_data.json
 	@echo -e "\n\nTest users: admin, darix, factory-auto, dimstar. All have password 'a'. Tokens: flow-<username>"
 
+.PHONY: reset-data
+reset-data:
+	rm -rf ./packages/server/src/obs_flow_server/git_repos/*
+
+.PHONY: setup-demo
+setup-demo: reset-data reset-db
+	./scripts/populate_test_data.sh
+
+.PHONY: demo
+demo: setup-demo run
+
 .PHONY: run
 run: ## Run the django-bolt server in development mode
 	uv run --package obs-flow-server python packages/server/src/obs_flow_server/manage.py runbolt --dev
